@@ -1,0 +1,45 @@
+# AgentCompany エージェント定義テンプレート
+# このファイルをコピーして新しいエージェントを定義してください
+
+# 一意識別子（snake_case）
+id: "agent_id"
+
+# 表示名
+title: "Agent Title"
+
+# 責務リスト
+responsibilities:
+  - "責務1"
+  - "責務2"
+
+# 能力リスト
+capabilities:
+  - "能力1"
+  - "能力2"
+
+# 成果物リスト
+deliverables:
+  - "成果物1"
+  - "成果物2"
+
+# 品質ゲート
+quality_gates:
+  - "ゲート1"
+  - "ゲート2"
+
+# 予算制約
+budget:
+  tokens: 10000        # トークン上限
+  time_minutes: 30     # 時間上限（分）
+
+# 人格設定（プロンプト）
+persona: |
+  あなたは[役割]です。
+  [詳細な人格設定をここに記述]
+
+# エスカレーション先
+escalation:
+  to: "escalation_target_id"  # エスカレーション先エージェントID
+  conditions:
+    - "条件1"
+    - "条件2"
