@@ -28,8 +28,8 @@ const DEFAULT_ALLOWLIST_DIR = path.join(__dirname, 'allowlist');
 export function parseAllowlistFile(content: string): string[] {
   return content
     .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0 && !line.startsWith('#'));
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith('#'));
 }
 
 /**
@@ -40,11 +40,11 @@ export function loadAllowlist(
   allowlistDir: string = DEFAULT_ALLOWLIST_DIR
 ): string[] {
   const filePath = path.join(allowlistDir, `${type}.txt`);
-  
+
   if (!fs.existsSync(filePath)) {
     throw new Error(`Allowlist file not found: ${filePath}`);
   }
-  
+
   const content = fs.readFileSync(filePath, 'utf-8');
   return parseAllowlistFile(content);
 }
@@ -52,9 +52,7 @@ export function loadAllowlist(
 /**
  * すべてのallowlistを読み込む
  */
-export function loadAllAllowlists(
-  allowlistDir: string = DEFAULT_ALLOWLIST_DIR
-): AllowlistConfig {
+export function loadAllAllowlists(allowlistDir: string = DEFAULT_ALLOWLIST_DIR): AllowlistConfig {
   return {
     apt: loadAllowlist('apt', allowlistDir),
     pip: loadAllowlist('pip', allowlistDir),
@@ -85,6 +83,6 @@ export function isValidPackageName(name: string): boolean {
     return false;
   }
   // npm scoped packages (@scope/name) も許可
-  const validPattern = /^[@a-zA-Z0-9][\w\-\.\/]*$/;
+  const validPattern = /^[@a-zA-Z0-9][\w./-]*$/;
   return validPattern.test(name.trim());
 }

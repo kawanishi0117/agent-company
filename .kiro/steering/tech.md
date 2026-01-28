@@ -59,8 +59,8 @@ npx ts-node tools/cli/agentcompany.ts <command>
 
 ## 設定ファイル
 
-| ファイル | 用途 |
-|---------|------|
-| `infra/docker/compose.yaml` | Docker Compose設定 |
+| ファイル                           | 用途                 |
+| ---------------------------------- | -------------------- |
+| `infra/docker/compose.yaml`        | Docker Compose設定   |
 | `tools/installers/allowlist/*.txt` | 許可パッケージリスト |
-| `Makefile` | 統一コマンド定義 |
+| `Makefile`                         | 統一コマンド定義     |

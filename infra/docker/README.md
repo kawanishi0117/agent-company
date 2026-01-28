@@ -36,21 +36,23 @@ infra/docker/
 ## ベースイメージ
 
 ### 含まれる環境
+
 - Node.js 20
 - Python 3
 - Git, curl, jq
 
 ### セキュリティ
+
 - 非rootユーザー（`agent`）で実行
 - ネットワーク隔離
 - allowlist方式の依存管理
 
 ## ボリュームマウント
 
-| ホスト | コンテナ | 用途 |
-|--------|---------|------|
+| ホスト             | コンテナ     | 用途             |
+| ------------------ | ------------ | ---------------- |
 | プロジェクトルート | `/workspace` | 作業ディレクトリ |
-| `runtime/logs` | `/logs` | ログ出力 |
+| `runtime/logs`     | `/logs`      | ログ出力         |
 
 ## パッケージインストール
 
@@ -64,11 +66,11 @@ infra/docker/
 
 ### 許可リスト
 
-| ファイル | 用途 |
-|----------|------|
+| ファイル                 | 用途               |
+| ------------------------ | ------------------ |
 | `/etc/allowlist/apt.txt` | システムパッケージ |
-| `/etc/allowlist/pip.txt` | Pythonパッケージ |
-| `/etc/allowlist/npm.txt` | Node.jsパッケージ |
+| `/etc/allowlist/pip.txt` | Pythonパッケージ   |
+| `/etc/allowlist/npm.txt` | Node.jsパッケージ  |
 
 ## ログ
 
@@ -86,12 +88,14 @@ infra/docker/
 ## トラブルシューティング
 
 ### ビルドエラー
+
 ```bash
 # キャッシュクリアして再ビルド
 docker compose -f infra/docker/compose.yaml build --no-cache
 ```
 
 ### パッケージインストール拒否
+
 1. `/etc/allowlist/` を確認
 2. 必要なら `tools/installers/allowlist/` に追加
 3. イメージを再ビルド

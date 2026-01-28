@@ -19,13 +19,6 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "tools/**/*.ts",
-    "tests/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "runtime"
-  ]
+  "include": ["tools/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules", "dist", "runtime"]
 }

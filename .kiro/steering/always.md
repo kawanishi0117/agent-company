@@ -7,11 +7,13 @@ inclusion: always
 ## 最上位ルール
 
 ### R0. 変更は必ず記録する
+
 - コード・設定・運用を変更したら対応ドキュメントも更新
 - 不要なら「不要な理由」を成果物に明記
 - **spec実装完了時は必ず関連ドキュメントを更新すること**
 
 ### R0.1 Spec実装時のドキュメント更新（必須）
+
 spec（`.kiro/specs/`）のタスク完了時、以下を必ず実施：
 
 1. **実装内容に応じたドキュメント更新**
@@ -33,26 +35,29 @@ spec（`.kiro/specs/`）のタスク完了時、以下を必ず実施：
    - 大きな機能追加時はプロジェクト概要も更新
 
 ### R1. 会社OSを参照
+
 意思決定前に必ず確認：
+
 - `docs/company/policies.md`
 - `docs/company/definition-of-done.md`
 - `docs/company/review-standards.md`
 - `docs/company/waiver-policy.md`
 
 ### R2. 例外はWaiverを発行
+
 - `workflows/waivers/` に作成
 - 期限・理由・代替策・フォロータスク必須
 
 ## ドキュメント更新ルール
 
-| 変更内容 | 更新先 |
-|---------|--------|
-| 会社ルール | `docs/company/` + `workflows/decisions/` |
-| Docker/権限 | `infra/docker/` + `docs/architecture/permissions.md` |
-| 品質ゲート | `docs/company/definition-of-done.md` |
-| allowlist | `tools/installers/` + `docs/company/policies.md` |
-| エージェント | `agents/registry/` + `docs/playbooks/hiring.md` |
-| GUI | `gui/web/README.md` |
+| 変更内容     | 更新先                                               |
+| ------------ | ---------------------------------------------------- |
+| 会社ルール   | `docs/company/` + `workflows/decisions/`             |
+| Docker/権限  | `infra/docker/` + `docs/architecture/permissions.md` |
+| 品質ゲート   | `docs/company/definition-of-done.md`                 |
+| allowlist    | `tools/installers/` + `docs/company/policies.md`     |
+| エージェント | `agents/registry/` + `docs/playbooks/hiring.md`      |
+| GUI          | `gui/web/README.md`                                  |
 
 ## 作業フロー
 

@@ -19,6 +19,7 @@ docker compose -f infra/docker/compose.yaml down
 ```
 
 **特徴**:
+
 - プロジェクトファイルをボリュームマウント
 - ネットワーク隔離
 - 非rootユーザー実行
@@ -28,11 +29,13 @@ docker compose -f infra/docker/compose.yaml down
 **Dockerfile**: `infra/docker/images/base/Dockerfile`
 
 **含まれる環境**:
+
 - Node.js 20
 - Python 3
 - Git, curl, jq
 
 **セキュリティ**:
+
 - 非rootユーザー（`agent`）で実行
 - 最小権限の原則
 
@@ -40,11 +43,11 @@ docker compose -f infra/docker/compose.yaml down
 
 **場所**: `tools/installers/allowlist/`
 
-| ファイル | 用途 |
-|----------|------|
+| ファイル  | 用途               |
+| --------- | ------------------ |
 | `apt.txt` | システムパッケージ |
-| `pip.txt` | Pythonパッケージ |
-| `npm.txt` | Node.jsパッケージ |
+| `pip.txt` | Pythonパッケージ   |
+| `npm.txt` | Node.jsパッケージ  |
 
 **フォーマット**: 1行1パッケージ、`#`でコメント
 
@@ -83,6 +86,7 @@ install.sh apt curl
 **出力先**: `runtime/logs/install/`
 
 **フォーマット（JSON）**:
+
 ```json
 {
   "timestamp": "2026-01-28T10:30:00Z",
@@ -94,6 +98,7 @@ install.sh apt curl
 ```
 
 **ステータス**:
+
 - `success`: インストール成功
 - `rejected`: allowlist外で拒否
 - `failed`: allowlist内だがエラー発生
@@ -124,7 +129,7 @@ await logger.write({
   type: 'npm',
   package: 'typescript',
   status: 'success',
-  duration_ms: 1234
+  duration_ms: 1234,
 });
 ```
 

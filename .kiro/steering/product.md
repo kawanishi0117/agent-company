@@ -11,11 +11,11 @@ AIエージェントを「会社組織」として運用するフレームワー
 
 ## 3ライン構造
 
-| ライン | 役割 | 担当エージェント |
-|--------|------|-----------------|
-| Delivery | 実行・納品 | Developer, QA Executor |
-| Governance | 品質判定 | Quality Authority |
-| Talent | 採用・評価 | Hiring Manager |
+| ライン     | 役割       | 担当エージェント       |
+| ---------- | ---------- | ---------------------- |
+| Delivery   | 実行・納品 | Developer, QA Executor |
+| Governance | 品質判定   | Quality Authority      |
+| Talent     | 採用・評価 | Hiring Manager         |
 
 ## 固定エージェント（MVP）
 

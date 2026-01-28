@@ -23,7 +23,7 @@ e2e:
 	npm run e2e
 
 # 全品質ゲート実行
-ci: lint test
+ci: lint test e2e
 	@echo "✅ All quality gates passed"
 
 # ビルド

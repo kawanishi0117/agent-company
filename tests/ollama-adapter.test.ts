@@ -119,9 +119,7 @@ describe('OllamaAdapter', () => {
 
       const result = await adapter.chat({
         model: 'llama3',
-        messages: [
-          { role: 'user', content: 'Who are you?' },
-        ],
+        messages: [{ role: 'user', content: 'Who are you?' }],
       });
 
       expect(result.content).toBe('I am an AI assistant.');
@@ -158,11 +156,7 @@ describe('OllamaAdapter', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          models: [
-            { name: 'llama3' },
-            { name: 'codellama' },
-            { name: 'mistral' },
-          ],
+          models: [{ name: 'llama3' }, { name: 'codellama' }, { name: 'mistral' }],
         }),
       });
 

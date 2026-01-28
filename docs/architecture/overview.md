@@ -32,34 +32,39 @@
 
 ## 3ライン構造
 
-| ライン | 役割 | エージェント |
-|--------|------|-------------|
-| Delivery | 実行・納品 | Developer, QA Executor |
-| Governance | 品質判定 | Quality Authority |
-| Talent | 採用・評価 | Hiring Manager |
+| ライン     | 役割       | エージェント           |
+| ---------- | ---------- | ---------------------- |
+| Delivery   | 実行・納品 | Developer, QA Executor |
+| Governance | 品質判定   | Quality Authority      |
+| Talent     | 採用・評価 | Hiring Manager         |
 
 ## コンポーネント
 
 ### 1. CLI (`tools/cli/`)
+
 - `agentcompany.ts`: メインエントリポイント
 - `workflow.ts`: Plan → Run → Report 実行
 - `validator.ts`: エージェント定義検証
 - `deliverable-validator.ts`: 成果物検証
 
 ### 2. Adapters (`tools/adapters/`)
+
 - `base.ts`: AI実行基盤インターフェース
 - `ollama.ts`: Ollama実装
 
 ### 3. Installers (`tools/installers/`)
+
 - `install.sh`: パッケージインストーラ
 - `allowlist-parser.ts`: 許可リスト解析
 - `log-writer.ts`: インストールログ出力
 
 ### 4. Docker (`infra/docker/`)
+
 - `compose.yaml`: Workspace定義
 - `images/base/`: ベースイメージ
 
 ### 5. Runtime (`runtime/`)
+
 - `runs/`: 実行ログ・成果物
 - `logs/install/`: インストールログ
 - `cache/`: キャッシュ

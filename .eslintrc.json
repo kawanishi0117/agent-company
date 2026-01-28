@@ -6,10 +6,7 @@
     "sourceType": "module"
   },
   "plugins": ["@typescript-eslint"],
-  "extends": [
-    "eslint:recommended",
-    "plugin:@typescript-eslint/recommended"
-  ],
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
   "env": {
     "node": true,
     "es2022": true
@@ -19,5 +16,5 @@
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     "no-console": "warn"
   },
-  "ignorePatterns": ["dist", "node_modules", "runtime"]
+  "ignorePatterns": ["dist", "node_modules", "runtime", "coverage", "e2e"]
 }

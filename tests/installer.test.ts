@@ -58,20 +58,17 @@ describe('Installer', () => {
    */
   describe('Property 1: Allowlist Enforcement', () => {
     // allowlistに含まれないパッケージ名を生成
-    const notInAllowlistPackage = (type: PackageType) => {
+    const notInAllowlistPackage = (type: PackageType): fc.Arbitrary<string> => {
       const allowlist = loadAllowlist(type, ALLOWLIST_DIR);
       return fc
-        .stringMatching(/^[a-z][a-z0-9\-]{2,30}$/)
-        .filter(name => !allowlist.includes(name));
+        .stringMatching(/^[a-z][a-z0-9-]{2,30}$/)
+        .filter((name) => !allowlist.includes(name));
     };
 
     it('should reject packages not in apt allowlist', () => {
       fc.assert(
         fc.property(notInAllowlistPackage('apt'), (packageName) => {
-          const result = validateInstall(
-            { type: 'apt', package: packageName },
-            ALLOWLIST_DIR
-          );
+          const result = validateInstall({ type: 'apt', package: packageName }, ALLOWLIST_DIR);
           expect(result.allowed).toBe(false);
           expect(result.reason).toContain('not in');
         }),
@@ -82,10 +79,7 @@ describe('Installer', () => {
     it('should reject packages not in pip allowlist', () => {
       fc.assert(
         fc.property(notInAllowlistPackage('pip'), (packageName) => {
-          const result = validateInstall(
-            { type: 'pip', package: packageName },
-            ALLOWLIST_DIR
-          );
+          const result = validateInstall({ type: 'pip', package: packageName }, ALLOWLIST_DIR);
           expect(result.allowed).toBe(false);
           expect(result.reason).toContain('not in');
         }),
@@ -96,10 +90,7 @@ describe('Installer', () => {
     it('should reject packages not in npm allowlist', () => {
       fc.assert(
         fc.property(notInAllowlistPackage('npm'), (packageName) => {
-          const result = validateInstall(
-            { type: 'npm', package: packageName },
-            ALLOWLIST_DIR
-          );
+          const result = validateInstall({ type: 'npm', package: packageName }, ALLOWLIST_DIR);
           expect(result.allowed).toBe(false);
           expect(result.reason).toContain('not in');
         }),
@@ -116,7 +107,7 @@ describe('Installer', () => {
    */
   describe('Property 2: Allowlist Acceptance', () => {
     // allowlistに含まれるパッケージ名を生成
-    const inAllowlistPackage = (type: PackageType) => {
+    const inAllowlistPackage = (type: PackageType): fc.Arbitrary<string> => {
       const allowlist = loadAllowlist(type, ALLOWLIST_DIR);
       return fc.constantFrom(...allowlist);
     };
@@ -124,10 +115,7 @@ describe('Installer', () => {
     it('should accept packages in apt allowlist', () => {
       fc.assert(
         fc.property(inAllowlistPackage('apt'), (packageName) => {
-          const result = validateInstall(
-            { type: 'apt', package: packageName },
-            ALLOWLIST_DIR
-          );
+          const result = validateInstall({ type: 'apt', package: packageName }, ALLOWLIST_DIR);
           expect(result.allowed).toBe(true);
           expect(result.reason).toBeUndefined();
         }),
@@ -138,10 +126,7 @@ describe('Installer', () => {
     it('should accept packages in pip allowlist', () => {
       fc.assert(
         fc.property(inAllowlistPackage('pip'), (packageName) => {
-          const result = validateInstall(
-            { type: 'pip', package: packageName },
-            ALLOWLIST_DIR
-          );
+          const result = validateInstall({ type: 'pip', package: packageName }, ALLOWLIST_DIR);
           expect(result.allowed).toBe(true);
           expect(result.reason).toBeUndefined();
         }),
@@ -152,10 +137,7 @@ describe('Installer', () => {
     it('should accept packages in npm allowlist', () => {
       fc.assert(
         fc.property(inAllowlistPackage('npm'), (packageName) => {
-          const result = validateInstall(
-            { type: 'npm', package: packageName },
-            ALLOWLIST_DIR
-          );
+          const result = validateInstall({ type: 'npm', package: packageName }, ALLOWLIST_DIR);
           expect(result.allowed).toBe(true);
           expect(result.reason).toBeUndefined();
         }),

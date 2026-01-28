@@ -24,71 +24,58 @@ describe('Allowlist Parser', () => {
    */
   describe('Property 4: Allowlist Format Consistency', () => {
     // 有効なパッケージ名を生成するArbitrary
-    const validPackageName = fc.stringMatching(/^[a-z][a-z0-9\-\_\.]{0,50}$/);
-    
+    const validPackageName = fc.stringMatching(/^[a-z][a-z0-9_.-]{0,50}$/);
+
     // コメント行を生成するArbitrary
-    const commentLine = fc.string().map(s => `# ${s.replace(/\n/g, ' ')}`);
-    
+    const commentLine = fc.string().map((s) => `# ${s.replace(/\n/g, ' ')}`);
+
     // 空行を生成するArbitrary
     const emptyLine = fc.constant('');
-    
+
     // allowlistの行を生成するArbitrary
-    const allowlistLine = fc.oneof(
-      validPackageName,
-      commentLine,
-      emptyLine
-    );
+    const allowlistLine = fc.oneof(validPackageName, commentLine, emptyLine);
 
     it('should parse each non-empty, non-comment line as exactly one package name', () => {
       fc.assert(
-        fc.property(
-          fc.array(allowlistLine, { minLength: 0, maxLength: 50 }),
-          (lines) => {
-            const content = lines.join('\n');
-            const parsed = parseAllowlistFile(content);
-            
-            // パースされた結果は、元の行から空行とコメントを除いたものと一致
-            const expectedPackages = lines
-              .map(l => l.trim())
-              .filter(l => l.length > 0 && !l.startsWith('#'));
-            
-            expect(parsed).toEqual(expectedPackages);
-            
-            // 各パース結果は1つのパッケージ名（空白を含まない）
-            parsed.forEach(pkg => {
-              expect(pkg).not.toContain('\n');
-              expect(pkg.trim()).toBe(pkg);
-            });
-          }
-        ),
+        fc.property(fc.array(allowlistLine, { minLength: 0, maxLength: 50 }), (lines) => {
+          const content = lines.join('\n');
+          const parsed = parseAllowlistFile(content);
+
+          // パースされた結果は、元の行から空行とコメントを除いたものと一致
+          const expectedPackages = lines
+            .map((l) => l.trim())
+            .filter((l) => l.length > 0 && !l.startsWith('#'));
+
+          expect(parsed).toEqual(expectedPackages);
+
+          // 各パース結果は1つのパッケージ名（空白を含まない）
+          parsed.forEach((pkg) => {
+            expect(pkg).not.toContain('\n');
+            expect(pkg.trim()).toBe(pkg);
+          });
+        }),
         { numRuns: 100 }
       );
     });
 
     it('should ignore lines starting with #', () => {
       fc.assert(
-        fc.property(
-          fc.array(commentLine, { minLength: 1, maxLength: 20 }),
-          (comments) => {
-            const content = comments.join('\n');
-            const parsed = parseAllowlistFile(content);
-            expect(parsed).toHaveLength(0);
-          }
-        ),
+        fc.property(fc.array(commentLine, { minLength: 1, maxLength: 20 }), (comments) => {
+          const content = comments.join('\n');
+          const parsed = parseAllowlistFile(content);
+          expect(parsed).toHaveLength(0);
+        }),
         { numRuns: 100 }
       );
     });
 
     it('should ignore empty lines', () => {
       fc.assert(
-        fc.property(
-          fc.array(emptyLine, { minLength: 1, maxLength: 20 }),
-          (empties) => {
-            const content = empties.join('\n');
-            const parsed = parseAllowlistFile(content);
-            expect(parsed).toHaveLength(0);
-          }
-        ),
+        fc.property(fc.array(emptyLine, { minLength: 1, maxLength: 20 }), (empties) => {
+          const content = empties.join('\n');
+          const parsed = parseAllowlistFile(content);
+          expect(parsed).toHaveLength(0);
+        }),
         { numRuns: 100 }
       );
     });
@@ -118,19 +105,16 @@ describe('Allowlist Parser', () => {
 
     it('should reject whitespace-only strings', () => {
       fc.assert(
-        fc.property(
-          fc.stringOf(fc.constantFrom(' ', '\t', '\r')),
-          (whitespace) => {
-            expect(isValidPackageName(whitespace)).toBe(false);
-          }
-        ),
+        fc.property(fc.stringOf(fc.constantFrom(' ', '\t', '\r')), (whitespace) => {
+          expect(isValidPackageName(whitespace)).toBe(false);
+        }),
         { numRuns: 50 }
       );
     });
 
     it('should accept valid package names', () => {
       const validNames = ['typescript', 'eslint', 'fast-check', 'python3.11', '@types/node'];
-      validNames.forEach(name => {
+      validNames.forEach((name) => {
         expect(isValidPackageName(name)).toBe(true);
       });
     });

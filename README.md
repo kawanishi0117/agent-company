@@ -87,11 +87,11 @@ Workspace内では、allowlist方式で許可されたパッケージのみイ�
 
 許可パッケージは以下のファイルで管理されています：
 
-| ファイル | 用途 |
-|---------|------|
+| ファイル                             | 用途               |
+| ------------------------------------ | ------------------ |
 | `tools/installers/allowlist/apt.txt` | システムパッケージ |
-| `tools/installers/allowlist/pip.txt` | Pythonパッケージ |
-| `tools/installers/allowlist/npm.txt` | Node.jsパッケージ |
+| `tools/installers/allowlist/pip.txt` | Pythonパッケージ   |
+| `tools/installers/allowlist/npm.txt` | Node.jsパッケージ  |
 
 新しいパッケージを追加する場合は、対応するallowlistファイルに追記してください。
 
@@ -101,12 +101,12 @@ Workspace内では、allowlist方式で許可されたパッケージのみイ�
 
 ## 主要コマンド
 
-| コマンド | 説明 |
-|---------|------|
-| `make lint` | 静的解析 |
+| コマンド    | 説明           |
+| ----------- | -------------- |
+| `make lint` | 静的解析       |
 | `make test` | ユニットテスト |
-| `make e2e` | E2Eテスト |
-| `make ci` | 全ゲート実行 |
+| `make e2e`  | E2Eテスト      |
+| `make ci`   | 全ゲート実行   |
 
 ## MVPマイルストーン
 

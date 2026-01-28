@@ -13,10 +13,10 @@
 
 ### A. Company OS（固定2エージェント）
 
-| エージェント | 役割 |
-|-------------|------|
-| COO/PM | バックログ化、アサイン、実行指示、結果収集、レポート生成 |
-| Quality Authority | PR/差分/ログを見て `PASS/FAIL/WAIVER` 判定 |
+| エージェント      | 役割                                                     |
+| ----------------- | -------------------------------------------------------- |
+| COO/PM            | バックログ化、アサイン、実行指示、結果収集、レポート生成 |
+| Quality Authority | PR/差分/ログを見て `PASS/FAIL/WAIVER` 判定               |
 
 ### B. Agent Registry
 
@@ -75,23 +75,25 @@
 - [x] allowlist作成 (`apt.txt`, `pip.txt`, `npm.txt`)
 - [x] インストールログ出力機能
 
-**完了条件**: 
+**完了条件**:
+
 - [x] allowlist外のパッケージは拒否される
 - [x] allowlist内は成功し、ログが保存される
 
 ---
 
-### M2: 品質ゲート [2-3日]
+### M2: 品質ゲート [2-3日] ✅ 完了
 
-- [ ] `make lint` 実装（ESLint + Prettier）
-- [ ] `make test` 実装（Vitest）
-- [ ] `make e2e` 実装（Playwright 1本）
-- [ ] `make ci` 実装（全ゲート統合）
-- [ ] E2E失敗時の成果物保存（スクショ/動画）
+- [x] `make lint` 実装（ESLint + Prettier）
+- [x] `make test` 実装（Vitest）
+- [x] `make e2e` 実装（Playwright 5本）
+- [x] `make ci` 実装（全ゲート統合）
+- [x] E2E失敗時の成果物保存（スクショ/動画）
 
-**完了条件**: 
-- `make ci` が成功/失敗を明確に返す
-- E2E失敗時に成果物が残る
+**完了条件**:
+
+- [x] `make ci` が成功/失敗を明確に返す
+- [x] E2E失敗時に成果物が残る
 
 ---
 

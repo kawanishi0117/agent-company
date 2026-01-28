@@ -55,13 +55,15 @@ describe('Log Writer', () => {
     const installStatus = fc.constantFrom<InstallStatus>('success', 'rejected', 'failed');
 
     // 有効なパッケージ名を生成
-    const validPackageName = fc.stringMatching(/^[a-z][a-z0-9\-]{2,30}$/);
+    const validPackageName = fc.stringMatching(/^[a-z][a-z0-9-]{2,30}$/);
 
     // オプショナルなduration_msを生成
     const optionalDuration = fc.option(fc.integer({ min: 0, max: 60000 }), { nil: undefined });
 
     // オプショナルなエラーメッセージを生成
-    const optionalError = fc.option(fc.string({ minLength: 1, maxLength: 100 }), { nil: undefined });
+    const optionalError = fc.option(fc.string({ minLength: 1, maxLength: 100 }), {
+      nil: undefined,
+    });
 
     it('should write log entries with all required fields', async () => {
       await fc.assert(
@@ -122,7 +124,7 @@ describe('Log Writer', () => {
 
             // 書き込んだログが含まれていることを確認
             const found = logs.some(
-              log => log.type === type && log.package === pkg && log.status === status
+              (log) => log.type === type && log.package === pkg && log.status === status
             );
             expect(found).toBe(true);
           }
@@ -194,12 +196,22 @@ describe('Log Writer', () => {
     it('should reject invalid log results', () => {
       const invalidResults = [
         { timestamp: '', type: 'npm', package: 'test', status: 'success' },
-        { timestamp: '2026-01-28', type: 'invalid' as PackageType, package: 'test', status: 'success' },
+        {
+          timestamp: '2026-01-28',
+          type: 'invalid' as PackageType,
+          package: 'test',
+          status: 'success',
+        },
         { timestamp: '2026-01-28', type: 'npm', package: '', status: 'success' },
-        { timestamp: '2026-01-28', type: 'npm', package: 'test', status: 'unknown' as InstallStatus },
+        {
+          timestamp: '2026-01-28',
+          type: 'npm',
+          package: 'test',
+          status: 'unknown' as InstallStatus,
+        },
       ];
 
-      invalidResults.forEach(result => {
+      invalidResults.forEach((result) => {
         expect(validateLogResult(result as InstallResult)).toBe(false);
       });
     });

@@ -14,7 +14,7 @@ graph TB
         AL[Allowlist Files]
         IL[Install Logs]
     end
-    
+
     subgraph Container["Workspace Container"]
         BI[Base Image]
         IS[install.sh]
@@ -22,12 +22,12 @@ graph TB
         PR[Python Runtime]
         WD[/workspace]
     end
-    
+
     DC -->|起動| Container
     PF -->|volume mount| WD
     AL -->|copy| IS
     IS -->|write| IL
-    
+
     subgraph Allowlist["Allowlist Files"]
         APT[apt.txt]
         PIP[pip.txt]
@@ -102,20 +102,20 @@ USER agent
 install_package() {
     local pkg_type=$1
     local pkg_name=$2
-    
+
     # Allowlist検証
     if ! is_allowed "$pkg_type" "$pkg_name"; then
         log_install "$pkg_type" "$pkg_name" "rejected"
         return 1
     fi
-    
+
     # インストール実行
     case "$pkg_type" in
         apt) sudo apt-get install -y "$pkg_name" ;;
         pip) pip install "$pkg_name" ;;
         npm) npm install "$pkg_name" ;;
     esac
-    
+
     # 結果ログ
     if [ $? -eq 0 ]; then
         log_install "$pkg_type" "$pkg_name" "success"
@@ -197,58 +197,60 @@ interface AllowlistConfig {
 
 ## Correctness Properties
 
-*A property is a characteristic or behavior that should hold true across all valid executions of a system-essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
+_A property is a characteristic or behavior that should hold true across all valid executions of a system-essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees._
 
 ### Property 1: Allowlist Enforcement
 
-*For any* package installation request, if the package is NOT in the corresponding allowlist, the installer SHALL reject the request and return exit code 1.
+_For any_ package installation request, if the package is NOT in the corresponding allowlist, the installer SHALL reject the request and return exit code 1.
 
 **Validates: Requirements 4.3**
 
 ### Property 2: Allowlist Acceptance
 
-*For any* package installation request, if the package IS in the corresponding allowlist, the installer SHALL attempt to install it (not reject it).
+_For any_ package installation request, if the package IS in the corresponding allowlist, the installer SHALL attempt to install it (not reject it).
 
 **Validates: Requirements 4.2**
 
 ### Property 3: Log Completeness
 
-*For any* package installation request (whether successful, rejected, or failed), the installer SHALL write a log entry containing timestamp, package type, package name, and status.
+_For any_ package installation request (whether successful, rejected, or failed), the installer SHALL write a log entry containing timestamp, package type, package name, and status.
 
 **Validates: Requirements 5.2, 5.3, 5.4, 5.5**
 
 ### Property 4: Allowlist Format Consistency
 
-*For any* valid allowlist file, each line SHALL contain exactly one package name (ignoring empty lines and comments starting with #).
+_For any_ valid allowlist file, each line SHALL contain exactly one package name (ignoring empty lines and comments starting with #).
 
 **Validates: Requirements 3.5**
 
 ## Error Handling
 
-| エラー状況 | 対応 |
-|-----------|------|
-| Allowlist外パッケージ | 拒否、exit code 1、ログに"rejected"記録 |
-| インストール失敗 | exit code 2、ログに"failed"とエラーメッセージ記録 |
-| Allowlistファイル不在 | エラーメッセージ出力、exit code 3 |
-| 無効なパッケージタイプ | エラーメッセージ出力、exit code 4 |
-| ログディレクトリ書き込み不可 | stderrに警告出力、インストール自体は続行 |
+| エラー状況                   | 対応                                              |
+| ---------------------------- | ------------------------------------------------- |
+| Allowlist外パッケージ        | 拒否、exit code 1、ログに"rejected"記録           |
+| インストール失敗             | exit code 2、ログに"failed"とエラーメッセージ記録 |
+| Allowlistファイル不在        | エラーメッセージ出力、exit code 3                 |
+| 無効なパッケージタイプ       | エラーメッセージ出力、exit code 4                 |
+| ログディレクトリ書き込み不可 | stderrに警告出力、インストール自体は続行          |
 
 ## Testing Strategy
 
 ### Unit Tests
+
 - Allowlist読み込みテスト
 - パッケージ名検証テスト
 - ログフォーマットテスト
 
 ### Property-Based Tests
+
 - Property 1: ランダムなパッケージ名でallowlist外は必ず拒否
 - Property 2: allowlist内パッケージは拒否されない
 - Property 3: すべての操作でログが出力される
 - Property 4: allowlistファイルのパース一貫性
 
 ### Integration Tests
+
 - Docker Compose起動テスト
 - ボリュームマウント検証
 - 実際のパッケージインストール（allowlist内）
 - 拒否動作検証（allowlist外）
-

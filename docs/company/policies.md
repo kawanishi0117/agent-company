@@ -11,11 +11,11 @@
 
 ### 許可パッケージ
 
-| 種別 | 許可リスト | 管理者 |
-|------|-----------|--------|
-| apt | `tools/installers/allowlist/apt.txt` | システム管理者 |
-| pip | `tools/installers/allowlist/pip.txt` | システム管理者 |
-| npm | `tools/installers/allowlist/npm.txt` | システム管理者 |
+| 種別 | 許可リスト                           | 管理者         |
+| ---- | ------------------------------------ | -------------- |
+| apt  | `tools/installers/allowlist/apt.txt` | システム管理者 |
+| pip  | `tools/installers/allowlist/pip.txt` | システム管理者 |
+| npm  | `tools/installers/allowlist/npm.txt` | システム管理者 |
 
 ### 新規パッケージ追加手順
 
@@ -38,6 +38,7 @@ make ci     # 全ゲート統合
 ### 成果物要件
 
 すべての納品物に以下を含めること：
+
 - 目的
 - 変更点
 - テスト結果
@@ -47,9 +48,9 @@ make ci     # 全ゲート統合
 
 ## エスカレーション
 
-| 状況 | エスカレーション先 |
-|------|-------------------|
-| 品質ゲート失敗 | Quality Authority |
-| allowlist外パッケージ必要 | システム管理者 |
-| セキュリティ懸念 | Quality Authority |
-| 判断困難 | COO/PM |
+| 状況                      | エスカレーション先 |
+| ------------------------- | ------------------ |
+| 品質ゲート失敗            | Quality Authority  |
+| allowlist外パッケージ必要 | システム管理者     |
+| セキュリティ懸念          | Quality Authority  |
+| 判断困難                  | COO/PM             |

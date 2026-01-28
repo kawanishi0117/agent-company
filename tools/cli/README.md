@@ -40,13 +40,13 @@ npx ts-node tools/cli/deliverable-validator.ts <deliverable-md>
 
 ## ファイル構成
 
-| ファイル | 用途 |
-|----------|------|
-| `agentcompany.ts` | メインエントリポイント |
-| `workflow.ts` | Plan → Run → Report 実行 |
-| `ticket.ts` | チケットパーサー |
-| `validator.ts` | エージェント定義検証 |
-| `deliverable-validator.ts` | 成果物検証 |
+| ファイル                   | 用途                     |
+| -------------------------- | ------------------------ |
+| `agentcompany.ts`          | メインエントリポイント   |
+| `workflow.ts`              | Plan → Run → Report 実行 |
+| `ticket.ts`                | チケットパーサー         |
+| `validator.ts`             | エージェント定義検証     |
+| `deliverable-validator.ts` | 成果物検証               |
 
 ## 実行フロー
 
@@ -64,15 +64,15 @@ npx ts-node tools/cli/deliverable-validator.ts <deliverable-md>
 
 ## 環境変数
 
-| 変数 | 説明 | デフォルト |
-|------|------|-----------|
+| 変数          | 説明                 | デフォルト               |
+| ------------- | -------------------- | ------------------------ |
 | `OLLAMA_HOST` | Ollamaエンドポイント | `http://localhost:11434` |
 
 ## エラーコード
 
-| コード | 意味 |
-|--------|------|
-| 0 | 成功 |
-| 1 | チケット読み込みエラー |
-| 2 | 実行エラー |
-| 3 | 検証エラー |
+| コード | 意味                   |
+| ------ | ---------------------- |
+| 0      | 成功                   |
+| 1      | チケット読み込みエラー |
+| 2      | 実行エラー             |
+| 3      | 検証エラー             |

@@ -3,12 +3,7 @@
  * allowlistに基づいてパッケージインストールを検証し、ログを出力する
  */
 
-import {
-  PackageType,
-  isPackageAllowed,
-  isValidPackageName,
-  loadAllowlist,
-} from './allowlist-parser';
+import { PackageType, isPackageAllowed, isValidPackageName } from './allowlist-parser';
 import { writeInstallLog, InstallResult } from './log-writer';
 
 // インストール検証結果
@@ -47,10 +42,7 @@ export function isValidPackageType(type: string): type is PackageType {
  * - パッケージ名の形式チェック
  * - allowlistチェック
  */
-export function validateInstall(
-  request: InstallRequest,
-  allowlistDir?: string
-): InstallValidation {
+export function validateInstall(request: InstallRequest, allowlistDir?: string): InstallValidation {
   const { type, package: packageName } = request;
 
   // パッケージ名の形式チェック
@@ -167,7 +159,7 @@ export async function main(args: string[]): Promise<number> {
 
 // 直接実行時
 if (require.main === module) {
-  main(process.argv.slice(2)).then(code => {
+  main(process.argv.slice(2)).then((code) => {
     process.exit(code);
   });
 }

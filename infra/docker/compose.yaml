@@ -7,7 +7,7 @@ services:
       context: ./images/base
       dockerfile: Dockerfile
     container_name: agentcompany-workspace
-    
+
     # ボリュームマウント
     volumes:
       # プロジェクトファイル（読み書き可能）
@@ -16,27 +16,27 @@ services:
       - ../../../runtime/logs:/workspace/runtime/logs:rw
       # allowlistファイル（読み取り専用）
       - ../../tools/installers/allowlist:/usr/local/agentcompany/installers/allowlist:ro
-    
+
     # 作業ディレクトリ
     working_dir: /workspace
-    
+
     # 非rootユーザーで実行
     user: agent
-    
+
     # 環境変数
     environment:
       - NODE_ENV=development
       - INSTALL_LOG_DIR=/workspace/runtime/logs/install
       - ALLOWLIST_DIR=/usr/local/agentcompany/installers/allowlist
-    
+
     # ネットワーク設定
     networks:
       - workspace-net
-    
+
     # セキュリティ設定
     security_opt:
       - no-new-privileges:true
-    
+
     # リソース制限
     deploy:
       resources:
@@ -46,7 +46,7 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-    
+
     # インタラクティブモード
     stdin_open: true
     tty: true

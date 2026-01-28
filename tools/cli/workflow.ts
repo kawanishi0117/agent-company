@@ -138,7 +138,7 @@ DoD: ${ticket.dod.join(', ')}
     // 各ステップを実行（シミュレーション）
     for (const step of plan.steps) {
       logs.push(`[${new Date().toISOString()}] Step ${step.order}: ${step.description}`);
-      
+
       // 実際の実行はここで行う（MVPでは空実装）
       logs.push(`[${new Date().toISOString()}] Step ${step.order} 完了`);
     }
@@ -181,7 +181,7 @@ DoD: ${ticket.dod.join(', ')}
    */
   async report(ticket: Ticket, result: RunResult): Promise<Report> {
     const summary = `チケット ${ticket.id} (${ticket.title}) の実行が完了しました。`;
-    
+
     const details = `
 # 実行レポート
 

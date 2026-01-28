@@ -52,10 +52,7 @@ export class OllamaAdapter implements BaseAdapter {
    * @param baseUrl OllamaのベースURL（デフォルト: http://localhost:11434）
    * @param timeoutMs タイムアウト時間（ミリ秒）
    */
-  constructor(
-    baseUrl = 'http://localhost:11434',
-    timeoutMs = DEFAULT_CONFIG.timeoutMs
-  ) {
+  constructor(baseUrl = 'http://localhost:11434', timeoutMs = DEFAULT_CONFIG.timeoutMs) {
     this.baseUrl = baseUrl;
     this.timeoutMs = timeoutMs;
   }
@@ -197,10 +194,7 @@ export class OllamaAdapter implements BaseAdapter {
   /**
    * タイムアウト付きfetch
    */
-  private async fetchWithTimeout(
-    url: string,
-    options: RequestInit
-  ): Promise<Response> {
+  private async fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -226,9 +220,6 @@ export class OllamaAdapter implements BaseAdapter {
 /**
  * デフォルトのOllamaアダプタインスタンスを作成
  */
-export function createOllamaAdapter(
-  baseUrl?: string,
-  timeoutMs?: number
-): OllamaAdapter {
+export function createOllamaAdapter(baseUrl?: string, timeoutMs?: number): OllamaAdapter {
   return new OllamaAdapter(baseUrl, timeoutMs);
 }

@@ -67,7 +67,7 @@ async function runWorkflow(ticketPath: string): Promise<void> {
 function listTickets(): void {
   try {
     const tickets = loadAllTickets('workflows/backlog');
-    
+
     if (tickets.length === 0) {
       // eslint-disable-next-line no-console
       console.log('チケットがありません。');
@@ -78,7 +78,7 @@ function listTickets(): void {
     console.log('バックログ:');
     // eslint-disable-next-line no-console
     console.log('---');
-    
+
     const statusOrder = ['todo', 'doing', 'review', 'done'];
     for (const status of statusOrder) {
       const filtered = tickets.filter((t) => t.status === status);
@@ -103,7 +103,7 @@ function listTickets(): void {
  */
 function validateAgent(filePath: string): void {
   const result = validateAgentFile(filePath);
-  
+
   if (result.valid) {
     // eslint-disable-next-line no-console
     console.log('✅ エージェント定義は有効です。');
@@ -125,7 +125,7 @@ function validateDeliverable(filePath: string): void {
   const result = validateDeliverableFile(filePath);
   // eslint-disable-next-line no-console
   console.log(formatValidationResult(result));
-  
+
   if (result.judgment === 'FAIL') {
     process.exit(1);
   }

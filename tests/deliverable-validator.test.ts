@@ -12,16 +12,18 @@ import {
 } from '../tools/cli/deliverable-validator';
 
 // 有効な成果物Markdownを生成するArbitrary
-const validDeliverableArb = fc.record({
-  title: fc.string({ minLength: 1 }),
-  purpose: fc.string({ minLength: 1 }),
-  changes: fc.array(fc.string({ minLength: 1 }), { minLength: 1 }),
-  testResult: fc.constantFrom('PASS', 'pass', '成功'),
-  e2eResult: fc.constantFrom('PASS', 'pass', '成功'),
-  rollback: fc.array(fc.string({ minLength: 1 }), { minLength: 1 }),
-  risks: fc.array(fc.string({ minLength: 1 }), { minLength: 1 }),
-}).map((data) => {
-  return `# 成果物レポート: ${data.title}
+const validDeliverableArb = fc
+  .record({
+    title: fc.string({ minLength: 1 }),
+    purpose: fc.string({ minLength: 1 }),
+    changes: fc.array(fc.string({ minLength: 1 }), { minLength: 1 }),
+    testResult: fc.constantFrom('PASS', 'pass', '成功'),
+    e2eResult: fc.constantFrom('PASS', 'pass', '成功'),
+    rollback: fc.array(fc.string({ minLength: 1 }), { minLength: 1 }),
+    risks: fc.array(fc.string({ minLength: 1 }), { minLength: 1 }),
+  })
+  .map((data) => {
+    return `# 成果物レポート: ${data.title}
 
 ## 目的
 ${data.purpose}
@@ -41,7 +43,7 @@ ${data.rollback.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 ## リスク
 ${data.risks.map((r) => `- ${r}`).join('\n')}
 `;
-});
+  });
 
 // セクションを削除するヘルパー
 function removeSections(content: string, sectionsToRemove: string[]): string {

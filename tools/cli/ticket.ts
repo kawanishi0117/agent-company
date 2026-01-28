@@ -62,10 +62,7 @@ function extractSection(content: string, sectionName: string): string {
   // 複数のセクション名をサポート（|区切り）
   const names = sectionName.split('|');
   for (const name of names) {
-    const pattern = new RegExp(
-      `## ${name.trim()}[^\\n]*\\n([\\s\\S]*?)(?=\\n## |$)`,
-      'i'
-    );
+    const pattern = new RegExp(`## ${name.trim()}[^\\n]*\\n([\\s\\S]*?)(?=\\n## |$)`, 'i');
     const match = content.match(pattern);
     if (match) {
       return match[1].trim();
@@ -154,9 +151,7 @@ export function updateTicketStatus(ticket: Ticket, newStatus: TicketStatus): voi
  * @returns チケットの配列
  */
 export function loadAllTickets(backlogDir: string): Ticket[] {
-  const files = readdirSync(backlogDir).filter(
-    (f) => f.endsWith('.md') && f !== 'TEMPLATE.md'
-  );
+  const files = readdirSync(backlogDir).filter((f) => f.endsWith('.md') && f !== 'TEMPLATE.md');
 
   return files.map((f) => parseTicket(join(backlogDir, f)));
 }

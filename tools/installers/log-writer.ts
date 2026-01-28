@@ -109,9 +109,9 @@ export function readInstallLogs(logFilePath: string): InstallResult[] {
   }
 
   const content = fs.readFileSync(logFilePath, 'utf-8');
-  const lines = content.split('\n').filter(line => line.trim().length > 0);
+  const lines = content.split('\n').filter((line) => line.trim().length > 0);
 
-  return lines.map(line => JSON.parse(line) as InstallResult);
+  return lines.map((line) => JSON.parse(line) as InstallResult);
 }
 
 /**

@@ -83,4 +83,3 @@ AgentCompanyの「Docker Workspace + 許可リスト」を構築する。エー�
 2. WHEN the workspace container starts, THE System SHALL be able to run the installer script
 3. THE Workspace SHALL run as a non-root user for security
 4. THE Workspace SHALL have network access restricted to necessary services only
-
