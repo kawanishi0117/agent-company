@@ -1,0 +1,10 @@
+# APT packages allowed for installation
+# One package per line, comments start with #
+
+curl
+git
+jq
+vim
+wget
+ca-certificates
+gnupg

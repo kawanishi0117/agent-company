@@ -1,0 +1,9 @@
+# Python packages allowed for installation
+# One package per line, comments start with #
+
+requests
+pytest
+black
+flake8
+pyyaml
+python-dotenv

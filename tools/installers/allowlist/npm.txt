@@ -1,0 +1,9 @@
+# NPM packages allowed for installation
+# One package per line, comments start with #
+
+typescript
+eslint
+prettier
+vitest
+fast-check
+yaml

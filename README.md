@@ -55,6 +55,50 @@ make ci
 make dev
 ```
 
+## Docker Workspace
+
+隔離されたDocker環境でエージェントを安全に実行できます。
+
+### 起動方法
+
+```bash
+# Workspaceコンテナをビルド・起動
+docker compose -f infra/docker/compose.yaml up -d
+
+# コンテナに入る
+docker compose -f infra/docker/compose.yaml exec workspace bash
+```
+
+### パッケージインストール
+
+Workspace内では、allowlist方式で許可されたパッケージのみインストール可能です。
+
+```bash
+# allowlist内のパッケージをインストール
+/usr/local/bin/install.sh npm typescript
+/usr/local/bin/install.sh pip requests
+/usr/local/bin/install.sh apt curl
+
+# allowlist外のパッケージは拒否される
+/usr/local/bin/install.sh npm malicious-package  # → rejected
+```
+
+### Allowlist管理
+
+許可パッケージは以下のファイルで管理されています：
+
+| ファイル | 用途 |
+|---------|------|
+| `tools/installers/allowlist/apt.txt` | システムパッケージ |
+| `tools/installers/allowlist/pip.txt` | Pythonパッケージ |
+| `tools/installers/allowlist/npm.txt` | Node.jsパッケージ |
+
+新しいパッケージを追加する場合は、対応するallowlistファイルに追記してください。
+
+### インストールログ
+
+すべてのインストール操作は `runtime/logs/install/` に記録されます。
+
 ## 主要コマンド
 
 | コマンド | 説明 |
@@ -66,8 +110,8 @@ make dev
 
 ## MVPマイルストーン
 
-- **M0**: 会社の骨格（Registry/Orchestrator/QA）
-- **M1**: Docker Workspace + 許可リスト
+- **M0**: 会社の骨格（Registry/Orchestrator/QA） ✅
+- **M1**: Docker Workspace + 許可リスト ✅
 - **M2**: 品質ゲート（lint/test/e2e）
 - **M3**: Governance判定（PASS/FAIL/WAIVER）
 - **M4**: GUI（Backlog/Runs/Reports）

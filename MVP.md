@@ -67,17 +67,17 @@
 
 ---
 
-### M1: Docker Workspace + 許可リスト [1-2日]
+### M1: Docker Workspace + 許可リスト [1-2日] ✅ 完了
 
-- [ ] `infra/docker/compose.yaml` 作成
-- [ ] ベースイメージ作成 (`infra/docker/images/base/`)
-- [ ] `tools/installers/install.sh` 作成
-- [ ] allowlist作成 (`apt.txt`, `pip.txt`, `npm.txt`)
-- [ ] インストールログ出力機能
+- [x] `infra/docker/compose.yaml` 作成
+- [x] ベースイメージ作成 (`infra/docker/images/base/`)
+- [x] `tools/installers/install.sh` 作成
+- [x] allowlist作成 (`apt.txt`, `pip.txt`, `npm.txt`)
+- [x] インストールログ出力機能
 
 **完了条件**: 
-- allowlist外のパッケージは拒否される
-- allowlist内は成功し、ログが保存される
+- [x] allowlist外のパッケージは拒否される
+- [x] allowlist内は成功し、ログが保存される
 
 ---
 
@@ -133,7 +133,7 @@
 ## MVP完了の Definition of Done
 
 - [ ] Docker上で隔離された環境で実装〜テスト〜E2Eが回る
-- [ ] allowlist運用（方式A）が機能する
+- [x] allowlist運用（方式A）が機能する
 - [ ] Quality Authorityが最終判定できる
 - [ ] GUIでBacklog/Runs/Reportsが見える
 - [ ] 採用（Registry登録）でエージェントを増やせる

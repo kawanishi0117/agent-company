@@ -9,6 +9,10 @@ inclusion: always
 ```
 agent-company/
 ├── docs/                        # 会社の規程（人が読める）
+│   ├── specs/                   # 機能仕様書（正式版）
+│   │   ├── cli.md               # CLI仕様
+│   │   ├── docker-workspace.md  # Docker隔離仕様
+│   │   └── quality-gate.md      # 品質ゲート仕様
 │   ├── company/                 # 不変のポリシー
 │   │   ├── policies.md          # 会社ポリシー
 │   │   ├── definition-of-done.md
