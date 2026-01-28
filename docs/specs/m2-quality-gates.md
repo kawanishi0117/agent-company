@@ -31,16 +31,19 @@ npm run ci
 **ツール**: ESLint + Prettier
 
 **設定ファイル**:
+
 - `.eslintrc.json` - ESLint設定
 - `.prettierrc` - Prettier設定
 
 **チェック内容**:
+
 - TypeScript構文エラー
 - コードスタイル違反
 - 未使用変数
 - フォーマット不整合
 
 **修正コマンド**:
+
 ```bash
 npm run lint:fix
 ```
@@ -56,6 +59,7 @@ npm run lint:fix
 **カバレッジ出力**: `coverage/`
 
 **実行オプション**:
+
 ```bash
 # 通常実行
 npm run test
@@ -77,6 +81,7 @@ npm run test:watch
 **レポート出力**: `runtime/e2e-report/`
 
 **実行オプション**:
+
 ```bash
 # 通常実行
 npm run e2e
@@ -91,6 +96,7 @@ npx playwright show-report runtime/e2e-report
 ### 失敗時の成果物
 
 E2Eテスト失敗時、以下が自動保存される:
+
 - スクリーンショット（失敗時のみ）
 - 動画（リトライ時のみ）
 - トレース（リトライ時のみ）
@@ -107,16 +113,17 @@ E2Eテスト失敗時、以下が自動保存される:
 
 ## 設定ファイル一覧
 
-| ファイル | 用途 |
-|----------|------|
-| `.eslintrc.json` | ESLint設定 |
-| `.prettierrc` | Prettier設定 |
-| `vitest.config.ts` | Vitest設定 |
+| ファイル               | 用途           |
+| ---------------------- | -------------- |
+| `.eslintrc.json`       | ESLint設定     |
+| `.prettierrc`          | Prettier設定   |
+| `vitest.config.ts`     | Vitest設定     |
 | `playwright.config.ts` | Playwright設定 |
 
 ## 除外パターン
 
 以下のディレクトリはlint/テストから除外:
+
 - `node_modules/`
 - `dist/`
 - `runtime/`

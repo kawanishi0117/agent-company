@@ -97,14 +97,25 @@
 
 ---
 
-### M3: Governance判定 [1日]
+### M3: Governance判定 [1日] ✅ 完了
 
-- [ ] Quality Authority判定ロジック実装
-- [ ] `PASS/FAIL/WAIVER` 出力フォーマット
-- [ ] Waiver作成テンプレート (`workflows/waivers/`)
-- [ ] Waiver必須項目チェック（期限・理由・フォロータスク）
+- [x] Quality Authority判定ロジック実装 (`tools/cli/lib/judgment.ts`)
+- [x] `PASS/FAIL/WAIVER` 出力フォーマット（JSON形式）
+- [x] Waiver作成テンプレート (`workflows/waivers/TEMPLATE.md`)
+- [x] Waiver必須項目チェック（期限・理由・フォロータスク）
+- [x] `judge`コマンド実装 (`tools/cli/commands/judge.ts`)
+- [x] `waiver`コマンド実装 (`tools/cli/commands/waiver.ts`)
 
-**完了条件**: PASS/FAIL/WAIVERの例がそれぞれ再現できる
+**完了条件**: PASS/FAIL/WAIVERの例がそれぞれ再現できる ✅
+
+```bash
+# PASS判定
+npx tsx tools/cli/agentcompany.ts judge 2026-01-27-151426-q3me
+
+# Waiver作成・検証
+npx tsx tools/cli/agentcompany.ts waiver create "テスト例外"
+npx tsx tools/cli/agentcompany.ts waiver list
+```
 
 ---
 
@@ -136,6 +147,6 @@
 
 - [ ] Docker上で隔離された環境で実装〜テスト〜E2Eが回る
 - [x] allowlist運用（方式A）が機能する
-- [ ] Quality Authorityが最終判定できる
+- [x] Quality Authorityが最終判定できる
 - [ ] GUIでBacklog/Runs/Reportsが見える
 - [ ] 採用（Registry登録）でエージェントを増やせる

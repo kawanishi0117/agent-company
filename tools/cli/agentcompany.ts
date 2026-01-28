@@ -8,6 +8,8 @@ import { parseTicket, loadAllTickets, formatTicket } from './ticket.js';
 import { MinimalWorkflow } from './workflow.js';
 import { validateAgentFile } from './validator.js';
 import { validateDeliverableFile, formatValidationResult } from './deliverable-validator.js';
+import { handleJudgeCommand } from './commands/judge.js';
+import { executeWaiverCommand } from './commands/waiver.js';
 
 // コマンドライン引数
 const args = process.argv.slice(2);
@@ -29,12 +31,17 @@ AgentCompany CLI
   list                    バックログのチケット一覧を表示
   validate-agent <path>   エージェント定義を検証
   validate-deliverable <path>  成果物を検証
+  judge <run-id>          判定を実行（PASS/FAIL/WAIVER）
+  waiver <subcommand>     Waiver（例外承認）を管理
   help                    このヘルプを表示
 
 例:
   agentcompany run workflows/backlog/0001-sample.md
   agentcompany list
   agentcompany validate-agent agents/registry/coo_pm.yaml
+  agentcompany judge 2026-01-27-151426-q3me
+  agentcompany waiver create "テストカバレッジ例外"
+  agentcompany waiver list
 `);
 }
 
@@ -165,6 +172,14 @@ async function main(): Promise<void> {
         process.exit(1);
       }
       validateDeliverable(args[1]);
+      break;
+
+    case 'judge':
+      handleJudgeCommand(args.slice(1));
+      break;
+
+    case 'waiver':
+      executeWaiverCommand(args.slice(1));
       break;
 
     case 'help':
