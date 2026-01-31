@@ -218,8 +218,17 @@ export class OllamaAdapter implements BaseAdapter {
 }
 
 /**
+ * 環境変数からOllamaホストを取得
+ * Docker環境では OLLAMA_HOST が設定される
+ */
+function getDefaultOllamaHost(): string {
+  return process.env.OLLAMA_HOST || 'http://localhost:11434';
+}
+
+/**
  * デフォルトのOllamaアダプタインスタンスを作成
+ * 環境変数 OLLAMA_HOST が設定されていればそれを使用
  */
 export function createOllamaAdapter(baseUrl?: string, timeoutMs?: number): OllamaAdapter {
-  return new OllamaAdapter(baseUrl, timeoutMs);
+  return new OllamaAdapter(baseUrl || getDefaultOllamaHost(), timeoutMs);
 }

@@ -1,12 +1,66 @@
 # AgentCompany Docker Compose Configuration
-# Workspace環境の定義
+# Workspace環境 + Ollama AI基盤
 
 services:
+  # ============================================
+  # Ollama - ローカルLLM実行基盤
+  # ============================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: agentcompany-ollama
+    
+    # GPUを使用する場合（NVIDIA）
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    
+    # ボリューム（モデルの永続化）
+    volumes:
+      - ollama-data:/root/.ollama
+    
+    # ポート公開
+    ports:
+      - "11434:11434"
+    
+    # ネットワーク
+    networks:
+      - workspace-net
+    
+    # リソース制限（CPU実行時）
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    
+    # ヘルスチェック（ollama cliを使用）
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ============================================
+  # Workspace - 開発・実行環境
+  # ============================================
   workspace:
     build:
       context: ./images/base
       dockerfile: Dockerfile
     container_name: agentcompany-workspace
+    
+    # Ollamaが起動してから開始
+    depends_on:
+      ollama:
+        condition: service_healthy
 
     # ボリュームマウント
     volumes:
@@ -28,6 +82,8 @@ services:
       - NODE_ENV=development
       - INSTALL_LOG_DIR=/workspace/runtime/logs/install
       - ALLOWLIST_DIR=/usr/local/agentcompany/installers/allowlist
+      # Ollama接続設定（コンテナ間通信）
+      - OLLAMA_HOST=http://ollama:11434
 
     # ネットワーク設定
     networks:
@@ -52,7 +108,17 @@ services:
     stdin_open: true
     tty: true
 
+# ============================================
+# ボリューム定義
+# ============================================
+volumes:
+  # Ollamaモデルの永続化
+  ollama-data:
+    driver: local
+
+# ============================================
 # ネットワーク定義
+# ============================================
 networks:
   workspace-net:
     driver: bridge

@@ -1,23 +1,108 @@
-# Docker Workspace
+# AgentCompany Docker環境
 
 ## 概要
 
-エージェントが安全に作業するための隔離されたDocker環境。
+AgentCompanyの実行環境をDockerで提供します。
+
+- **Workspace**: 開発・テスト実行環境
+- **Ollama**: ローカルLLM実行基盤
 
 ## クイックスタート
 
 ```bash
-# ビルド
-docker compose -f infra/docker/compose.yaml build
-
-# 起動
+# 1. Docker環境を起動
 docker compose -f infra/docker/compose.yaml up -d
 
-# コンテナに入る
-docker compose -f infra/docker/compose.yaml exec workspace bash
+# 2. Ollamaにモデルをインストール（初回のみ）
+docker exec agentcompany-ollama ollama pull llama3.2:1b
 
-# 停止
+# 3. デモを実行
+docker compose -f infra/docker/compose.yaml exec workspace npx tsx tools/cli/demo.ts
+```
+
+## 推奨モデル
+
+| モデル | サイズ | 用途 |
+|--------|--------|------|
+| `llama3.2:1b` | ~1GB | 軽量・高速（デモ向け） |
+| `qwen2.5-coder:1.5b` | ~1GB | コード生成特化 |
+| `llama3.2:3b` | ~2GB | バランス型 |
+| `codellama:7b` | ~4GB | 高品質コード生成 |
+| `deepseek-coder:6.7b` | ~4GB | 高性能コード生成 |
+
+```bash
+# モデルのインストール
+docker exec agentcompany-ollama ollama pull <model-name>
+
+# インストール済みモデルの確認
+docker exec agentcompany-ollama ollama list
+```
+
+## コマンド一覧
+
+```bash
+# 環境起動
+docker compose -f infra/docker/compose.yaml up -d
+
+# 環境停止
 docker compose -f infra/docker/compose.yaml down
+
+# ログ確認
+docker compose -f infra/docker/compose.yaml logs -f
+
+# Workspace内でコマンド実行
+docker compose -f infra/docker/compose.yaml exec workspace <command>
+
+# 例: テスト実行
+docker compose -f infra/docker/compose.yaml exec workspace npm run test
+
+# 例: CLI実行
+docker compose -f infra/docker/compose.yaml exec workspace npx tsx tools/cli/agentcompany.ts list
+```
+
+## MVP機能の試し方
+
+### 1. デモスクリプト（推奨）
+
+```bash
+docker compose -f infra/docker/compose.yaml exec workspace npx tsx tools/cli/demo.ts
+```
+
+Ollamaとの接続確認、テキスト生成、チャット、コードレビューのデモを実行します。
+
+### 2. チケット実行
+
+```bash
+# チケット一覧
+docker compose -f infra/docker/compose.yaml exec workspace npx tsx tools/cli/agentcompany.ts list
+
+# チケット実行
+docker compose -f infra/docker/compose.yaml exec workspace npx tsx tools/cli/agentcompany.ts run workflows/backlog/0001-sample.md
+```
+
+### 3. 品質判定
+
+```bash
+# 判定実行
+docker compose -f infra/docker/compose.yaml exec workspace npx tsx tools/cli/agentcompany.ts judge 2026-01-27-151426-q3me
+```
+
+### 4. 採用プロセス
+
+```bash
+# JD生成
+docker compose -f infra/docker/compose.yaml exec workspace npx tsx tools/cli/agentcompany.ts hire jd "Developer"
+
+# 採用フロー全体
+docker compose -f infra/docker/compose.yaml exec workspace npx tsx tools/cli/agentcompany.ts hire full "QA Engineer" candidate.yaml
+```
+
+### 5. GUI
+
+```bash
+# ホストマシンで実行（Docker外）
+cd gui/web && npm run dev
+# http://localhost:3000 でアクセス
 ```
 
 ## 構成
@@ -28,18 +113,10 @@ infra/docker/
 ├── images/
 │   └── base/
 │       ├── Dockerfile     # ベースイメージ
-│       ├── install.sh     # インストーラ（コピー用）
-│       └── allowlist/     # 許可リスト（コピー用）
+│       ├── install.sh     # インストーラ
+│       └── allowlist/     # 許可リスト
 └── policies/              # セキュリティポリシー
 ```
-
-## ベースイメージ
-
-### 含まれる環境
-
-- Node.js 20
-- Python 3
-- Git, curl, jq
 
 ## セキュリティ
 
@@ -47,78 +124,46 @@ infra/docker/
 - ネットワーク隔離
 - allowlist方式の依存管理
 
-### E2Eテスト実行時の注意
+## GPU対応（オプション）
 
-E2Eテスト（Playwright）を実行する場合、`no-new-privileges`セキュリティオプションを無効化する必要があります。
-これはPlaywrightのブラウザインストール時にsudoが必要なためです。
+NVIDIA GPUを使用する場合、`compose.yaml`のollamaサービスで以下のコメントを解除：
 
 ```yaml
-# compose.yaml での設定（E2Eテスト時）
-# security_opt:
-#   - no-new-privileges:true  # コメントアウト
-```
-
-## ボリュームマウント
-
-| ホスト             | コンテナ     | 用途             |
-| ------------------ | ------------ | ---------------- |
-| プロジェクトルート | `/workspace` | 作業ディレクトリ |
-| `runtime/logs`     | `/logs`      | ログ出力         |
-
-## パッケージインストール
-
-### 許可されたパッケージのみインストール可能
-
-```bash
-# コンテナ内で実行
-/usr/local/bin/install.sh npm typescript  # OK
-/usr/local/bin/install.sh npm malicious   # 拒否
-```
-
-### 許可リスト
-
-| ファイル                 | 用途               |
-| ------------------------ | ------------------ |
-| `/etc/allowlist/apt.txt` | システムパッケージ |
-| `/etc/allowlist/pip.txt` | Pythonパッケージ   |
-| `/etc/allowlist/npm.txt` | Node.jsパッケージ  |
-
-## ログ
-
-インストール操作は `/logs/install/` に記録される。
-
-```json
-{
-  "timestamp": "2026-01-28T10:30:00Z",
-  "type": "npm",
-  "package": "typescript",
-  "status": "success"
-}
+deploy:
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: 1
+          capabilities: [gpu]
 ```
 
 ## トラブルシューティング
 
-### ビルドエラー
+### Ollamaに接続できない
 
 ```bash
-# キャッシュクリアして再ビルド
-docker compose -f infra/docker/compose.yaml build --no-cache
+# コンテナの状態確認
+docker compose -f infra/docker/compose.yaml ps
+
+# Ollamaのログ確認
+docker logs agentcompany-ollama
+
+# ヘルスチェック
+curl http://localhost:11434/api/tags
 ```
 
-### パッケージインストール拒否
+### モデルのダウンロードが遅い
 
-1. `/etc/allowlist/` を確認
-2. 必要なら `tools/installers/allowlist/` に追加
-3. イメージを再ビルド
+大きなモデルは時間がかかります。まず軽量モデル（`llama3.2:1b`）で試してください。
+
+### メモリ不足
+
+`compose.yaml`のリソース制限を調整するか、より小さいモデルを使用してください。
 
 ### E2Eテスト実行
 
-E2Eテストを実行する前に、Playwrightブラウザをインストールする必要があります：
-
 ```bash
-# コンテナ起動
-docker compose -f infra/docker/compose.yaml up -d
-
 # Playwrightブラウザインストール
 docker compose -f infra/docker/compose.yaml exec workspace npx playwright install chromium
 
