@@ -5,9 +5,11 @@ node_modules/
 dist/
 
 # Runtime data
-runtime/runs/
-runtime/cache/
-runtime/state/
+runtime/
+
+# Next.js build output
+.next/
+gui/web/.next/
 
 # IDE
 .vscode/

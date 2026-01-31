@@ -119,15 +119,20 @@ npx tsx tools/cli/agentcompany.ts waiver list
 
 ---
 
-### M4: GUI [2-4日]
+### M4: GUI [2-4日] ✅ 完了
 
-- [ ] Next.jsプロジェクト作成 (`gui/web/`)
-- [ ] 画面1: Backlog（Todo/Doing/Review/Done）
-- [ ] 画面2: Runs（実行ログ、成果物リンク）
-- [ ] 画面3: Reports（日次/週次レポート）
-- [ ] `runtime/runs/` からのデータ読み込み
+- [x] Next.jsプロジェクト作成 (`gui/web/`)
+- [x] 画面1: Backlog（Todo/Doing/Review/Done）
+- [x] 画面2: Runs（実行ログ、成果物リンク）
+- [x] 画面3: Reports（日次/週次レポート）
+- [x] `runtime/runs/` からのデータ読み込み
 
-**完了条件**: 今何が動いていて、何が詰まっているかがGUIで追える
+**完了条件**: 今何が動いていて、何が詰まっているかがGUIで追える ✅
+
+```bash
+# 確認コマンド
+cd gui/web && npm run dev  # http://localhost:3000 でGUIを確認
+```
 
 ---
 
@@ -148,5 +153,5 @@ npx tsx tools/cli/agentcompany.ts waiver list
 - [ ] Docker上で隔離された環境で実装〜テスト〜E2Eが回る
 - [x] allowlist運用（方式A）が機能する
 - [x] Quality Authorityが最終判定できる
-- [ ] GUIでBacklog/Runs/Reportsが見える
+- [x] GUIでBacklog/Runs/Reportsが見える
 - [ ] 採用（Registry登録）でエージェントを増やせる

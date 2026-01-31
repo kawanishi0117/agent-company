@@ -1,0 +1,18 @@
+# ビルド成果物
+dist
+node_modules
+coverage
+.next
+out
+
+# ランタイムデータ（自動生成）
+runtime
+
+# パッケージロック
+package-lock.json
+
+# gui/web内の自動生成ファイル
+gui/web/.next
+gui/web/out
+gui/web/node_modules
+gui/web/package-lock.json

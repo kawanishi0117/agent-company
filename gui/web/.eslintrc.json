@@ -1,0 +1,19 @@
+{
+  // Next.js固有の設定のみを使用
+  // ルートプロジェクトとは独立してlintを実行
+  "root": true,
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "env": {
+    "node": true,
+    "es2022": true,
+    "browser": true
+  },
+  "rules": {
+    // プロジェクト共通ルール
+    "@typescript-eslint/explicit-function-return-type": "warn",
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "no-console": "warn",
+    "prefer-const": "error"
+  },
+  "ignorePatterns": [".next", "node_modules", "coverage", "out"]
+}

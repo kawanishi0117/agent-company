@@ -25,6 +25,8 @@ export default defineConfig({
 
   // 共通設定
   use: {
+    // ベースURL（GUIテスト用）
+    baseURL: 'http://localhost:3000',
     // トレース: リトライ時のみ
     trace: 'on-first-retry',
     // スクリーンショット: 失敗時のみ
@@ -48,5 +50,15 @@ export default defineConfig({
   timeout: 30000,
   expect: {
     timeout: 5000,
+  },
+
+  // GUIテスト用のWebサーバー設定
+  // Next.js開発サーバーを起動してテストを実行
+  webServer: {
+    command: 'npm run dev',
+    cwd: './gui/web',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000, // 2分（Next.jsの初回起動に時間がかかる場合がある）
   },
 });

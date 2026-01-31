@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "lint": "eslint . --ext .ts && prettier --check \"**/*.{ts,json,md,yaml}\" --ignore-path .gitignore",
-    "lint:fix": "eslint . --ext .ts --fix && prettier --write \"**/*.{ts,json,md,yaml}\" --ignore-path .gitignore",
+    "lint": "eslint . --ext .ts && cd gui/web && npm run lint && cd ../.. && prettier --check \"**/*.{ts,json,md,yaml}\" --ignore-path .gitignore",
+    "lint:fix": "eslint . --ext .ts --fix && cd gui/web && npm run lint:fix && cd ../.. && prettier --write \"**/*.{ts,json,md,yaml}\" --ignore-path .gitignore",
     "format": "prettier --write \"**/*.{ts,json,md,yaml}\" --ignore-path .gitignore",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
