@@ -203,7 +203,10 @@ export function KanbanBoard({ tickets }: KanbanBoardProps): JSX.Element {
   return (
     <>
       {/* カンバンボード */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div 
+        className="flex gap-4 overflow-x-auto pb-4"
+        data-testid="kanban-board"
+      >
         {COLUMNS.map((column) => (
           <KanbanColumn
             key={column.status}

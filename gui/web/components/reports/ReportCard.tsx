@@ -88,6 +88,7 @@ export function ReportCard({ report, onClick }: ReportCardProps): JSX.Element {
     <Card
       onClick={onClick}
       className="w-full text-left group"
+      data-testid="report-card"
     >
       {/* ヘッダー: 日付とタイプバッジ */}
       <div className="flex items-center justify-between mb-3">

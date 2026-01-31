@@ -69,11 +69,11 @@ test.describe('GUI Dashboard', () => {
       // Backlogリンクをクリック
       await page.locator('nav').locator('text=Backlog').click();
 
+      // Backlogページのタイトルが表示されるまで待機（コンテンツベースの待機）
+      await expect(page.locator('h1')).toContainText('Backlog', { timeout: 15000 });
+
       // URLが変更されていること
       await expect(page).toHaveURL('/backlog');
-
-      // Backlogページのタイトルが表示されていること
-      await expect(page.locator('h1')).toContainText('Backlog');
     });
 
     test('should navigate to Runs page without full page reload', async ({ page }) => {
@@ -84,11 +84,11 @@ test.describe('GUI Dashboard', () => {
       // Runsリンクをクリック
       await page.locator('nav').locator('text=Runs').click();
 
+      // Runsページのタイトルが表示されるまで待機（コンテンツベースの待機）
+      await expect(page.locator('h1')).toContainText('Runs', { timeout: 15000 });
+
       // URLが変更されていること
       await expect(page).toHaveURL('/runs');
-
-      // Runsページのタイトルが表示されていること
-      await expect(page.locator('h1')).toContainText('Runs');
     });
 
     test('should navigate to Reports page without full page reload', async ({ page }) => {
@@ -99,11 +99,11 @@ test.describe('GUI Dashboard', () => {
       // Reportsリンクをクリック
       await page.locator('nav').locator('text=Reports').click();
 
+      // Reportsページのタイトルが表示されるまで待機（コンテンツベースの待機）
+      await expect(page.locator('h1')).toContainText('Reports', { timeout: 15000 });
+
       // URLが変更されていること
       await expect(page).toHaveURL('/reports');
-
-      // Reportsページのタイトルが表示されていること
-      await expect(page.locator('h1')).toContainText('Reports');
     });
 
     test('should highlight current page in navigation', async ({ page }) => {
@@ -148,8 +148,16 @@ test.describe('GUI Dashboard', () => {
       // Backlogページにアクセス
       await page.goto('/backlog');
 
-      // ローディングが完了するまで待機
+      // ローディングが完了するまで待機（ローディング表示が消えるまで）
       await page.waitForLoadState('networkidle');
+
+      // ローディング表示が消えるか、コンテンツが表示されるまで待機
+      await Promise.race([
+        page.locator('[data-testid="kanban-board"]').waitFor({ state: 'visible', timeout: 30000 }),
+        page.locator('text=チケットがありません').waitFor({ state: 'visible', timeout: 30000 }),
+      ]).catch(() => {
+        // タイムアウトしても続行（後続のアサーションで検証）
+      });
 
       // カンバンボードまたは空状態が表示されていること
       const hasKanban = (await page.locator('[data-testid="kanban-board"]').count()) > 0;

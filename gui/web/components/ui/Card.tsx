@@ -15,6 +15,8 @@ interface CardProps {
   onClick?: () => void;
   /** パディングを無効化 */
   noPadding?: boolean;
+  /** テスト用ID */
+  'data-testid'?: string;
 }
 
 /**
@@ -26,6 +28,7 @@ export function Card({
   className = '',
   onClick,
   noPadding = false,
+  'data-testid': testId,
 }: CardProps): JSX.Element {
   const baseClasses = `
     bg-bg-secondary
@@ -43,6 +46,7 @@ export function Card({
       className={`${baseClasses} ${className}`.trim()}
       onClick={onClick}
       type={onClick ? 'button' : undefined}
+      data-testid={testId}
     >
       {children}
     </Component>

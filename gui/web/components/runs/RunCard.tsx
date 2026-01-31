@@ -133,6 +133,7 @@ export function RunCard({ run, onClick }: RunCardProps): JSX.Element {
     <Card
       onClick={onClick}
       className="w-full text-left group"
+      data-testid="run-card"
     >
       {/* ヘッダー: Run ID とステータス */}
       <div className="flex items-center justify-between mb-3">

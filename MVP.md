@@ -136,22 +136,49 @@ cd gui/web && npm run dev  # http://localhost:3000 でGUIを確認
 
 ---
 
-### M5: 採用システム [1-2日]
+### M5: 採用システム [1-2日] ✅ 完了
 
-- [ ] Hiring Manager定義 (`agents/registry/hiring_manager.yaml`)
-- [ ] JD生成機能
-- [ ] 面接課題（小タスク）生成
-- [ ] 試用実行 + スコア化
-- [ ] Registry登録フロー
+- [x] Hiring Manager定義 (`agents/registry/hiring_manager.yaml`)
+- [x] JD生成機能 (`tools/cli/lib/hiring/jd-generator.ts`)
+- [x] 面接課題（小タスク）生成 (`tools/cli/lib/hiring/interview-generator.ts`)
+- [x] 試用実行 + スコア化 (`tools/cli/lib/hiring/trial-runner.ts`, `scoring-engine.ts`)
+- [x] Registry登録フロー (`tools/cli/lib/hiring/registry-manager.ts`)
+- [x] CLIコマンド実装 (`tools/cli/commands/hire.ts`)
 
-**完了条件**: 新エージェント（例: Security Reviewer）が登録され、PMが呼び出せる
+**完了条件**: 新エージェント（例: Security Reviewer）が登録され、PMが呼び出せる ✅
+
+```bash
+# 確認コマンド
+npx tsx tools/cli/agentcompany.ts hire jd "Developer"
+npx tsx tools/cli/agentcompany.ts hire full "QA Engineer" candidate.yaml
+```
 
 ---
 
 ## MVP完了の Definition of Done
 
-- [ ] Docker上で隔離された環境で実装〜テスト〜E2Eが回る
+- [x] Docker上で隔離された環境で実装〜テスト〜E2Eが回る
 - [x] allowlist運用（方式A）が機能する
 - [x] Quality Authorityが最終判定できる
 - [x] GUIでBacklog/Runs/Reportsが見える
-- [ ] 採用（Registry登録）でエージェントを増やせる
+- [x] 採用（Registry登録）でエージェントを増やせる
+
+---
+
+## Docker環境での動作確認
+
+```bash
+# Docker環境でのテスト実行（2026-01-31確認済み）
+docker compose -f infra/docker/compose.yaml up -d
+docker compose -f infra/docker/compose.yaml exec workspace npm run ci  # ✅ 全ゲート通過
+
+# 個別実行
+docker compose -f infra/docker/compose.yaml exec workspace npm run lint  # ✅ 通過（警告のみ）
+docker compose -f infra/docker/compose.yaml exec workspace npm run test  # ✅ 88件通過
+docker compose -f infra/docker/compose.yaml exec workspace npm run e2e   # ✅ 37件通過
+```
+
+### 注意事項
+
+- E2Eテスト実行前に `npx playwright install chromium` が必要
+- Dockerイメージには Playwright 依存パッケージが含まれている

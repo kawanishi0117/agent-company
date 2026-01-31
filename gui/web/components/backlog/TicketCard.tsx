@@ -89,6 +89,7 @@ export function TicketCard({ ticket, onClick }: TicketCardProps): JSX.Element {
     <Card
       onClick={onClick}
       className="w-full text-left group"
+      data-testid="ticket-card"
     >
       {/* ヘッダー: ID とステータス */}
       <div className="flex items-center justify-between mb-2">

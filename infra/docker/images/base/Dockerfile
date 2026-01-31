@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV NODE_ENV=development
 ENV INSTALL_LOG_DIR=/workspace/runtime/logs/install
 
-# システムパッケージインストール
+# システムパッケージインストール（Playwright依存含む）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
@@ -25,6 +25,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     gnupg \
     sudo \
+    # Playwright依存パッケージ
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libdbus-1-3 \
+    libxkbcommon0 \
+    libatspi2.0-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 

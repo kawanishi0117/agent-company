@@ -47,6 +47,60 @@ npx ts-node tools/cli/deliverable-validator.ts <deliverable-md>
 | `ticket.ts`                | チケットパーサー         |
 | `validator.ts`             | エージェント定義検証     |
 | `deliverable-validator.ts` | 成果物検証               |
+| `commands/judge.ts`        | 品質判定コマンド         |
+| `commands/waiver.ts`       | Waiver管理コマンド       |
+| `lib/judgment.ts`          | 判定ロジック             |
+| `lib/waiver-validator.ts`  | Waiver検証               |
+| `lib/hiring/`              | 採用システムライブラリ   |
+
+## ライブラリ
+
+### lib/hiring/ - 採用システム
+
+採用システム（Hiring System）の機能を提供するライブラリ群。
+
+| ファイル                 | 用途                      | 状態   |
+| ------------------------ | ------------------------- | ------ |
+| `types.ts`               | 共通型定義                | ✅完了 |
+| `index.ts`               | エクスポート集約          | ✅完了 |
+| `jd-generator.ts`        | JD（Job Description）生成 | ✅完了 |
+| `interview-generator.ts` | 面接課題生成              | 未実装 |
+| `trial-runner.ts`        | 試用実行                  | 未実装 |
+| `scoring-engine.ts`      | スコア化                  | 未実装 |
+| `registry-manager.ts`    | Registry管理              | 未実装 |
+| `hiring-logger.ts`       | 採用ログ                  | 未実装 |
+
+#### JD Generator 使用例
+
+```typescript
+import { generateJD, formatJDAsMarkdown, validateJD } from './lib/hiring/index.js';
+
+// JD生成
+const jd = generateJD({
+  role: 'developer',
+  outputDir: 'runtime/runs/run-001',
+});
+
+// バリデーション
+const result = validateJD(jd);
+if (!result.valid) {
+  console.error('Validation errors:', result.errors);
+}
+
+// Markdown形式で出力
+const markdown = formatJDAsMarkdown(jd);
+console.log(markdown);
+```
+
+#### 対応役割プリセット
+
+| 役割名        | 説明                   |
+| ------------- | ---------------------- |
+| `developer`   | 開発者エージェント     |
+| `qa_executor` | QA実行エージェント     |
+| `reviewer`    | レビュアーエージェント |
+
+プリセットにない役割名を指定した場合は、汎用テンプレートが生成されます。
 
 ## 実行フロー
 

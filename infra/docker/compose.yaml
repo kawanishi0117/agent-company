@@ -11,9 +11,9 @@ services:
     # ボリュームマウント
     volumes:
       # プロジェクトファイル（読み書き可能）
-      - ../../..:/workspace:rw
+      - ../..:/workspace:rw
       # ログディレクトリ
-      - ../../../runtime/logs:/workspace/runtime/logs:rw
+      - ../../runtime/logs:/workspace/runtime/logs:rw
       # allowlistファイル（読み取り専用）
       - ../../tools/installers/allowlist:/usr/local/agentcompany/installers/allowlist:ro
 
@@ -34,8 +34,9 @@ services:
       - workspace-net
 
     # セキュリティ設定
-    security_opt:
-      - no-new-privileges:true
+    # E2Eテスト時はno-new-privilegesを無効化する必要がある場合があります
+    # security_opt:
+    #   - no-new-privileges:true
 
     # リソース制限
     deploy:

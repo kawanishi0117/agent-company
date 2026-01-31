@@ -10,6 +10,7 @@ import { validateAgentFile } from './validator.js';
 import { validateDeliverableFile, formatValidationResult } from './deliverable-validator.js';
 import { handleJudgeCommand } from './commands/judge.js';
 import { executeWaiverCommand } from './commands/waiver.js';
+import { executeHireCommand } from './commands/hire.js';
 
 // コマンドライン引数
 const args = process.argv.slice(2);
@@ -33,6 +34,7 @@ AgentCompany CLI
   validate-deliverable <path>  成果物を検証
   judge <run-id>          判定を実行（PASS/FAIL/WAIVER）
   waiver <subcommand>     Waiver（例外承認）を管理
+  hire <subcommand>       採用プロセスを実行
   help                    このヘルプを表示
 
 例:
@@ -42,6 +44,8 @@ AgentCompany CLI
   agentcompany judge 2026-01-27-151426-q3me
   agentcompany waiver create "テストカバレッジ例外"
   agentcompany waiver list
+  agentcompany hire jd "Developer"
+  agentcompany hire full "QA Engineer" candidate.yaml
 `);
 }
 
@@ -180,6 +184,10 @@ async function main(): Promise<void> {
 
     case 'waiver':
       executeWaiverCommand(args.slice(1));
+      break;
+
+    case 'hire':
+      await executeHireCommand(args.slice(1));
       break;
 
     case 'help':
