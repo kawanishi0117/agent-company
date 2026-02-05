@@ -38,15 +38,51 @@ spec（`.kiro/specs/`）のタスク完了時、以下を必ず実施：
 
 意思決定前に必ず確認：
 
-- `docs/company/policies.md`
-- `docs/company/definition-of-done.md`
-- `docs/company/review-standards.md`
-- `docs/company/waiver-policy.md`
+| ドキュメント                        | 内容                           |
+| ----------------------------------- | ------------------------------ |
+| `docs/company/policies.md`          | 会社ポリシー、依存管理ルール   |
+| `docs/company/definition-of-done.md`| 成果物の完了基準               |
+| `docs/company/review-standards.md`  | レビュー基準、判定条件         |
+| `docs/company/waiver-policy.md`     | 例外承認ルール                 |
 
 ### R2. 例外はWaiverを発行
 
 - `workflows/waivers/` に作成
-- 期限・理由・代替策・フォロータスク必須
+- 必須項目: 期限・理由・代替策・フォロータスク
+- テンプレート: `workflows/waivers/TEMPLATE.md`
+
+## コーディング規約
+
+### TypeScript基本ルール
+
+- 関数には戻り値の型を明示（ESLint: explicit-function-return-type）
+- 未使用変数は `_` プレフィックス（ESLint: no-unused-vars）
+- console.log は warn（本番コードでは避ける）
+- CLI（ESM）: 相対パス + `.js` 拡張子でインポート
+- GUI（Next.js）: `@/` パスエイリアスでインポート
+- 型は `tools/cli/lib/execution/types.ts` に集約
+- インターフェースにはJSDocコメント必須
+
+### エラーハンドリング
+
+- カスタムエラークラスを使用（例: `OrchestratorError`）
+- エラーは適切にキャッチして処理
+- 未知のエラーはラップして再スロー
+
+### コメント規約
+
+- モジュールには `@module` タグ
+- 関数には `@param`, `@returns`, `@throws` タグ
+- 要件との対応は `@see Requirements:` で記載
+
+## テスト規約
+
+| 種別           | 場所                   | 命名規則               |
+| -------------- | ---------------------- | ---------------------- |
+| ユニットテスト | `tests/`               | `*.test.ts`            |
+| Property-based | `tests/`               | `*.property.test.ts`   |
+| E2Eテスト      | `e2e/`                 | `*.spec.ts`            |
+| GUIテスト      | `gui/web/lib/parsers/` | `*.test.ts`            |
 
 ## ドキュメント更新ルール
 
@@ -58,6 +94,7 @@ spec（`.kiro/specs/`）のタスク完了時、以下を必ず実施：
 | allowlist    | `tools/installers/` + `docs/company/policies.md`     |
 | エージェント | `agents/registry/` + `docs/playbooks/hiring.md`      |
 | GUI          | `gui/web/README.md`                                  |
+| 実行エンジン | `docs/architecture/execution-engine.md`              |
 
 ## 作業フロー
 
@@ -71,15 +108,52 @@ spec（`.kiro/specs/`）のタスク完了時、以下を必ず実施：
 - 導入は `tools/installers/install.sh` 経由のみ
 - allowlist: `tools/installers/allowlist/`
 - allowlist外は先にWaiver作成
+- 新規追加手順: Waiver申請 → レビュー → 承認 → allowlist追加
 
 ## 品質ゲート
 
 ```bash
-make lint   # 静的解析
-make test   # ユニットテスト
-make e2e    # E2Eテスト
-make ci     # 全ゲート
+make lint   # 静的解析（ESLint + Prettier）
+make test   # ユニットテスト（Vitest、カバレッジ80%目標）
+make e2e    # E2Eテスト（Playwright）
+make ci     # 全ゲート統合
 ```
+
+## Git規約
+
+### ブランチ命名
+- `feature/<ticket-id>-<description>`
+- `fix/<ticket-id>-<description>`
+- `hotfix/<description>`
+
+### コミットタイプ
+| type     | 用途             |
+| -------- | ---------------- |
+| feat     | 新機能           |
+| fix      | バグ修正         |
+| docs     | ドキュメント     |
+| refactor | リファクタリング |
+| test     | テスト           |
+| chore    | ビルド・設定     |
+
+## エスカレーション
+
+| 状況                      | エスカレーション先 |
+| ------------------------- | ------------------ |
+| 品質ゲート失敗            | Quality Authority  |
+| allowlist外パッケージ必要 | システム管理者     |
+| セキュリティ懸念          | Quality Authority  |
+| 判断困難                  | COO/PM             |
+
+## 禁止事項
+
+1. ハードコードされた認証情報
+2. allowlist外パッケージの使用（Waiverなし）
+3. テストのスキップ（理由なし）
+4. 未処理のエラー
+5. console.log の乱用
+6. 型の `any` 使用
+7. マジックナンバー
 
 ## 日本語対応
 
