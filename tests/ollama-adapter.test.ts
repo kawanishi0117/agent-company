@@ -1,11 +1,15 @@
 /**
  * Ollama Adapter のテスト
- * 接続テスト、エラーハンドリングテスト
+ * 接続テスト、エラーハンドリングテスト、ツール呼び出しテスト
+ *
+ * Requirements:
+ * - 7.3: Ollamaアダプタの実装
+ * - 7.2: ツール呼び出し対応
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OllamaAdapter, createOllamaAdapter } from '../tools/adapters/ollama';
-import { AdapterConnectionError } from '../tools/adapters/base';
+import { AdapterConnectionError, ToolDefinition } from '../tools/adapters/base';
 
 // グローバルfetchをモック
 const mockFetch = vi.fn();
@@ -181,6 +185,209 @@ describe('OllamaAdapter', () => {
     it('カスタム設定でアダプタを作成できる', () => {
       const adapter = createOllamaAdapter('http://custom:8080', 10000);
       expect(adapter.name).toBe('ollama');
+    });
+  });
+
+  // ============================================================
+  // ツール呼び出し機能のテスト
+  // Requirements: 7.2
+  // ============================================================
+
+  describe('chatWithTools', () => {
+    it('ツール付きチャットが正常に動作する', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          model: 'llama3.1',
+          message: {
+            role: 'assistant',
+            content: 'I will use the tool to help you.',
+            tool_calls: [
+              {
+                function: {
+                  name: 'read_file',
+                  arguments: { path: '/test/file.txt' },
+                },
+              },
+            ],
+          },
+          done: true,
+          eval_count: 25,
+        }),
+      });
+
+      const tools: ToolDefinition[] = [
+        {
+          name: 'read_file',
+          description: 'Read a file from the filesystem',
+          parameters: {
+            type: 'object',
+            properties: {
+              path: { type: 'string', description: 'File path' },
+            },
+            required: ['path'],
+          },
+        },
+      ];
+
+      const result = await adapter.chatWithTools({
+        model: 'llama3.1',
+        messages: [{ role: 'user', content: 'Read the file /test/file.txt' }],
+        tools,
+      });
+
+      expect(result.content).toBe('I will use the tool to help you.');
+      expect(result.toolCalls).toBeDefined();
+      expect(result.toolCalls!.length).toBe(1);
+      expect(result.toolCalls![0].name).toBe('read_file');
+      expect(result.toolCalls![0].arguments).toEqual({ path: '/test/file.txt' });
+      expect(result.isComplete).toBe(false); // ツール呼び出しがあるので未完了
+    });
+
+    it('ツール呼び出しなしの場合isCompleteがtrueになる', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          model: 'llama3.1',
+          message: {
+            role: 'assistant',
+            content: 'Here is the answer without using tools.',
+          },
+          done: true,
+          eval_count: 15,
+        }),
+      });
+
+      const tools: ToolDefinition[] = [
+        {
+          name: 'read_file',
+          description: 'Read a file',
+          parameters: {
+            type: 'object',
+            properties: {
+              path: { type: 'string' },
+            },
+          },
+        },
+      ];
+
+      const result = await adapter.chatWithTools({
+        model: 'llama3.1',
+        messages: [{ role: 'user', content: 'What is 2+2?' }],
+        tools,
+      });
+
+      expect(result.content).toBe('Here is the answer without using tools.');
+      expect(result.toolCalls).toEqual([]);
+      expect(result.isComplete).toBe(true);
+    });
+
+    it('複数のツール呼び出しを処理できる', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          model: 'llama3.1',
+          message: {
+            role: 'assistant',
+            content: 'I will read both files.',
+            tool_calls: [
+              {
+                function: {
+                  name: 'read_file',
+                  arguments: { path: '/file1.txt' },
+                },
+              },
+              {
+                function: {
+                  name: 'read_file',
+                  arguments: { path: '/file2.txt' },
+                },
+              },
+            ],
+          },
+          done: true,
+        }),
+      });
+
+      const tools: ToolDefinition[] = [
+        {
+          name: 'read_file',
+          description: 'Read a file',
+          parameters: {
+            type: 'object',
+            properties: {
+              path: { type: 'string' },
+            },
+          },
+        },
+      ];
+
+      const result = await adapter.chatWithTools({
+        model: 'llama3.1',
+        messages: [{ role: 'user', content: 'Read file1.txt and file2.txt' }],
+        tools,
+      });
+
+      expect(result.toolCalls!.length).toBe(2);
+      expect(result.toolCalls![0].arguments).toEqual({ path: '/file1.txt' });
+      expect(result.toolCalls![1].arguments).toEqual({ path: '/file2.txt' });
+    });
+
+    it('接続エラー時にAdapterConnectionErrorを投げる', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Connection refused'));
+
+      const tools: ToolDefinition[] = [
+        {
+          name: 'test_tool',
+          description: 'Test tool',
+          parameters: {
+            type: 'object',
+            properties: {},
+          },
+        },
+      ];
+
+      await expect(
+        adapter.chatWithTools({
+          model: 'llama3.1',
+          messages: [{ role: 'user', content: 'Test' }],
+          tools,
+        })
+      ).rejects.toThrow(AdapterConnectionError);
+    });
+  });
+
+  describe('getModelInfo', () => {
+    it('モデル情報を取得できる', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          models: [{ name: 'llama3.1' }],
+        }),
+      });
+
+      const info = await adapter.getModelInfo();
+      expect(info.name).toBe('llama3.1');
+      expect(info.supportsTools).toBe(true);
+    });
+
+    it('ツールサポートモデルを正しく判定する', async () => {
+      // llama3.1はツールサポート
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          models: [{ name: 'llama3.1:latest' }],
+        }),
+      });
+
+      const info1 = await adapter.getModelInfo();
+      expect(info1.supportsTools).toBe(true);
+    });
+  });
+
+  describe('supportsTools', () => {
+    it('Ollamaはツール呼び出しをサポートする', () => {
+      expect(adapter.supportsTools()).toBe(true);
     });
   });
 });

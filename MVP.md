@@ -165,6 +165,56 @@ npx tsx tools/cli/agentcompany.ts hire full "QA Engineer" candidate.yaml
 
 ---
 
+### M6: Agent Execution Engine [5-7日] ✅ 完了
+
+エージェントが実際にコード生成・ファイル操作を行う実行エンジン。
+
+#### Phase 1: コア実行エンジン ✅
+
+- [x] 基盤インターフェースとデータモデル (`tools/cli/lib/execution/types.ts`)
+- [x] State Manager (`tools/cli/lib/execution/state-manager.ts`)
+- [x] Process Monitor (`tools/cli/lib/execution/process-monitor.ts`)
+- [x] Git Manager (`tools/cli/lib/execution/git-manager.ts`)
+- [x] Agent Bus (`tools/cli/lib/execution/agent-bus.ts`)
+- [x] Task Decomposer (`tools/cli/lib/execution/decomposer.ts`)
+- [x] Container Runtime (`tools/cli/lib/execution/container-runtime.ts`)
+- [x] Worker Container (`tools/cli/lib/execution/worker-container.ts`)
+- [x] Worker Pool (`tools/cli/lib/execution/worker-pool.ts`)
+- [x] Tool Call (`tools/cli/lib/execution/tools.ts`)
+- [x] AI Adapter拡張 (`tools/adapters/`)
+- [x] Worker/Manager/Reviewer/Merger Agent (`tools/cli/lib/execution/agents/`)
+- [x] Quality Gate統合 (`tools/cli/lib/execution/quality-gate.ts`)
+- [x] Orchestrator (`tools/cli/lib/execution/orchestrator.ts`)
+- [x] Error Handler (`tools/cli/lib/execution/error-handler.ts`)
+
+#### Phase 2: GUI拡張 ✅
+
+- [x] CLIコマンド (`tools/cli/commands/execute.ts`, `project.ts`)
+- [x] Project Manager (`tools/cli/lib/execution/project-manager.ts`)
+- [x] GUI Settings画面 (`gui/web/app/settings/`)
+- [x] GUI Dashboard画面 (`gui/web/app/dashboard/`)
+- [x] GUI Command Center画面 (`gui/web/app/command/`)
+- [x] GUI Task Detail画面 (`gui/web/app/tasks/[id]/`)
+- [x] GUI Review画面 (`gui/web/app/review/`)
+
+#### Phase 3: 統合・最適化 ✅
+
+- [x] エージェント定義ファイル (`agents/registry/reviewer.yaml`, `merger.yaml`)
+- [x] プロンプトテンプレート (`agents/prompts/roles/manager.md`, `worker.md`)
+- [x] E2Eフロー統合テスト (`e2e/execution-engine.spec.ts`)
+- [x] ドキュメント更新 (`docs/specs/agent-execution-engine.md`, `docs/architecture/execution-engine.md`)
+
+**完了条件**: 指示 → 分解 → 実行 → レビュー → マージの一連のフローが動作する ✅
+
+```bash
+# 確認コマンド
+npx tsx tools/cli/agentcompany.ts execute <ticket-id>
+npx tsx tools/cli/agentcompany.ts status
+npx tsx tools/cli/agentcompany.ts project list
+```
+
+---
+
 ## Docker環境での動作確認
 
 ```bash

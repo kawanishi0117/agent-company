@@ -108,6 +108,81 @@ services:
     stdin_open: true
     tty: true
 
+  # ============================================
+  # Worker - ワーカーエージェント実行環境
+  # @see Requirement 5.2: THE Worker_Container SHALL be based on `infra/docker/images/worker/` image
+  # @see Requirement 5.7: THE container management SHALL use Container Runtime Abstraction
+  # ============================================
+  worker:
+    build:
+      context: ./images/worker
+      dockerfile: Dockerfile
+    # コンテナ名はworker-container.tsで動的に生成されるため、ここでは設定しない
+    # container_name: agentcompany-worker
+    
+    # プロファイルを使用して、明示的に起動する場合のみ起動
+    profiles:
+      - worker
+    
+    # 環境変数（実行時に上書き）
+    environment:
+      - WORKER_ID=${WORKER_ID:-worker-default}
+      - RUN_ID=${RUN_ID:-}
+      - GIT_REPO_URL=${GIT_REPO_URL:-}
+      - GIT_BRANCH=${GIT_BRANCH:-main}
+      - GIT_TOKEN=${GIT_TOKEN:-}
+      - WORKSPACE_PATH=/workspace
+      # Ollama接続設定（Agent_Bus経由で通信する場合は不要）
+      # - OLLAMA_HOST=http://ollama:11434
+    
+    # ボリュームマウント
+    # 注意: /workspaceはコンテナ内にcloneされるため、ホストからマウントしない
+    # @see Requirement 5.3: THE Worker_Container SHALL clone the repository into container-local `/workspace`
+    volumes:
+      # 結果出力ディレクトリ（読み取り専用）
+      # @see Requirement 5.4: Shared read-only: `runtime/runs/<run-id>/` for result collection only
+      - ../../runtime/runs:/results:ro
+    
+    # 作業ディレクトリ
+    working_dir: /workspace
+    
+    # 非rootユーザーで実行
+    user: agent
+    
+    # ネットワーク設定
+    # @see Requirement 5.4: Network: No inter-container communication except via Agent_Bus
+    # デフォルトはネットワーク隔離（none）だが、開発時はworkspace-netに接続可能
+    # 本番環境ではworker-container.tsがnetworkMode='none'で起動する
+    networks:
+      - workspace-net
+    
+    # セキュリティ設定
+    # @see Requirement 5.4: THE Worker_Container SHALL be isolated
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    
+    # リソース制限
+    # @see Requirement 5.6: THE Worker_Container SHALL have configurable resource limits (CPU, memory)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # プロセス数制限
+    pids_limit: 256
+    
+    # 読み取り専用ルートファイルシステム（オプション）
+    # read_only: true
+    # tmpfs:
+    #   - /tmp:rw,noexec,nosuid,size=256m
+    #   - /var/tmp:rw,noexec,nosuid,size=256m
+
 # ============================================
 # ボリューム定義
 # ============================================

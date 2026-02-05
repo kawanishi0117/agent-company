@@ -11,6 +11,13 @@ import { validateDeliverableFile, formatValidationResult } from './deliverable-v
 import { handleJudgeCommand } from './commands/judge.js';
 import { executeWaiverCommand } from './commands/waiver.js';
 import { executeHireCommand } from './commands/hire.js';
+import {
+  handleExecuteCommand,
+  handleStatusCommand,
+  handleStopCommand,
+  handleResumeCommand,
+} from './commands/execute.js';
+import { handleProjectCommand } from './commands/project.js';
 
 // コマンドライン引数
 const args = process.argv.slice(2);
@@ -35,6 +42,11 @@ AgentCompany CLI
   judge <run-id>          判定を実行（PASS/FAIL/WAIVER）
   waiver <subcommand>     Waiver（例外承認）を管理
   hire <subcommand>       採用プロセスを実行
+  execute <ticket-id>     エージェント実行エンジンでタスクを実行
+  status                  実行状況を表示
+  stop <run-id>           実行を停止
+  resume <run-id>         実行を再開
+  project <subcommand>    プロジェクト管理
   help                    このヘルプを表示
 
 例:
@@ -46,6 +58,13 @@ AgentCompany CLI
   agentcompany waiver list
   agentcompany hire jd "Developer"
   agentcompany hire full "QA Engineer" candidate.yaml
+  agentcompany execute 0001-sample --adapter ollama --workers 3
+  agentcompany execute --decompose 0001-sample
+  agentcompany status
+  agentcompany stop run-abc123
+  agentcompany resume run-abc123
+  agentcompany project list
+  agentcompany project add my-app https://github.com/user/my-app.git
 `);
 }
 
@@ -188,6 +207,26 @@ async function main(): Promise<void> {
 
     case 'hire':
       await executeHireCommand(args.slice(1));
+      break;
+
+    case 'execute':
+      await handleExecuteCommand(args.slice(1));
+      break;
+
+    case 'status':
+      await handleStatusCommand(args.slice(1));
+      break;
+
+    case 'stop':
+      await handleStopCommand(args.slice(1));
+      break;
+
+    case 'resume':
+      await handleResumeCommand(args.slice(1));
+      break;
+
+    case 'project':
+      await handleProjectCommand(args.slice(1));
       break;
 
     case 'help':

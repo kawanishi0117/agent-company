@@ -111,12 +111,50 @@ cd gui/web && npm run dev
 infra/docker/
 ├── compose.yaml           # Docker Compose設定
 ├── images/
-│   └── base/
-│       ├── Dockerfile     # ベースイメージ
-│       ├── install.sh     # インストーラ
-│       └── allowlist/     # 許可リスト
+│   ├── base/
+│   │   ├── Dockerfile     # ベースイメージ
+│   │   ├── install.sh     # インストーラ
+│   │   └── allowlist/     # 許可リスト
+│   └── worker/
+│       ├── Dockerfile     # ワーカーイメージ
+│       └── entrypoint.sh  # エントリポイント
 └── policies/              # セキュリティポリシー
 ```
+
+## イメージ構成
+
+### ベースイメージ (`agentcompany/base`)
+
+開発・テスト実行環境の基盤イメージ。Node.js、Python、Git等の基本ツールを含む。
+
+### ワーカーイメージ (`agentcompany/worker`)
+
+エージェント実行エンジンのワーカーコンテナ用イメージ。
+
+**特徴:**
+- ベースイメージを継承
+- Git認証（トークン、Deploy key）対応
+- リポジトリを`/workspace`にclone（ホストbind mountではない）
+- リソース制限（CPU、メモリ）設定可能
+- ネットワーク隔離
+
+**ビルド方法:**
+```bash
+# ベースイメージをビルド
+docker build -t agentcompany/base:latest infra/docker/images/base/
+
+# ワーカーイメージをビルド
+docker build -t agentcompany/worker:latest infra/docker/images/worker/
+```
+
+**環境変数:**
+| 変数名 | 説明 | 必須 |
+|--------|------|------|
+| `WORKER_ID` | ワーカーID | ○ |
+| `RUN_ID` | 実行ID | - |
+| `GIT_REPO_URL` | cloneするリポジトリURL | - |
+| `GIT_BRANCH` | cloneするブランチ（デフォルト: main） | - |
+| `GIT_TOKEN` | Git認証トークン（HTTPS用） | - |
 
 ## セキュリティ
 

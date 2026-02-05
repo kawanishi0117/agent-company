@@ -9,6 +9,7 @@ AgentCompanyの状態を可視化するWebダッシュボードアプリケー�
 - **Backlog**: チケット（タスク）の管理画面（カンバンボード形式）
 - **Runs**: 実行ログと成果物の一覧・詳細画面
 - **Reports**: 日次・週次レポートの閲覧画面
+- **Settings**: システム設定の管理画面
 
 ## 技術スタック
 
@@ -96,11 +97,13 @@ gui/web/
 │   ├── api/               # APIルート
 │   │   ├── backlog/       # チケットAPI
 │   │   ├── runs/          # 実行結果API
-│   │   └── reports/       # レポートAPI
+│   │   ├── reports/       # レポートAPI
+│   │   └── settings/      # 設定API
 │   ├── backlog/           # Backlog画面
 │   ├── runs/              # Runs画面
 │   │   └── [id]/          # Run詳細画面
 │   ├── reports/           # Reports画面
+│   ├── settings/          # Settings画面
 │   ├── layout.tsx         # ルートレイアウト
 │   ├── page.tsx           # ホームページ
 │   └── globals.css        # グローバルスタイル
@@ -147,6 +150,17 @@ gui/web/
 - **データソース**: `workflows/reports/daily/`, `workflows/reports/weekly/`
 - **機能**: Daily/Weeklyタブ切り替え、Markdown表示
 
+### Settings（/settings）
+
+システム設定を管理します。
+
+- **データソース**: `runtime/state/config.json`
+- **機能**:
+  - ワーカー設定（最大同時実行数、メモリ制限、CPU制限、タイムアウト）
+  - AI設定（デフォルトアダプタ、モデル選択）
+  - コンテナランタイム選択（DoD/Rootless/DIND）
+  - その他設定（履歴保持日数、統合ブランチ、自動更新間隔）
+
 ## API エンドポイント
 
 | エンドポイント                   | メソッド | 説明                            |
@@ -157,6 +171,8 @@ gui/web/
 | `/api/runs/[id]`                 | GET      | Run詳細                         |
 | `/api/reports`                   | GET      | レポート一覧                    |
 | `/api/reports/[type]/[filename]` | GET      | レポート詳細                    |
+| `/api/settings`                  | GET      | システム設定取得                |
+| `/api/settings`                  | PUT      | システム設定更新                |
 
 ## 関連ドキュメント
 
