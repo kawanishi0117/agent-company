@@ -9,14 +9,49 @@ AIエージェントを「会社」として運用するためのフレームワ
 - **ゲート強制**: Quality Authorityによる最終判定
 - **採用システム**: Registry登録でエージェントを増員
 
+## 主要機能
+
+| 機能 | 説明 |
+|------|------|
+| Agent Execution Engine | タスク分解 → 並列実行 → レビュー → マージの自動化 |
+| Docker隔離環境 | ワーカーごとに独立したコンテナで安全に実行 |
+| 品質ゲート | lint/test/e2eの強制、PASS/FAIL/WAIVER判定 |
+| allowlist依存管理 | 許可されたパッケージのみインストール可能 |
+| GUI ダッシュボード | Backlog/Runs/Reports/Settingsの可視化 |
+| 採用システム | JD生成 → 面接 → 試用 → Registry登録 |
+
+## クイックスタート
+
+```bash
+# 1. 依存インストール
+npm install
+cd gui/web && npm install && cd ../..
+
+# 2. Docker環境を起動
+docker compose -f infra/docker/compose.yaml up -d
+
+# 3. Ollamaにモデルをインストール（初回のみ）
+docker exec agentcompany-ollama ollama pull llama3.2:1b
+
+# 4. 品質ゲート実行
+make ci
+
+# 5. GUIを起動
+cd gui/web && npm run dev
+# http://localhost:3000 でアクセス
+```
+
+詳細は [QUICKSTART.md](QUICKSTART.md) を参照。
+
 ## フォルダ構成
 
 ```
 agent-company/
-├── docs/                    # 会社の規程（人が読める）
+├── docs/                    # 会社の規程・仕様書
 │   ├── company/             # 不変のポリシー
-│   ├── playbooks/           # 運用手順書
-│   └── architecture/        # 設計ドキュメント
+│   ├── specs/               # 機能仕様書
+│   ├── architecture/        # 設計ドキュメント
+│   └── playbooks/           # 運用手順書
 ├── agents/                  # エージェント定義
 │   ├── registry/            # 採用済みエージェント（YAML）
 │   └── prompts/             # 役割別プロンプト
@@ -28,94 +63,145 @@ agent-company/
 ├── tools/                   # 実行ツール
 │   ├── cli/                 # AgentCompany CLI
 │   ├── installers/          # 許可リスト管理
-│   ├── validators/          # ルール検査
-│   └── adapters/            # AI CLI アダプタ
+│   └── adapters/            # AI アダプタ
 ├── runtime/                 # 実行時データ
 │   ├── runs/                # 実行ログ・成果物
-│   ├── cache/               # キャッシュ
-│   └── state/               # ジョブ状態
+│   ├── state/               # ジョブ状態
+│   └── logs/                # ログ
 ├── infra/                   # インフラ定義
-│   ├── docker/              # Docker設定
-│   └── ci/                  # CI設定
+│   └── docker/              # Docker設定
 ├── gui/                     # ダッシュボード
-│   └── web/                 # Web UI
-└── workspaces/              # 対象案件管理
+│   └── web/                 # Next.js Web UI
+├── tests/                   # ユニットテスト
+└── e2e/                     # E2Eテスト
 ```
-
-## クイックスタート
-
-```bash
-# 依存インストール（allowlist経由）
-make install
-
-# 品質ゲート実行
-make ci
-
-# 開発サーバー起動
-make dev
-```
-
-## Docker Workspace
-
-隔離されたDocker環境でエージェントを安全に実行できます。
-
-### 起動方法
-
-```bash
-# Workspaceコンテナをビルド・起動
-docker compose -f infra/docker/compose.yaml up -d
-
-# コンテナに入る
-docker compose -f infra/docker/compose.yaml exec workspace bash
-```
-
-### パッケージインストール
-
-Workspace内では、allowlist方式で許可されたパッケージのみインストール可能です。
-
-```bash
-# allowlist内のパッケージをインストール
-/usr/local/bin/install.sh npm typescript
-/usr/local/bin/install.sh pip requests
-/usr/local/bin/install.sh apt curl
-
-# allowlist外のパッケージは拒否される
-/usr/local/bin/install.sh npm malicious-package  # → rejected
-```
-
-### Allowlist管理
-
-許可パッケージは以下のファイルで管理されています：
-
-| ファイル                             | 用途               |
-| ------------------------------------ | ------------------ |
-| `tools/installers/allowlist/apt.txt` | システムパッケージ |
-| `tools/installers/allowlist/pip.txt` | Pythonパッケージ   |
-| `tools/installers/allowlist/npm.txt` | Node.jsパッケージ  |
-
-新しいパッケージを追加する場合は、対応するallowlistファイルに追記してください。
-
-### インストールログ
-
-すべてのインストール操作は `runtime/logs/install/` に記録されます。
 
 ## 主要コマンド
 
-| コマンド    | 説明           |
-| ----------- | -------------- |
-| `make lint` | 静的解析       |
-| `make test` | ユニットテスト |
-| `make e2e`  | E2Eテスト      |
-| `make ci`   | 全ゲート実行   |
+### Make
 
-## MVPマイルストーン
+| コマンド | 説明 |
+|----------|------|
+| `make install` | 依存インストール |
+| `make lint` | 静的解析（ESLint + Prettier） |
+| `make test` | ユニットテスト（Vitest） |
+| `make e2e` | E2Eテスト（Playwright） |
+| `make ci` | 全品質ゲート実行 |
 
-- **M0**: 会社の骨格（Registry/Orchestrator/QA） ✅
-- **M1**: Docker Workspace + 許可リスト ✅
-- **M2**: 品質ゲート（lint/test/e2e）
-- **M3**: Governance判定（PASS/FAIL/WAIVER）
-- **M4**: GUI（Backlog/Runs/Reports）
-- **M5**: 採用システム
+### CLI
+
+```bash
+# チケット管理
+npx tsx tools/cli/agentcompany.ts list
+npx tsx tools/cli/agentcompany.ts run workflows/backlog/0001-sample.md
+
+# エージェント実行
+npx tsx tools/cli/agentcompany.ts execute <ticket-id>
+npx tsx tools/cli/agentcompany.ts status
+npx tsx tools/cli/agentcompany.ts stop <run-id>
+
+# 品質判定
+npx tsx tools/cli/agentcompany.ts judge <run-id>
+npx tsx tools/cli/agentcompany.ts waiver create "例外理由"
+
+# 採用
+npx tsx tools/cli/agentcompany.ts hire jd "Developer"
+
+# プロジェクト管理
+npx tsx tools/cli/agentcompany.ts project list
+npx tsx tools/cli/agentcompany.ts project add my-app https://github.com/user/my-app.git
+```
+
+## Docker環境
+
+```bash
+# 起動
+docker compose -f infra/docker/compose.yaml up -d
+
+# コンテナ内でコマンド実行
+docker compose -f infra/docker/compose.yaml exec workspace npm run ci
+
+# 停止
+docker compose -f infra/docker/compose.yaml down
+```
+
+詳細は [infra/docker/README.md](infra/docker/README.md) を参照。
+
+## GUI ダッシュボード
+
+| 画面 | パス | 説明 |
+|------|------|------|
+| Dashboard | `/dashboard` | リアルタイム実行状況 |
+| Command Center | `/command` | タスク投入・制御 |
+| Backlog | `/backlog` | カンバンボード |
+| Runs | `/runs` | 実行履歴・成果物 |
+| Reports | `/reports` | 日次/週次レポート |
+| Review | `/review` | コードレビュー |
+| Settings | `/settings` | システム設定 |
+
+詳細は [gui/web/README.md](gui/web/README.md) を参照。
+
+## エージェント
+
+### 固定エージェント
+
+| エージェント | 役割 | 定義ファイル |
+|--------------|------|--------------|
+| COO/PM | バックログ管理、アサイン、レポート生成 | `agents/registry/coo_pm.yaml` |
+| Quality Authority | PASS/FAIL/WAIVER判定 | `agents/registry/quality_authority.yaml` |
+| Hiring Manager | 採用プロセス管理 | `agents/registry/hiring_manager.yaml` |
+| Reviewer | コードレビュー | `agents/registry/reviewer.yaml` |
+| Merger | ブランチマージ | `agents/registry/merger.yaml` |
+
+### エージェント定義
+
+```yaml
+# agents/registry/templates/agent_template.yaml
+id: 'agent_id'
+title: 'Agent Title'
+responsibilities:
+  - '責務1'
+capabilities:
+  - '能力1'
+deliverables:
+  - '成果物1'
+quality_gates:
+  - '品質基準1'
+budget:
+  tokens: 50000
+  time_minutes: 60
+persona: |
+  ペルソナ説明
+escalation:
+  to: 'escalation_target'
+  conditions:
+    - 'エスカレーション条件'
+```
+
+## ドキュメント
+
+| ドキュメント | 説明 |
+|--------------|------|
+| [MVP.md](MVP.md) | MVPロードマップ |
+| [QUICKSTART.md](QUICKSTART.md) | クイックスタートガイド |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 開発者向けガイド |
+| [docs/specs/](docs/specs/) | 機能仕様書 |
+| [docs/architecture/](docs/architecture/) | アーキテクチャ設計 |
+| [docs/company/](docs/company/) | 会社ポリシー |
+| [tools/cli/README.md](tools/cli/README.md) | CLI詳細 |
+| [gui/web/README.md](gui/web/README.md) | GUI詳細 |
+| [infra/docker/README.md](infra/docker/README.md) | Docker詳細 |
+
+## 技術スタック
+
+| カテゴリ | 技術 |
+|----------|------|
+| 言語 | TypeScript 5.3+ |
+| ランタイム | Node.js 20+ |
+| GUI | Next.js 14 (App Router), Tailwind CSS |
+| テスト | Vitest, Playwright, fast-check |
+| コンテナ | Docker, Docker Compose |
+| AI | Ollama (ローカルLLM) |
 
 ## ライセンス
 
