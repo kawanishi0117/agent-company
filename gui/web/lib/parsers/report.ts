@@ -57,8 +57,8 @@ type ParseResult<T> =
  * @returns プロジェクトルートの絶対パス
  */
 function getProjectRoot(): string {
-  // gui/web/lib/parsers/ から4階層上がプロジェクトルート
-  return path.resolve(__dirname, '../../../../');
+  // GUIは gui/web/ から実行されるため、ルートへは2階層上がる必要がある
+  return path.resolve(process.cwd(), '..', '..');
 }
 
 /**

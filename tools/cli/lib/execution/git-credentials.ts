@@ -67,10 +67,7 @@ export interface SshAgentCredential {
  * Git認証プロバイダー設定
  * @description 3つの認証方式のいずれかを表す共用体型
  */
-export type GitCredentialProvider =
-  | DeployKeyCredential
-  | TokenCredential
-  | SshAgentCredential;
+export type GitCredentialProvider = DeployKeyCredential | TokenCredential | SshAgentCredential;
 
 /**
  * Git認証検証結果
@@ -161,10 +158,7 @@ export function isForbiddenPath(targetPath: string): boolean {
   // ホームディレクトリの.sshを含むパターンを追加チェック
   const homeDir = os.homedir();
   const sshDir = path.join(homeDir, '.ssh');
-  if (
-    normalizedPath === sshDir ||
-    normalizedPath.startsWith(sshDir + path.sep)
-  ) {
+  if (normalizedPath === sshDir || normalizedPath.startsWith(sshDir + path.sep)) {
     return true;
   }
 
@@ -190,19 +184,19 @@ export function validateDeployKeyCredential(
     if (isForbiddenPath(credential.keyPath)) {
       errors.push(
         `Deploy keyのパス "${credential.keyPath}" は禁止されています。` +
-        '~/.ssh/ ディレクトリ内のキーは使用できません。' +
-        '専用のキーディレクトリを使用してください。'
+          '~/.ssh/ ディレクトリ内のキーは使用できません。' +
+          '専用のキーディレクトリを使用してください。'
       );
     }
 
     // 推奨ディレクトリのチェック
-    const isInAllowedDir = ALLOWED_KEY_DIRECTORIES.some(dir =>
+    const isInAllowedDir = ALLOWED_KEY_DIRECTORIES.some((dir) =>
       credential.keyPath.startsWith(dir)
     );
     if (!isInAllowedDir && !errors.length) {
       warnings.push(
         `Deploy keyは推奨ディレクトリ（${ALLOWED_KEY_DIRECTORIES.join(', ')}）` +
-        'に配置することを推奨します。'
+          'に配置することを推奨します。'
       );
     }
   }
@@ -219,9 +213,7 @@ export function validateDeployKeyCredential(
  * @param credential トークン認証設定
  * @returns 検証結果
  */
-export function validateTokenCredential(
-  credential: TokenCredential
-): CredentialValidationResult {
+export function validateTokenCredential(credential: TokenCredential): CredentialValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -236,8 +228,7 @@ export function validateTokenCredential(
   const validTokenTypes = ['github_pat', 'gitlab_token', 'generic'];
   if (!validTokenTypes.includes(credential.tokenType)) {
     errors.push(
-      `無効なトークン種別: ${credential.tokenType}。` +
-      `有効な値: ${validTokenTypes.join(', ')}`
+      `無効なトークン種別: ${credential.tokenType}。` + `有効な値: ${validTokenTypes.join(', ')}`
     );
   }
 
@@ -250,7 +241,7 @@ export function validateTokenCredential(
   ) {
     warnings.push(
       'GitHub PATは通常 "ghp_" または "github_pat_" で始まります。' +
-      'トークンが正しいか確認してください。'
+        'トークンが正しいか確認してください。'
     );
   }
 
@@ -262,7 +253,7 @@ export function validateTokenCredential(
   ) {
     warnings.push(
       'GitLab Personal Access Tokenは通常 "glpat-" で始まります。' +
-      'トークンが正しいか確認してください。'
+        'トークンが正しいか確認してください。'
     );
   }
 
@@ -290,7 +281,7 @@ export function validateSshAgentCredential(
   if (!allowSshAgent) {
     errors.push(
       'SSH agent forwardingは開発環境でのみ許可されています。' +
-      'システム設定で gitSshAgentEnabled を true に設定してください。'
+        'システム設定で gitSshAgentEnabled を true に設定してください。'
     );
   }
 
@@ -299,7 +290,7 @@ export function validateSshAgentCredential(
   if (!socketPath) {
     errors.push(
       'SSH_AUTH_SOCK環境変数が設定されていません。' +
-      'SSH agentが起動していることを確認してください。'
+        'SSH agentが起動していることを確認してください。'
     );
   }
 
@@ -307,7 +298,7 @@ export function validateSshAgentCredential(
   if (allowSshAgent) {
     warnings.push(
       'SSH agent forwardingは開発環境でのみ使用してください。' +
-      '本番環境ではDeploy keyまたはトークン認証を推奨します。'
+        '本番環境ではDeploy keyまたはトークン認証を推奨します。'
     );
   }
 
@@ -546,10 +537,7 @@ export function extractHostFromGitUrl(gitUrl: string): string {
  * @param credential トークン認証設定
  * @returns 認証情報付きURL
  */
-export function createAuthenticatedUrl(
-  gitUrl: string,
-  credential: TokenCredential
-): string {
+export function createAuthenticatedUrl(gitUrl: string, credential: TokenCredential): string {
   // SSH形式の場合はそのまま返す（トークン認証は使用しない）
   if (gitUrl.startsWith('git@')) {
     return gitUrl;

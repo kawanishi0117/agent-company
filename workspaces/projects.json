@@ -1,4 +1,17 @@
 {
-  "projects": [],
-  "lastUpdated": "2026-02-05T14:28:48.000Z"
+  "projects": [
+    {
+      "id": "my-app-44254079",
+      "name": "my-app",
+      "gitUrl": "https://github.com/kawanishi0117/mcp-test-timebox.git",
+      "defaultBranch": "main",
+      "integrationBranch": "develop",
+      "workDir": "workspaces\\my-app-44254079",
+      "createdAt": "2026-02-08T15:15:46.645Z",
+      "lastUsed": "2026-02-08T15:15:46.645Z",
+      "baseBranch": "main",
+      "agentBranch": "agent/my-app-44254079"
+    }
+  ],
+  "lastUpdated": "2026-02-08T15:15:46.652Z"
 }

@@ -7,7 +7,47 @@ AgentCompanyの実行環境をDockerで提供します。
 - **Workspace**: 開発・テスト実行環境
 - **Ollama**: ローカルLLM実行基盤
 
-## クイックスタート
+## ワンコマンド起動（推奨）
+
+Docker + Ollama + Orchestrator Server + GUI を一括で起動できます。
+
+```bash
+# 全環境を一括起動（初回はモデルの自動ダウンロードあり）
+make up
+
+# 全環境を一括停止
+make down
+
+# 起動状態を確認
+make status
+```
+
+起動後、ブラウザで http://localhost:3000 を開けばGUIにアクセスできます。
+
+**オプション（PowerShell）:**
+
+```powershell
+# Dockerなしで起動（ローカルOllama使用）
+.\scripts\start.ps1 -SkipDocker
+
+# モデルを指定
+.\scripts\start.ps1 -Model "codellama"
+
+# ポートを変更
+.\scripts\start.ps1 -GuiPort 8080 -ServerPort 8081
+```
+
+**オプション（bash）:**
+
+```bash
+./scripts/start.sh --skip-docker          # Dockerなし
+./scripts/start.sh --model codellama      # モデル指定
+./scripts/start.sh --gui-port 8080        # ポート変更
+```
+
+## 手動クイックスタート
+
+個別に起動する場合：
 
 ```bash
 # 1. Docker環境を起動
@@ -22,13 +62,13 @@ docker compose -f infra/docker/compose.yaml exec workspace npx tsx tools/cli/dem
 
 ## 推奨モデル
 
-| モデル | サイズ | 用途 |
-|--------|--------|------|
-| `llama3.2:1b` | ~1GB | 軽量・高速（デモ向け） |
-| `qwen2.5-coder:1.5b` | ~1GB | コード生成特化 |
-| `llama3.2:3b` | ~2GB | バランス型 |
-| `codellama:7b` | ~4GB | 高品質コード生成 |
-| `deepseek-coder:6.7b` | ~4GB | 高性能コード生成 |
+| モデル                | サイズ | 用途                   |
+| --------------------- | ------ | ---------------------- |
+| `llama3.2:1b`         | ~1GB   | 軽量・高速（デモ向け） |
+| `qwen2.5-coder:1.5b`  | ~1GB   | コード生成特化         |
+| `llama3.2:3b`         | ~2GB   | バランス型             |
+| `codellama:7b`        | ~4GB   | 高品質コード生成       |
+| `deepseek-coder:6.7b` | ~4GB   | 高性能コード生成       |
 
 ```bash
 # モデルのインストール
@@ -132,6 +172,7 @@ infra/docker/
 エージェント実行エンジンのワーカーコンテナ用イメージ。
 
 **特徴:**
+
 - ベースイメージを継承
 - Git認証（トークン、Deploy key）対応
 - リポジトリを`/workspace`にclone（ホストbind mountではない）
@@ -139,6 +180,7 @@ infra/docker/
 - ネットワーク隔離
 
 **ビルド方法:**
+
 ```bash
 # ベースイメージをビルド
 docker build -t agentcompany/base:latest infra/docker/images/base/

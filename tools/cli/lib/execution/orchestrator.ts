@@ -3,6 +3,7 @@
  *
  * エージェント実行エンジンの全体制御を担当するメインコンポーネント。
  * タスク管理、エージェント管理、設定管理を統合的に行う。
+ * TicketManager, PRCreator, ReviewWorkflowと連携してチケットベースのワークフローを実行。
  *
  * @module execution/orchestrator
  * @see Requirements: 23.2, 23.3, 13.1, 13.2, 13.5
@@ -16,18 +17,18 @@ import {
   Task,
   SubTask,
   TaskStatus,
-  SubTaskStatus,
   ExecutionState,
-  ExecutionStateStatus,
+  ExecutionResult,
   SystemConfig,
   DEFAULT_SYSTEM_CONFIG,
-  Project,
   ErrorInfo,
+  ParentTicket,
+  RunTaskMetadata,
 } from './types';
 import { StateManager } from './state-manager';
 import { AgentBus, createAgentBus } from './agent-bus';
 import { ManagerAgent, ManagerAgentConfig, createManagerAgent } from './agents/manager';
-import { WorkerPool, createWorkerPool, createWorkerPoolFromConfig } from './worker-pool';
+import { createWorkerPoolFromConfig } from './worker-pool';
 import {
   ErrorHandler,
   createErrorHandler,
@@ -36,8 +37,19 @@ import {
   RetryResult,
   EscalationInfo,
   ErrorCategory,
-  DEFAULT_RETRY_CONFIG,
 } from './error-handler';
+import { TicketManager, createTicketManager } from './ticket-manager';
+import { PRCreator, createPRCreator } from './pr-creator';
+import { ReviewWorkflow, createReviewWorkflow } from './review-workflow';
+import { WorkerTypeRegistry, createWorkerTypeRegistry } from './worker-type-registry';
+import { AIHealthChecker, createAIHealthChecker, AIHealthStatus } from './ai-health-checker';
+import { ExecutionReporter, ExecutionReporterOptions } from './execution-reporter';
+import {
+  QualityGateIntegration,
+  createQualityGateIntegration,
+  QualityGateIntegrationConfig,
+} from './quality-gate-integration';
+import { RunDirectoryManager } from './run-directory-manager';
 
 // =============================================================================
 // 定数定義
@@ -128,6 +140,22 @@ export interface OrchestratorConfig {
   managerAgent?: ManagerAgent;
   /** Error Handler（オプション、指定しない場合は新規作成） */
   errorHandler?: ErrorHandler;
+  /** Ticket Manager（オプション、指定しない場合は新規作成） */
+  ticketManager?: TicketManager;
+  /** PR Creator（オプション、指定しない場合は新規作成） */
+  prCreator?: PRCreator;
+  /** Review Workflow（オプション、指定しない場合は新規作成） */
+  reviewWorkflow?: ReviewWorkflow;
+  /** Worker Type Registry（オプション、指定しない場合は新規作成） */
+  workerTypeRegistry?: WorkerTypeRegistry;
+  /** AI Health Checker（オプション、指定しない場合は新規作成） */
+  aiHealthChecker?: AIHealthChecker;
+  /** Execution Reporter（オプション、指定しない場合は新規作成） */
+  executionReporter?: ExecutionReporter;
+  /** Quality Gate Integration（オプション、指定しない場合は新規作成） */
+  qualityGateIntegration?: QualityGateIntegration;
+  /** Run Directory Manager（オプション、指定しない場合は新規作成） */
+  runDirectoryManager?: RunDirectoryManager;
   /** システム設定（オプション） */
   systemConfig?: Partial<SystemConfig>;
   /** エラーハンドラーオプション（オプション） */
@@ -220,6 +248,33 @@ export class Orchestrator implements IOrchestrator {
   /** Error Handler */
   private errorHandler: ErrorHandler;
 
+  /** Ticket Manager - チケット管理 */
+  private ticketManager: TicketManager;
+
+  /** PR Creator - Pull Request作成 */
+  private prCreator: PRCreator;
+
+  /** Review Workflow - レビューワークフロー */
+  private reviewWorkflow: ReviewWorkflow;
+
+  /** Worker Type Registry - ワーカータイプ管理 */
+  private workerTypeRegistry: WorkerTypeRegistry;
+
+  /** AI Health Checker - AI可用性チェック */
+  private aiHealthChecker: AIHealthChecker;
+
+  /** Execution Reporter - 実行レポート生成 */
+  private executionReporter: ExecutionReporter;
+
+  /** Quality Gate Integration - 品質ゲート統合 */
+  private qualityGateIntegration: QualityGateIntegration;
+
+  /** Run Directory Manager - 実行ディレクトリ管理 */
+  private runDirectoryManager: RunDirectoryManager;
+
+  /** AI可用性ステータス（最新のチェック結果） */
+  private aiHealthStatus: AIHealthStatus | null = null;
+
   /** システム設定 */
   private systemConfig: SystemConfig;
 
@@ -259,12 +314,14 @@ export class Orchestrator implements IOrchestrator {
     this.workerPool = config?.workerPool ?? createWorkerPoolFromConfig(this.systemConfig);
 
     // Error Handlerを設定（エスカレーションコールバック付き）
-    this.errorHandler = config?.errorHandler ?? createErrorHandler({
-      ...config?.errorHandlerOptions,
-      onEscalation: async (info) => {
-        await this.handleEscalation(info);
-      },
-    });
+    this.errorHandler =
+      config?.errorHandler ??
+      createErrorHandler({
+        ...config?.errorHandlerOptions,
+        onEscalation: async (info) => {
+          await this.handleEscalation(info);
+        },
+      });
 
     // Manager Agentを設定
     if (config?.managerAgent) {
@@ -279,6 +336,34 @@ export class Orchestrator implements IOrchestrator {
       };
       this.managerAgent = createManagerAgent(managerConfig);
     }
+
+    // Ticket Managerを設定
+    this.ticketManager = config?.ticketManager ?? createTicketManager();
+
+    // PR Creatorを設定
+    this.prCreator = config?.prCreator ?? createPRCreator();
+
+    // Review Workflowを設定
+    this.reviewWorkflow = config?.reviewWorkflow ?? createReviewWorkflow();
+
+    // Worker Type Registryを設定
+    this.workerTypeRegistry = config?.workerTypeRegistry ?? createWorkerTypeRegistry();
+
+    // AI Health Checkerを設定
+    // @see Requirement 1.1: THE Orchestrator SHALL check AI adapter availability
+    this.aiHealthChecker = config?.aiHealthChecker ?? createAIHealthChecker();
+
+    // Execution Reporterを設定
+    // @see Requirements: 5.1, 5.2, 5.3, 5.4
+    this.executionReporter = config?.executionReporter ?? new ExecutionReporter();
+
+    // Quality Gate Integrationを設定
+    // @see Requirements: 4.1, 4.2, 4.3
+    this.qualityGateIntegration = config?.qualityGateIntegration ?? createQualityGateIntegration();
+
+    // Run Directory Managerを設定
+    // @see Requirements: 2.4, 2.5
+    this.runDirectoryManager = config?.runDirectoryManager ?? new RunDirectoryManager();
   }
 
   // ===========================================================================
@@ -306,6 +391,27 @@ export class Orchestrator implements IOrchestrator {
 
     // 保存された実行状態を復元
     await this.restoreSavedStates();
+
+    // AI可用性チェック（graceful degradation: 失敗してもシステムは起動する）
+    // @see Requirement 1.1: WHEN the system starts, THE Orchestrator SHALL check AI adapter availability
+    // @see Requirement 1.5: THE System SHALL support graceful degradation when AI is temporarily unavailable
+    try {
+      this.aiHealthStatus = await this.aiHealthChecker.getHealthStatus();
+      if (!this.aiHealthStatus.available) {
+        console.warn('[Orchestrator] AI実行基盤が利用不可です');
+        if (this.aiHealthStatus.setupInstructions) {
+          console.warn(`[Orchestrator] ${this.aiHealthStatus.setupInstructions}`);
+        }
+      } else {
+        console.log(
+          `[Orchestrator] AI実行基盤: 利用可能 (モデル: ${this.aiHealthStatus.modelsInstalled.join(', ')})`
+        );
+      }
+    } catch (error) {
+      // AI可用性チェック失敗時もシステムは起動する（graceful degradation）
+      console.warn('[Orchestrator] AI可用性チェックに失敗しました（システムは起動を継続）:', error);
+      this.aiHealthStatus = null;
+    }
 
     this.initialized = true;
     console.log('[Orchestrator] 初期化完了');
@@ -346,12 +452,16 @@ export class Orchestrator implements IOrchestrator {
    * タスクを送信
    *
    * 社長（ユーザー）からの指示を受け取り、Manager Agentに自動的に処理を開始させる。
+   * AI可用性チェック → 実行ディレクトリ作成 → メタデータ保存 → タスク処理開始の順で実行。
    *
    * @param instruction - 指示内容
    * @param projectId - プロジェクトID
    * @param options - 送信オプション
    * @returns タスクID
    *
+   * @see Requirement 1.1: WHEN the system starts, THE Orchestrator SHALL check AI adapter availability
+   * @see Requirement 2.4: WHEN a task is submitted, THE System SHALL create a run directory
+   * @see Requirement 2.5: THE System SHALL persist task metadata to task.json
    * @see Requirement 23.2: WHEN President submits instruction via GUI, THE Manager_Agent SHALL automatically start processing
    */
   async submitTask(
@@ -376,6 +486,27 @@ export class Orchestrator implements IOrchestrator {
 
     if (!projectId || projectId.trim().length === 0) {
       throw new OrchestratorError('プロジェクトIDは必須です', 'INVALID_INPUT');
+    }
+
+    // AI可用性チェック（タスク送信前に確認、結果をステータスに反映）
+    // @see Requirement 1.1: THE Orchestrator SHALL check AI adapter availability
+    // @see Requirement 1.2: IF Ollama is not available, display error message with setup instructions
+    // @see Requirement 1.5: THE System SHALL support graceful degradation when AI is temporarily unavailable
+    // 注: AI利用不可でもタスク送信自体はブロックしない（graceful degradation）
+    //      OrchestratorServerレベルでブロック判断を行う
+    try {
+      const healthStatus = await this.aiHealthChecker.getHealthStatus();
+      this.aiHealthStatus = healthStatus;
+
+      if (!healthStatus.available) {
+        console.warn('[Orchestrator] AI実行基盤が利用不可です（タスクは受付済み、実行時にエラーの可能性あり）');
+        if (healthStatus.setupInstructions) {
+          console.warn(`[Orchestrator] ${healthStatus.setupInstructions}`);
+        }
+      }
+    } catch (error) {
+      // ヘルスチェック自体の失敗はgraceful degradation（警告のみで続行）
+      console.warn('[Orchestrator] AI可用性チェックに失敗しました（タスク処理は続行）:', error);
     }
 
     // タスクIDを生成
@@ -404,10 +535,34 @@ export class Orchestrator implements IOrchestrator {
     console.log(`[Orchestrator] タスクを受信: ${taskId}`);
     console.log(`[Orchestrator] 指示: ${instruction.substring(0, 100)}...`);
 
+    // 実行ディレクトリを作成し、タスクメタデータを保存
+    // @see Requirement 2.4: WHEN a task is submitted, THE System SHALL create a run directory
+    // @see Requirement 2.5: THE System SHALL persist task metadata to task.json
+    const runId = this.generateRunId();
+    try {
+      await this.runDirectoryManager.createRunDirectory(runId);
+
+      const taskMetadata: RunTaskMetadata = {
+        taskId,
+        runId,
+        projectId,
+        instruction: instruction.trim(),
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+        aiAdapter: this.systemConfig.defaultAiAdapter,
+        model: this.systemConfig.defaultModel,
+      };
+      await this.runDirectoryManager.saveTaskMetadata(runId, taskMetadata);
+    } catch (dirError) {
+      // ディレクトリ作成失敗時もタスク処理は継続（graceful degradation）
+      console.warn(`[Orchestrator] 実行ディレクトリ作成に失敗: ${runId}`, dirError);
+    }
+
     // 一時停止中でなければ自動的に処理を開始
     if (!this.paused) {
       // 非同期で処理を開始（awaitしない）
-      this.startTaskProcessing(task, options?.autoDecompose ?? true).catch((error) => {
+      this.startTaskProcessing(task, options?.autoDecompose ?? true, runId).catch((error) => {
         console.error(`[Orchestrator] タスク処理エラー: ${taskId}`, error);
         this.updateTaskStatus(taskId, 'failed');
       });
@@ -420,18 +575,27 @@ export class Orchestrator implements IOrchestrator {
    * タスク処理を開始
    *
    * Manager Agentにタスクを渡し、分解・割り当て・監視を自動的に行わせる。
+   * タスク完了後に品質ゲート実行、成果物収集、レポート生成を行う。
    *
    * @param task - タスク
    * @param autoDecompose - 自動分解フラグ
+   * @param preGeneratedRunId - 事前生成された実行ID（submitTaskで生成済み）
    *
    * @see Requirement 23.3: THE Manager_Agent SHALL decompose, assign, and monitor without manual intervention
+   * @see Requirements: 4.1, 4.2, 4.3 (品質ゲート統合)
+   * @see Requirements: 5.1, 5.2, 5.3 (レポート生成)
    */
-  private async startTaskProcessing(task: Task, autoDecompose: boolean): Promise<void> {
+  private async startTaskProcessing(
+    task: Task,
+    autoDecompose: boolean,
+    preGeneratedRunId?: RunId
+  ): Promise<void> {
     // タスクステータスを更新
     this.updateTaskStatus(task.id, 'decomposing');
 
-    // 実行IDを生成
-    const runId = this.generateRunId();
+    // 実行IDを使用（事前生成済みがあればそれを使用、なければ新規生成）
+    const runId = preGeneratedRunId ?? this.generateRunId();
+    const startTime = new Date().toISOString();
 
     // 実行状態を作成
     const executionState: ExecutionState = {
@@ -469,6 +633,132 @@ export class Orchestrator implements IOrchestrator {
       // ワーカーにタスクを割り当て
       await this.assignSubTasksToWorkers(subTasks, runId, task.projectId);
     }
+
+    // タスク完了後の後処理（品質ゲート・レポート生成）
+    // @see Requirements: 4.1, 4.2, 4.3 (品質ゲート統合)
+    // @see Requirements: 5.1, 5.2, 5.3 (レポート生成)
+    await this.finalizeTaskExecution(task, runId, executionState, startTime);
+  }
+
+  /**
+   * タスク実行の後処理を実行
+   *
+   * 品質ゲートの実行、成果物の収集、レポートの生成・保存を行う。
+   * 各ステップでエラーが発生しても、可能な限り後続処理を継続する。
+   *
+   * @param task - 実行対象タスク
+   * @param runId - 実行ID
+   * @param executionState - 実行状態
+   * @param startTime - 実行開始日時（ISO8601形式）
+   *
+   * @see Requirement 4.1: WHEN a Worker_Agent completes code changes, THE System SHALL run lint automatically
+   * @see Requirement 4.2: WHEN lint passes, THE System SHALL run tests automatically
+   * @see Requirement 4.3: THE System SHALL record quality gate results to quality.json
+   * @see Requirement 5.1: WHEN a task completes, THE System SHALL collect all artifacts to Run_Directory
+   * @see Requirement 5.2: THE System SHALL generate a summary report at report.md
+   * @see Requirement 5.3: THE report SHALL include: task description, changes made, test results, conversation summary
+   */
+  private async finalizeTaskExecution(
+    task: Task,
+    runId: RunId,
+    executionState: ExecutionState,
+    startTime: string
+  ): Promise<void> {
+    const endTime = new Date().toISOString();
+
+    // --- 品質ゲート実行 ---
+    // @see Requirement 4.1: THE System SHALL run lint automatically
+    // @see Requirement 4.2: WHEN lint passes, THE System SHALL run tests automatically
+    let qualityGatesPassed = false;
+    try {
+      const qualityResults = await this.qualityGateIntegration.runAllChecks('.');
+      qualityGatesPassed = qualityResults.overall;
+
+      // 品質ゲート結果を保存
+      // @see Requirement 4.3: THE System SHALL record quality gate results to quality.json
+      await this.qualityGateIntegration.saveResults(runId, qualityResults);
+
+      if (qualityGatesPassed) {
+        console.log(`[Orchestrator] 品質ゲート通過: ${runId}`);
+      } else {
+        console.warn(`[Orchestrator] 品質ゲート失敗: ${runId}`);
+      }
+    } catch (qgError) {
+      // 品質ゲート実行エラーはログに記録して続行
+      console.warn(`[Orchestrator] 品質ゲート実行エラー: ${runId}`, qgError);
+    }
+
+    // --- 成果物収集 ---
+    // @see Requirement 5.1: WHEN a task completes, THE System SHALL collect all artifacts
+    const artifacts = executionState.artifacts ?? [];
+    try {
+      if (artifacts.length > 0) {
+        await this.executionReporter.collectArtifacts(runId, artifacts);
+        console.log(`[Orchestrator] 成果物収集完了: ${runId} (${artifacts.length}件)`);
+      }
+    } catch (artifactError) {
+      // 成果物収集エラーはログに記録して続行
+      console.warn(`[Orchestrator] 成果物収集エラー: ${runId}`, artifactError);
+    }
+
+    // --- レポート生成 ---
+    // @see Requirement 5.2: THE System SHALL generate a summary report at report.md
+    // @see Requirement 5.3: THE report SHALL include: task description, changes made, test results, conversation summary
+    try {
+      // ExecutionResultを構築
+      const executionResult: ExecutionResult = {
+        runId,
+        ticketId: task.id,
+        agentId: this.managerAgent.agentId,
+        status: qualityGatesPassed ? 'success' : 'quality_failed',
+        startTime,
+        endTime,
+        artifacts,
+        gitBranch: Object.values(executionState.gitBranches)[0] ?? '',
+        commits: [],
+        qualityGates: {
+          lint: { passed: qualityGatesPassed, output: '' },
+          test: { passed: qualityGatesPassed, output: '' },
+          overall: qualityGatesPassed,
+        },
+        errors: [],
+        conversationTurns: this.countConversationTurns(executionState),
+        tokensUsed: 0,
+      };
+
+      // レポートを生成・保存
+      const report = this.executionReporter.generateReport(runId, executionResult);
+      await this.executionReporter.saveReport(runId, report);
+      console.log(`[Orchestrator] レポート生成完了: ${runId}`);
+    } catch (reportError) {
+      // レポート生成エラーはログに記録して続行
+      console.warn(`[Orchestrator] レポート生成エラー: ${runId}`, reportError);
+    }
+
+    // --- 実行状態の最終更新 ---
+    executionState.status = qualityGatesPassed ? 'completed' : 'failed';
+    executionState.lastUpdated = new Date().toISOString();
+    this.executionStates.set(runId, executionState);
+    await this.stateManager.saveState(runId, executionState);
+
+    // タスクステータスの最終更新
+    this.updateTaskStatus(task.id, qualityGatesPassed ? 'completed' : 'failed');
+  }
+
+  /**
+   * 実行状態から会話ターン数を集計
+   *
+   * @param executionState - 実行状態
+   * @returns 会話ターン数の合計
+   */
+  private countConversationTurns(executionState: ExecutionState): number {
+    let totalTurns = 0;
+    for (const history of Object.values(executionState.conversationHistories)) {
+      if (Array.isArray(history)) {
+        totalTurns += history.length;
+      }
+    }
+    return totalTurns;
   }
 
   /**
@@ -476,12 +766,12 @@ export class Orchestrator implements IOrchestrator {
    *
    * @param subTasks - サブタスク一覧
    * @param runId - 実行ID
-   * @param projectId - プロジェクトID
+   * @param _projectId - プロジェクトID（将来の拡張用）
    */
   private async assignSubTasksToWorkers(
     subTasks: SubTask[],
     runId: RunId,
-    projectId: string
+    _projectId: string
   ): Promise<void> {
     // 並列実行可能なタスクを取得
     const parallelizableTasks = subTasks.filter((t) => t.status === 'pending');
@@ -664,7 +954,7 @@ export class Orchestrator implements IOrchestrator {
     } else if (this.paused) {
       managerStatus = 'paused';
     }
-    
+
     agents.push({
       id: this.managerAgent.agentId,
       type: 'manager',
@@ -782,10 +1072,7 @@ export class Orchestrator implements IOrchestrator {
     this.managerAgent.stopProgressMonitoring();
 
     // Worker Poolを停止
-    await Promise.race([
-      this.workerPool.stop(),
-      this.sleep(EMERGENCY_STOP_TIMEOUT_MS),
-    ]);
+    await Promise.race([this.workerPool.stop(), this.sleep(EMERGENCY_STOP_TIMEOUT_MS)]);
 
     // 全ての実行状態を失敗に更新
     for (const [runId, state] of this.executionStates) {
@@ -973,11 +1260,7 @@ export class Orchestrator implements IOrchestrator {
    *
    * @see Requirement 13.2: WHEN Tool_Call fails, THE System SHALL report error to AI and continue conversation
    */
-  async handleToolCallError(
-    error: Error,
-    toolName: string,
-    runId: RunId
-  ): Promise<string> {
+  async handleToolCallError(error: Error, toolName: string, runId: RunId): Promise<string> {
     return this.errorHandler.handleToolCallError(error, toolName, runId);
   }
 
@@ -1105,6 +1388,205 @@ export class Orchestrator implements IOrchestrator {
   getErrorHandler(): ErrorHandler {
     return this.errorHandler;
   }
+
+  /**
+   * Ticket Managerを取得
+   * @returns Ticket Manager
+   */
+  getTicketManager(): TicketManager {
+    return this.ticketManager;
+  }
+
+  /**
+   * PR Creatorを取得
+   * @returns PR Creator
+   */
+  getPRCreator(): PRCreator {
+    return this.prCreator;
+  }
+
+  /**
+   * Review Workflowを取得
+   * @returns Review Workflow
+   */
+  getReviewWorkflow(): ReviewWorkflow {
+    return this.reviewWorkflow;
+  }
+
+  /**
+   * Worker Type Registryを取得
+   * @returns Worker Type Registry
+   */
+  getWorkerTypeRegistry(): WorkerTypeRegistry {
+    return this.workerTypeRegistry;
+  }
+
+  /**
+   * AI Health Checkerを取得
+   * @returns AI Health Checker
+   */
+  getAIHealthChecker(): AIHealthChecker {
+    return this.aiHealthChecker;
+  }
+
+  /**
+   * Execution Reporterを取得
+   * @returns Execution Reporter
+   */
+  getExecutionReporter(): ExecutionReporter {
+    return this.executionReporter;
+  }
+
+  /**
+   * Quality Gate Integrationを取得
+   * @returns Quality Gate Integration
+   */
+  getQualityGateIntegration(): QualityGateIntegration {
+    return this.qualityGateIntegration;
+  }
+
+  /**
+   * Run Directory Managerを取得
+   * @returns Run Directory Manager
+   */
+  getRunDirectoryManager(): RunDirectoryManager {
+    return this.runDirectoryManager;
+  }
+
+  /**
+   * AI可用性ステータスを取得
+   * @returns 最新のAI可用性ステータス（未チェックの場合はnull）
+   * @see Requirement 1.1: THE Orchestrator SHALL check AI adapter availability
+   */
+  getAIHealthStatus(): AIHealthStatus | null {
+    return this.aiHealthStatus;
+  }
+
+  /**
+   * AI可用性を再チェック
+   * @returns 最新のAI可用性ステータス
+   * @see Requirement 1.1: THE Orchestrator SHALL check AI adapter availability
+   */
+  async recheckAIHealth(): Promise<AIHealthStatus> {
+    this.aiHealthStatus = await this.aiHealthChecker.getHealthStatus();
+    return this.aiHealthStatus;
+  }
+
+  // ===========================================================================
+  // チケットベースワークフロー
+  // ===========================================================================
+
+  /**
+   * チケットからワークフローを実行
+   * @param ticketId - 親チケットID
+   * @returns 実行ID
+   * @see Requirements: 2.1, 2.2, 2.3, 2.4
+   */
+  async executeTicketWorkflow(ticketId: string): Promise<RunId> {
+    if (!this.initialized) {
+      throw new OrchestratorError('Orchestrator is not initialized', 'NOT_INITIALIZED');
+    }
+
+    // チケットを取得
+    const ticket = await this.ticketManager.getParentTicket(ticketId);
+    if (!ticket) {
+      throw new OrchestratorError(`Ticket not found: ${ticketId}`, 'TICKET_NOT_FOUND');
+    }
+
+    // 実行IDを生成
+    const runId = this.generateRunId();
+
+    // チケットステータスを更新
+    await this.ticketManager.updateTicketStatus(ticketId, 'decomposing');
+
+    // タスクとして送信（戻り値は将来のチケット追跡用に保持可能）
+    await this.submitTask(ticket.instruction, ticket.projectId, {
+      priority: ticket.metadata.priority,
+      tags: ticket.metadata.tags,
+      deadline: ticket.metadata.deadline,
+    });
+
+    // チケットとタスクを関連付け
+    await this.ticketManager.updateTicketStatus(ticketId, 'in_progress');
+
+    return runId;
+  }
+
+  /**
+   * チケットのレビューをリクエスト
+   * @param ticketId - チケットID
+   * @param reviewerId - レビュアーID
+   * @returns レビューリクエストID
+   * @see Requirements: 5.1, 5.2
+   */
+  async requestTicketReview(ticketId: string, reviewerId: string): Promise<string> {
+    // チケットステータスを更新
+    await this.ticketManager.updateTicketStatus(ticketId, 'review_requested');
+
+    // レビューをリクエスト
+    const reviewId = await this.reviewWorkflow.requestReview({
+      ticketId,
+      reviewerId,
+      requestedAt: new Date().toISOString(),
+    });
+
+    return reviewId;
+  }
+
+  /**
+   * チケットのPRを作成
+   * @param ticketId - 親チケットID
+   * @returns PR作成結果
+   * @see Requirements: 10.1, 10.2, 10.3
+   */
+  async createTicketPR(
+    ticketId: string
+  ): Promise<{ success: boolean; prUrl?: string; error?: string }> {
+    // チケットを取得
+    const ticket = await this.ticketManager.getParentTicket(ticketId);
+    if (!ticket) {
+      return { success: false, error: `Ticket not found: ${ticketId}` };
+    }
+
+    // PR作成
+    const result = await this.prCreator.createPullRequest({
+      ticketId,
+      projectId: ticket.projectId,
+      title: `[AgentCompany] ${ticket.instruction.substring(0, 50)}`,
+      body: this.generatePRBody(ticket),
+    });
+
+    if (result.success) {
+      // チケットステータスを更新
+      await this.ticketManager.updateTicketStatus(ticketId, 'pr_created');
+    }
+
+    return result;
+  }
+
+  /**
+   * PR本文を生成
+   * @param ticket - 親チケット
+   * @returns PR本文
+   */
+  private generatePRBody(ticket: ParentTicket): string {
+    const childSummary = ticket.childTickets
+      .map((child) => `- ${child.title} (${child.status})`)
+      .join('\n');
+
+    return `## Overview
+${ticket.instruction}
+
+## Changes
+${childSummary}
+
+## Ticket ID
+${ticket.id}
+
+## Created by
+AgentCompany Autonomous Workflow
+`;
+  }
 }
 
 // =============================================================================
@@ -1163,9 +1645,7 @@ export function createOrchestrator(config?: OrchestratorConfig): Orchestrator {
  * @param systemConfig - システム設定
  * @returns Orchestratorインスタンス
  */
-export function createOrchestratorFromConfig(
-  systemConfig: Partial<SystemConfig>
-): Orchestrator {
+export function createOrchestratorFromConfig(systemConfig: Partial<SystemConfig>): Orchestrator {
   return new Orchestrator({ systemConfig });
 }
 

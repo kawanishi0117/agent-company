@@ -119,9 +119,7 @@ describe('ProcessMonitor', () => {
      * 標準エラー出力を含むコマンド
      */
     it('標準エラー出力を正しく収集する', async () => {
-      const command = isWindows
-        ? 'cmd /c echo error message 1>&2'
-        : 'echo "error message" >&2';
+      const command = isWindows ? 'cmd /c echo error message 1>&2' : 'echo "error message" >&2';
       const result = await processMonitor.execute(command, { timeout: 5 });
 
       expect(result.exitCode).toBe(0);
@@ -155,8 +153,7 @@ describe('ProcessMonitor', () => {
       expect(result.exitCode).toBe(0);
       // パスの正規化（Windowsでは大文字小文字が異なる場合がある）
       expect(result.stdout.trim().toLowerCase()).toContain(
-        tempDir.toLowerCase().replace(/\\/g, '/')
-          .split('/').pop() || ''
+        tempDir.toLowerCase().replace(/\\/g, '/').split('/').pop() || ''
       );
     });
 

@@ -78,9 +78,10 @@ interface ApiResponse<T> {
 // 定数
 // =============================================================================
 
-const BACKLOG_DIR = path.join(process.cwd(), 'workflows', 'backlog');
-const RUNS_DIR = path.join(process.cwd(), 'runtime', 'runs');
-const STATE_DIR = path.join(process.cwd(), 'runtime', 'state');
+// GUIは gui/web/ から実行されるため、ルートへは2階層上がる必要がある
+const BACKLOG_DIR = path.join(process.cwd(), '..', '..', 'workflows', 'backlog');
+const RUNS_DIR = path.join(process.cwd(), '..', '..', 'runtime', 'runs');
+const STATE_DIR = path.join(process.cwd(), '..', '..', 'runtime', 'state');
 
 // =============================================================================
 // ユーティリティ関数
@@ -111,16 +112,11 @@ async function parseTicketFile(ticketId: string): Promise<{
   try {
     // チケットファイルを探す
     const files = await fs.readdir(BACKLOG_DIR);
-    const ticketFile = files.find(
-      (f) => f.startsWith(ticketId) && f.endsWith('.md')
-    );
+    const ticketFile = files.find((f) => f.startsWith(ticketId) && f.endsWith('.md'));
 
     if (!ticketFile) return null;
 
-    const content = await fs.readFile(
-      path.join(BACKLOG_DIR, ticketFile),
-      'utf-8'
-    );
+    const content = await fs.readFile(path.join(BACKLOG_DIR, ticketFile), 'utf-8');
 
     // フロントマターをパース
     const frontMatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
@@ -175,7 +171,7 @@ async function getRunInfo(ticketId: string): Promise<{
   try {
     // 実行ディレクトリを探す
     const runs = await fs.readdir(RUNS_DIR);
-    
+
     // チケットIDに関連する実行を探す
     for (const runId of runs.reverse()) {
       if (runId === '.gitkeep') continue;
@@ -268,7 +264,7 @@ async function saveTaskState(
 ): Promise<void> {
   const stateFile = path.join(STATE_DIR, 'tasks', `${taskId}.json`);
   await fs.mkdir(path.dirname(stateFile), { recursive: true });
-  
+
   let existingState = {};
   if (await fileExists(stateFile)) {
     const content = await fs.readFile(stateFile, 'utf-8');
@@ -308,10 +304,7 @@ export async function GET(
     // チケット情報を取得
     const ticket = await parseTicketFile(taskId);
     if (!ticket) {
-      return NextResponse.json(
-        { error: `タスク ${taskId} が見つかりません` },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: `タスク ${taskId} が見つかりません` }, { status: 404 });
     }
 
     // 実行情報を取得
@@ -363,10 +356,7 @@ export async function POST(
     // チケットが存在するか確認
     const ticket = await parseTicketFile(taskId);
     if (!ticket) {
-      return NextResponse.json(
-        { error: `タスク ${taskId} が見つかりません` },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: `タスク ${taskId} が見つかりません` }, { status: 404 });
     }
 
     let message = '';
@@ -389,10 +379,7 @@ export async function POST(
 
       case 'instruct':
         if (!instruction || typeof instruction !== 'string') {
-          return NextResponse.json(
-            { error: '追加指示は必須です' },
-            { status: 400 }
-          );
+          return NextResponse.json({ error: '追加指示は必須です' }, { status: 400 });
         }
         await saveTaskState(taskId, {
           status: 'executing',
@@ -402,10 +389,7 @@ export async function POST(
         break;
 
       default:
-        return NextResponse.json(
-          { error: `不明なアクション: ${action}` },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: `不明なアクション: ${action}` }, { status: 400 });
     }
 
     return NextResponse.json({
@@ -413,9 +397,6 @@ export async function POST(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : '不明なエラー';
-    return NextResponse.json(
-      { error: `操作に失敗しました: ${message}` },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: `操作に失敗しました: ${message}` }, { status: 500 });
   }
 }

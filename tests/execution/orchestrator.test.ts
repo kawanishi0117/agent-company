@@ -9,22 +9,21 @@
  * @see Requirements: 23.2, 23.3
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import {
   Orchestrator,
   createOrchestrator,
   createOrchestratorFromConfig,
-  OrchestratorConfig,
   OrchestratorError,
-  AgentInfo,
-  TaskStatusDetail,
 } from '../../tools/cli/lib/execution/orchestrator';
 import { StateManager } from '../../tools/cli/lib/execution/state-manager';
 import { AgentBus, createAgentBus } from '../../tools/cli/lib/execution/agent-bus';
 import { WorkerPool, createWorkerPool } from '../../tools/cli/lib/execution/worker-pool';
-import { DEFAULT_SYSTEM_CONFIG, SystemConfig } from '../../tools/cli/lib/execution/types';
+import { DEFAULT_SYSTEM_CONFIG } from '../../tools/cli/lib/execution/types';
+import { AIHealthChecker } from '../../tools/cli/lib/execution/ai-health-checker';
+import { RunDirectoryManager } from '../../tools/cli/lib/execution/run-directory-manager';
 
 // =============================================================================
 // テスト用ヘルパー
@@ -140,10 +139,7 @@ describe('Orchestrator', () => {
 
     describe('submitTask', () => {
       it('タスクを送信してタスクIDを取得できる', async () => {
-        const taskId = await orchestrator.submitTask(
-          'テスト機能を実装してください',
-          'project-001'
-        );
+        const taskId = await orchestrator.submitTask('テスト機能を実装してください', 'project-001');
 
         expect(taskId).toBeDefined();
         expect(taskId).toMatch(/^task-/);
@@ -167,23 +163,21 @@ describe('Orchestrator', () => {
       });
 
       it('空の指示でエラーになる', async () => {
-        await expect(
-          orchestrator.submitTask('', 'project-001')
-        ).rejects.toThrow(OrchestratorError);
+        await expect(orchestrator.submitTask('', 'project-001')).rejects.toThrow(OrchestratorError);
       });
 
       it('空のプロジェクトIDでエラーになる', async () => {
-        await expect(
-          orchestrator.submitTask('テスト機能を実装', '')
-        ).rejects.toThrow(OrchestratorError);
+        await expect(orchestrator.submitTask('テスト機能を実装', '')).rejects.toThrow(
+          OrchestratorError
+        );
       });
 
       it('緊急停止中は新規タスクを受け付けない', async () => {
         await orchestrator.emergencyStop();
 
-        await expect(
-          orchestrator.submitTask('テスト機能を実装', 'project-001')
-        ).rejects.toThrow('緊急停止中');
+        await expect(orchestrator.submitTask('テスト機能を実装', 'project-001')).rejects.toThrow(
+          '緊急停止中'
+        );
       });
     });
 
@@ -204,9 +198,9 @@ describe('Orchestrator', () => {
       });
 
       it('存在しないタスクIDでエラーになる', async () => {
-        await expect(
-          orchestrator.getTaskStatus('non-existent-task')
-        ).rejects.toThrow('タスクが見つかりません');
+        await expect(orchestrator.getTaskStatus('non-existent-task')).rejects.toThrow(
+          'タスクが見つかりません'
+        );
       });
     });
 
@@ -225,9 +219,9 @@ describe('Orchestrator', () => {
       });
 
       it('存在しないタスクIDでエラーになる', async () => {
-        await expect(
-          orchestrator.cancelTask('non-existent-task')
-        ).rejects.toThrow('タスクが見つかりません');
+        await expect(orchestrator.cancelTask('non-existent-task')).rejects.toThrow(
+          'タスクが見つかりません'
+        );
       });
     });
 
@@ -481,11 +475,7 @@ describe('Orchestrator', () => {
       await orchestrator.initialize();
 
       const error = new Error('File not found');
-      const message = await orchestrator.handleToolCallError(
-        error,
-        'read_file',
-        'run-test-002'
-      );
+      const message = await orchestrator.handleToolCallError(error, 'read_file', 'run-test-002');
 
       expect(message).toContain('read_file');
       expect(message).toContain('File not found');
@@ -506,6 +496,153 @@ describe('Orchestrator', () => {
 
       expect(result.result).toBe('fallback-result');
       expect(result.usedFallback).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // AI実行統合テスト（タスク13.1: Orchestratorへの統合）
+  // ===========================================================================
+
+  describe('AI実行統合', () => {
+    beforeEach(async () => {
+      await orchestrator.initialize();
+    });
+
+    describe('AI可用性チェック統合', () => {
+      it('submitTask時にAI可用性チェックが実行される', async () => {
+        // Ollamaが起動していない環境でもタスク送信は成功する（graceful degradation）
+        const taskId = await orchestrator.submitTask(
+          'テスト機能を実装してください',
+          'project-001',
+          { autoDecompose: false }
+        );
+
+        expect(taskId).toBeDefined();
+        expect(taskId).toMatch(/^task-/);
+
+        // AI可用性ステータスが更新されている
+        const healthStatus = orchestrator.getAIHealthStatus();
+        expect(healthStatus).toBeDefined();
+        // テスト環境ではOllamaが起動していないため、利用不可
+        expect(healthStatus?.ollamaRunning).toBe(false);
+      });
+
+      it('recheckAIHealthでAI可用性を再チェックできる', async () => {
+        const status = await orchestrator.recheckAIHealth();
+
+        expect(status).toBeDefined();
+        expect(status.lastChecked).toBeDefined();
+        expect(status.recommendedModels).toBeInstanceOf(Array);
+        expect(status.recommendedModels.length).toBeGreaterThan(0);
+      });
+
+      it('AI利用不可でもタスク送信がブロックされない', async () => {
+        // graceful degradation: AI利用不可でもタスクは受け付ける
+        const taskId = await orchestrator.submitTask(
+          'コードレビューを実施してください',
+          'project-002',
+          { autoDecompose: false }
+        );
+
+        expect(taskId).toBeDefined();
+        const task = orchestrator.getTask(taskId);
+        expect(task).toBeDefined();
+        expect(task?.instruction).toBe('コードレビューを実施してください');
+      });
+    });
+
+    describe('コンポーネントアクセス（統合コンポーネント）', () => {
+      it('AIHealthCheckerを取得できる', () => {
+        const checker = orchestrator.getAIHealthChecker();
+        expect(checker).toBeDefined();
+      });
+
+      it('ExecutionReporterを取得できる', () => {
+        const reporter = orchestrator.getExecutionReporter();
+        expect(reporter).toBeDefined();
+      });
+
+      it('QualityGateIntegrationを取得できる', () => {
+        const qgi = orchestrator.getQualityGateIntegration();
+        expect(qgi).toBeDefined();
+      });
+
+      it('RunDirectoryManagerを取得できる', () => {
+        const rdm = orchestrator.getRunDirectoryManager();
+        expect(rdm).toBeDefined();
+      });
+    });
+
+    describe('カスタムコンポーネント注入', () => {
+      it('カスタムAIHealthCheckerを注入できる', () => {
+        const customChecker = new AIHealthChecker({
+          ollamaBaseUrl: 'http://custom-host:11434',
+        });
+
+        const customOrchestrator = createOrchestrator({
+          stateManager,
+          agentBus,
+          workerPool,
+          aiHealthChecker: customChecker,
+        });
+
+        expect(customOrchestrator.getAIHealthChecker()).toBe(customChecker);
+      });
+
+      it('カスタムRunDirectoryManagerを注入できる', () => {
+        const customRdm = new RunDirectoryManager(path.join(tempDir, 'custom-runs'));
+
+        const customOrchestrator = createOrchestrator({
+          stateManager,
+          agentBus,
+          workerPool,
+          runDirectoryManager: customRdm,
+        });
+
+        expect(customOrchestrator.getRunDirectoryManager()).toBe(customRdm);
+      });
+    });
+
+    describe('実行ディレクトリ統合', () => {
+      it('submitTask時に実行ディレクトリが作成される', async () => {
+        // カスタムRunDirectoryManagerを使用してテスト用ディレクトリに保存
+        const runsDir = path.join(tempDir, 'runs');
+        const customRdm = new RunDirectoryManager(runsDir);
+
+        const customOrchestrator = createOrchestrator({
+          stateManager,
+          agentBus,
+          workerPool,
+          runDirectoryManager: customRdm,
+        });
+        await customOrchestrator.initialize();
+
+        const taskId = await customOrchestrator.submitTask(
+          'テスト機能を実装してください',
+          'project-001',
+          { autoDecompose: false }
+        );
+
+        expect(taskId).toBeDefined();
+
+        // 実行ディレクトリが作成されたことを確認
+        const entries = await fs.readdir(runsDir).catch(() => []);
+        // ディレクトリが少なくとも1つ作成されている
+        expect(entries.length).toBeGreaterThanOrEqual(1);
+
+        // task.jsonが保存されていることを確認
+        if (entries.length > 0) {
+          const runDir = path.join(runsDir, entries[0]);
+          const taskJsonPath = path.join(runDir, 'task.json');
+          const taskJson = await fs.readFile(taskJsonPath, 'utf-8');
+          const metadata = JSON.parse(taskJson);
+
+          expect(metadata.taskId).toBe(taskId);
+          expect(metadata.projectId).toBe('project-001');
+          expect(metadata.instruction).toBe('テスト機能を実装してください');
+          expect(metadata.status).toBe('pending');
+        }
+      });
     });
   });
 });

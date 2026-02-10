@@ -14,10 +14,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as fc from 'fast-check';
-import {
-  TaskDecomposer,
-  createTaskDecomposer,
-} from '../../tools/cli/lib/execution/decomposer';
+import { TaskDecomposer, createTaskDecomposer } from '../../tools/cli/lib/execution/decomposer';
 import { BaseAdapter, AdapterResponse, ChatOptions } from '../../tools/adapters/base';
 import { SubTask, SubTaskStatus } from '../../tools/cli/lib/execution/types';
 
@@ -89,6 +86,7 @@ describe('Property 2: Task Decomposition Independence', () => {
 
   beforeEach(() => {
     mockAdapter = new MockIndependentTaskAdapter();
+    // decomposerを正しく初期化
     decomposer = createTaskDecomposer(mockAdapter, 'test-model');
   });
 
@@ -227,7 +225,6 @@ describe('Property 2: Task Decomposition Independence', () => {
     );
   });
 });
-
 
 describe('Property 2 (Extended): Dependency Sequencing', () => {
   let mockAdapter: MockIndependentTaskAdapter;
@@ -553,7 +550,6 @@ describe('Task Decomposer Dependency Analysis - Edge Cases', () => {
   });
 });
 
-
 // =============================================================================
 // Property 3: Sub-Task Parent Reference
 // =============================================================================
@@ -572,11 +568,13 @@ describe('Task Decomposer Dependency Analysis - Edge Cases', () => {
 
 describe('Property 3: Sub-Task Parent Reference', () => {
   let mockAdapter: MockIndependentTaskAdapter;
-  let decomposer: TaskDecomposer;
+  // decomposerはテスト内でtestDecomposerとして個別に作成されるため、ここでは未使用
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  let _decomposer: TaskDecomposer;
 
   beforeEach(() => {
     mockAdapter = new MockIndependentTaskAdapter();
-    decomposer = createTaskDecomposer(mockAdapter, 'test-model');
+    _decomposer = createTaskDecomposer(mockAdapter, 'test-model');
   });
 
   /**
@@ -790,12 +788,14 @@ import { ProjectContext } from '../../tools/cli/lib/execution/decomposer';
 
 describe('Property 4: Sub-Task File Naming Convention', () => {
   let mockAdapter: MockIndependentTaskAdapter;
-  let decomposer: TaskDecomposer;
+  // decomposerはテスト内でtestDecomposerとして個別に作成されるため、ここでは未使用
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  let _decomposer: TaskDecomposer;
   let tempDir: string;
 
   beforeEach(async () => {
     mockAdapter = new MockIndependentTaskAdapter();
-    decomposer = createTaskDecomposer(mockAdapter, 'test-model');
+    _decomposer = createTaskDecomposer(mockAdapter, 'test-model');
     // テスト用の一時ディレクトリを作成
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'decomposer-test-'));
   });
@@ -1183,9 +1183,9 @@ describe('Sub-Task Parent Reference and File Naming - Edge Cases', () => {
 
     const backlogDir = path.join(tempDir, 'workflows', 'backlog');
 
-    await expect(
-      decomposer.saveSubTask(invalidSubTask, { backlogDir })
-    ).rejects.toThrow('SubTask parentId is required');
+    await expect(decomposer.saveSubTask(invalidSubTask, { backlogDir })).rejects.toThrow(
+      'SubTask parentId is required'
+    );
   });
 
   /**
@@ -1206,9 +1206,9 @@ describe('Sub-Task Parent Reference and File Naming - Edge Cases', () => {
 
     const backlogDir = path.join(tempDir, 'workflows', 'backlog');
 
-    await expect(
-      decomposer.saveSubTask(invalidSubTask, { backlogDir })
-    ).rejects.toThrow('SubTask id is required');
+    await expect(decomposer.saveSubTask(invalidSubTask, { backlogDir })).rejects.toThrow(
+      'SubTask id is required'
+    );
   });
 
   /**

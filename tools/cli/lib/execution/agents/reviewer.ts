@@ -160,7 +160,7 @@ export class ReviewerAgent {
    */
   constructor(config: ReviewerAgentConfig) {
     this.agentId = config.agentId;
-    this.modelName = config.modelName ?? 'llama3';
+    this.modelName = config.modelName ?? 'llama3.2:1b';
     this.workspacePath = config.workspacePath ?? process.cwd();
 
     // AIアダプタを取得

@@ -387,18 +387,24 @@ describe('SQLiteMessageQueue', () => {
 
   it('poll()が未実装エラーをスローすること', async () => {
     const queue = new SQLiteMessageQueue();
-    await expect(queue.poll('agent-001')).rejects.toThrow('SQLiteMessageQueue is not yet implemented');
+    await expect(queue.poll('agent-001')).rejects.toThrow(
+      'SQLiteMessageQueue is not yet implemented'
+    );
   });
 
   it('broadcast()が未実装エラーをスローすること', async () => {
     const queue = new SQLiteMessageQueue();
     const message = createTestMessage();
-    await expect(queue.broadcast(message)).rejects.toThrow('SQLiteMessageQueue is not yet implemented');
+    await expect(queue.broadcast(message)).rejects.toThrow(
+      'SQLiteMessageQueue is not yet implemented'
+    );
   });
 
   it('getMessageHistory()が未実装エラーをスローすること', async () => {
     const queue = new SQLiteMessageQueue();
-    await expect(queue.getMessageHistory('run-001')).rejects.toThrow('SQLiteMessageQueue is not yet implemented');
+    await expect(queue.getMessageHistory('run-001')).rejects.toThrow(
+      'SQLiteMessageQueue is not yet implemented'
+    );
   });
 
   it('cleanup()が未実装エラーをスローすること', async () => {
@@ -445,18 +451,24 @@ describe('RedisMessageQueue', () => {
 
   it('poll()が未実装エラーをスローすること', async () => {
     const queue = new RedisMessageQueue();
-    await expect(queue.poll('agent-001')).rejects.toThrow('RedisMessageQueue is not yet implemented');
+    await expect(queue.poll('agent-001')).rejects.toThrow(
+      'RedisMessageQueue is not yet implemented'
+    );
   });
 
   it('broadcast()が未実装エラーをスローすること', async () => {
     const queue = new RedisMessageQueue();
     const message = createTestMessage();
-    await expect(queue.broadcast(message)).rejects.toThrow('RedisMessageQueue is not yet implemented');
+    await expect(queue.broadcast(message)).rejects.toThrow(
+      'RedisMessageQueue is not yet implemented'
+    );
   });
 
   it('getMessageHistory()が未実装エラーをスローすること', async () => {
     const queue = new RedisMessageQueue();
-    await expect(queue.getMessageHistory('run-001')).rejects.toThrow('RedisMessageQueue is not yet implemented');
+    await expect(queue.getMessageHistory('run-001')).rejects.toThrow(
+      'RedisMessageQueue is not yet implemented'
+    );
   });
 
   it('cleanup()が未実装エラーをスローすること', async () => {

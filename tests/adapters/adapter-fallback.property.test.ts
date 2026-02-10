@@ -10,10 +10,9 @@
  * @module tests/adapters/adapter-fallback.property.test
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fc from 'fast-check';
 import {
-  BaseAdapter,
   ExtendedAdapter,
   GenerateOptions,
   ChatOptions,
@@ -173,7 +172,9 @@ class IntermittentAdapter implements ExtendedAdapter {
   async generate(options: GenerateOptions): Promise<AdapterResponse> {
     this.callCount++;
     if (this.callCount <= this.failuresBeforeSuccess) {
-      throw new AdapterConnectionError(`${this.name} temporary failure (attempt ${this.callCount})`);
+      throw new AdapterConnectionError(
+        `${this.name} temporary failure (attempt ${this.callCount})`
+      );
     }
     return {
       content: `Generated after ${this.callCount} attempts`,
@@ -186,7 +187,9 @@ class IntermittentAdapter implements ExtendedAdapter {
   async chat(options: ChatOptions): Promise<AdapterResponse> {
     this.callCount++;
     if (this.callCount <= this.failuresBeforeSuccess) {
-      throw new AdapterConnectionError(`${this.name} temporary failure (attempt ${this.callCount})`);
+      throw new AdapterConnectionError(
+        `${this.name} temporary failure (attempt ${this.callCount})`
+      );
     }
     return {
       content: `Chat response after ${this.callCount} attempts`,
@@ -199,7 +202,9 @@ class IntermittentAdapter implements ExtendedAdapter {
   async chatWithTools(options: ChatWithToolsOptions): Promise<ToolCallResponse> {
     this.callCount++;
     if (this.callCount <= this.failuresBeforeSuccess) {
-      throw new AdapterConnectionError(`${this.name} temporary failure (attempt ${this.callCount})`);
+      throw new AdapterConnectionError(
+        `${this.name} temporary failure (attempt ${this.callCount})`
+      );
     }
     return {
       content: `Tool response after ${this.callCount} attempts`,
@@ -274,7 +279,9 @@ const generateOptionsArb: fc.Arbitrary<GenerateOptions> = fc.record({
  * ChatMessageを生成するArbitrary
  */
 const chatMessageArb = fc.record({
-  role: fc.constantFrom('system', 'user', 'assistant') as fc.Arbitrary<'system' | 'user' | 'assistant'>,
+  role: fc.constantFrom('system', 'user', 'assistant') as fc.Arbitrary<
+    'system' | 'user' | 'assistant'
+  >,
   content: fc.string({ minLength: 1, maxLength: 300 }),
 });
 
@@ -321,11 +328,6 @@ const chatWithToolsOptionsArb: fc.Arbitrary<ChatWithToolsOptions> = fc.record({
  * リトライ回数を生成するArbitrary
  */
 const maxRetriesArb: fc.Arbitrary<number> = fc.integer({ min: 1, max: 5 });
-
-/**
- * リトライ遅延を生成するArbitrary（テスト用に短い値）
- */
-const retryDelayArb: fc.Arbitrary<number> = fc.integer({ min: 10, max: 100 });
 
 // =============================================================================
 // Property 15: AI Adapter Fallback テスト

@@ -5,7 +5,7 @@
  * @see Requirements: 3.1, 3.2
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as os from 'os';
 import * as path from 'path';
 import {
@@ -514,10 +514,7 @@ describe('Git認証方式管理', () => {
         tokenType: 'github_pat',
       };
 
-      const result = createAuthenticatedUrl(
-        'https://github.com/user/repo.git',
-        credential
-      );
+      const result = createAuthenticatedUrl('https://github.com/user/repo.git', credential);
 
       expect(result).toContain('x-access-token');
       expect(result).toContain('test_token');
@@ -531,10 +528,7 @@ describe('Git認証方式管理', () => {
         tokenType: 'github_pat',
       };
 
-      const result = createAuthenticatedUrl(
-        'git@github.com:user/repo.git',
-        credential
-      );
+      const result = createAuthenticatedUrl('git@github.com:user/repo.git', credential);
 
       expect(result).toBe('git@github.com:user/repo.git');
     });
@@ -547,10 +541,7 @@ describe('Git認証方式管理', () => {
         username: 'custom_user',
       };
 
-      const result = createAuthenticatedUrl(
-        'https://example.com/repo.git',
-        credential
-      );
+      const result = createAuthenticatedUrl('https://example.com/repo.git', credential);
 
       expect(result).toContain('custom_user');
     });
@@ -567,7 +558,7 @@ describe('Git認証方式管理', () => {
     });
 
     it('不明な種別は「不明」を返す', () => {
-      expect(getCredentialTypeDisplayName('unknown' as any)).toBe('不明');
+      expect(getCredentialTypeDisplayName('unknown' as unknown as 'deploy_key')).toBe('不明');
     });
   });
 

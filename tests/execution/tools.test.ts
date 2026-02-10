@@ -297,9 +297,7 @@ describe('ToolExecutor', () => {
       await fs.writeFile(testFile, originalContent, 'utf-8');
 
       // 2行目の前に挿入
-      const edits: FileEdit[] = [
-        { type: 'insert', startLine: 2, content: 'Inserted Line' },
-      ];
+      const edits: FileEdit[] = [{ type: 'insert', startLine: 2, content: 'Inserted Line' }];
 
       const result = await toolExecutor.editFile('edit.txt', edits);
 
@@ -313,9 +311,7 @@ describe('ToolExecutor', () => {
       await fs.writeFile(testFile, originalContent, 'utf-8');
 
       // 2行目を削除
-      const edits: FileEdit[] = [
-        { type: 'delete', startLine: 2, endLine: 2 },
-      ];
+      const edits: FileEdit[] = [{ type: 'delete', startLine: 2, endLine: 2 }];
 
       const result = await toolExecutor.editFile('edit.txt', edits);
 
@@ -401,17 +397,17 @@ describe('ToolExecutor', () => {
       expect(result.data!.length).toBe(3);
 
       // ファイルとディレクトリが含まれていることを確認
-      const names = result.data!.map(e => e.name);
+      const names = result.data!.map((e) => e.name);
       expect(names).toContain('file1.txt');
       expect(names).toContain('file2.txt');
       expect(names).toContain('subdir');
 
       // タイプが正しいことを確認
-      const file1 = result.data!.find(e => e.name === 'file1.txt');
+      const file1 = result.data!.find((e) => e.name === 'file1.txt');
       expect(file1?.type).toBe('file');
       expect(file1?.size).toBeDefined();
 
-      const subdir = result.data!.find(e => e.name === 'subdir');
+      const subdir = result.data!.find((e) => e.name === 'subdir');
       expect(subdir?.type).toBe('directory');
     });
 
@@ -455,7 +451,7 @@ describe('ToolExecutor', () => {
       const result = await toolExecutor.listDirectory('.');
 
       expect(result.success).toBe(true);
-      const names = result.data!.map(e => e.name);
+      const names = result.data!.map((e) => e.name);
       expect(names).toEqual(['apple.txt', 'mango.txt', 'zebra.txt']);
     });
   });
@@ -547,9 +543,7 @@ describe('ToolExecutor', () => {
 describe('applyEditsToContent', () => {
   it('replace操作を正しく適用する', () => {
     const content = 'Line 1\nLine 2\nLine 3';
-    const edits: FileEdit[] = [
-      { type: 'replace', startLine: 2, endLine: 2, content: 'Modified' },
-    ];
+    const edits: FileEdit[] = [{ type: 'replace', startLine: 2, endLine: 2, content: 'Modified' }];
 
     const result = applyEditsToContent(content, edits);
 
@@ -559,9 +553,7 @@ describe('applyEditsToContent', () => {
 
   it('insert操作を正しく適用する', () => {
     const content = 'Line 1\nLine 2';
-    const edits: FileEdit[] = [
-      { type: 'insert', startLine: 2, content: 'Inserted' },
-    ];
+    const edits: FileEdit[] = [{ type: 'insert', startLine: 2, content: 'Inserted' }];
 
     const result = applyEditsToContent(content, edits);
 
@@ -571,9 +563,7 @@ describe('applyEditsToContent', () => {
 
   it('delete操作を正しく適用する', () => {
     const content = 'Line 1\nLine 2\nLine 3';
-    const edits: FileEdit[] = [
-      { type: 'delete', startLine: 2, endLine: 2 },
-    ];
+    const edits: FileEdit[] = [{ type: 'delete', startLine: 2, endLine: 2 }];
 
     const result = applyEditsToContent(content, edits);
 
@@ -596,9 +586,7 @@ describe('applyEditsToContent', () => {
 
   it('空のファイルに挿入できる', () => {
     const content = '';
-    const edits: FileEdit[] = [
-      { type: 'insert', startLine: 1, content: 'New content' },
-    ];
+    const edits: FileEdit[] = [{ type: 'insert', startLine: 1, content: 'New content' }];
 
     const result = applyEditsToContent(content, edits);
 
@@ -608,9 +596,7 @@ describe('applyEditsToContent', () => {
 
   it('複数行の内容を挿入できる', () => {
     const content = 'Line 1\nLine 3';
-    const edits: FileEdit[] = [
-      { type: 'insert', startLine: 2, content: 'Line 2a\nLine 2b' },
-    ];
+    const edits: FileEdit[] = [{ type: 'insert', startLine: 2, content: 'Line 2a\nLine 2b' }];
 
     const result = applyEditsToContent(content, edits);
 
@@ -620,9 +606,7 @@ describe('applyEditsToContent', () => {
 
   it('endLineがstartLineより小さい場合はエラー', () => {
     const content = 'Line 1\nLine 2\nLine 3';
-    const edits: FileEdit[] = [
-      { type: 'replace', startLine: 3, endLine: 1, content: 'Invalid' },
-    ];
+    const edits: FileEdit[] = [{ type: 'replace', startLine: 3, endLine: 1, content: 'Invalid' }];
 
     const result = applyEditsToContent(content, edits);
 

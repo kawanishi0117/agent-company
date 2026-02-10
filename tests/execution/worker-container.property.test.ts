@@ -28,9 +28,7 @@ import {
   extractWorkerIdFromContainerName,
   isWorkerContainerName,
 } from '../../tools/cli/lib/execution/worker-container';
-import {
-  ContainerRuntime,
-} from '../../tools/cli/lib/execution/container-runtime';
+import { ContainerRuntime } from '../../tools/cli/lib/execution/container-runtime';
 import { AgentId } from '../../tools/cli/lib/execution/types';
 
 // =============================================================================
@@ -67,8 +65,41 @@ function createMockRuntime(): ContainerRuntime {
  */
 const workerIdArb: fc.Arbitrary<AgentId> = fc
   .tuple(
-    fc.stringOf(fc.constantFrom('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'), { minLength: 1, maxLength: 3 }),
-    fc.stringOf(fc.constantFrom('0', '1', '2', '3', '4', '5', '6', '7', '8', '9'), { minLength: 1, maxLength: 3 })
+    fc.stringOf(
+      fc.constantFrom(
+        'a',
+        'b',
+        'c',
+        'd',
+        'e',
+        'f',
+        'g',
+        'h',
+        'i',
+        'j',
+        'k',
+        'l',
+        'm',
+        'n',
+        'o',
+        'p',
+        'q',
+        'r',
+        's',
+        't',
+        'u',
+        'v',
+        'w',
+        'x',
+        'y',
+        'z'
+      ),
+      { minLength: 1, maxLength: 3 }
+    ),
+    fc.stringOf(fc.constantFrom('0', '1', '2', '3', '4', '5', '6', '7', '8', '9'), {
+      minLength: 1,
+      maxLength: 3,
+    })
   )
   .map(([prefix, suffix]) => `worker-${prefix}-${suffix}`);
 
@@ -80,9 +111,15 @@ const twoDistinctWorkerIdsArb: fc.Arbitrary<[AgentId, AgentId]> = fc
   .filter(([a, b]) => a !== b);
 
 /**
- * ネットワークモードを生成するArbitrary
+ * ネットワークモードを生成するArbitrary（将来の拡張用）
+ * @description 現在は未使用だが、将来のネットワーク隔離テスト拡張時に使用予定
  */
-const networkModeArb: fc.Arbitrary<'none' | 'bridge' | 'host'> = fc.constantFrom('none', 'bridge', 'host');
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _networkModeArb: fc.Arbitrary<'none' | 'bridge' | 'host'> = fc.constantFrom(
+  'none',
+  'bridge',
+  'host'
+);
 
 /**
  * 完全に隔離された設定を生成するArbitrary
@@ -97,7 +134,10 @@ const fullyIsolatedConfigArb: fc.Arbitrary<Partial<ContainerIsolationConfig>> = 
 /**
  * タスク完了状態を生成するArbitrary
  */
-const taskCompletionStatusArb: fc.Arbitrary<'success' | 'failure'> = fc.constantFrom('success', 'failure');
+const taskCompletionStatusArb: fc.Arbitrary<'success' | 'failure'> = fc.constantFrom(
+  'success',
+  'failure'
+);
 
 // =============================================================================
 // Property 10: Worker Container Isolation
@@ -160,11 +200,11 @@ describe('Property 10: Worker Container Isolation', () => {
         const callArgsB = vi.mocked(mockRuntimeB.createContainer).mock.calls[0][0];
 
         // /workspaceへの共有マウントがないことを確認
-        const sharedVolumeA = callArgsA.volumes?.find((v: string) =>
-          v.includes('/workspace') && !v.includes(':ro')
+        const sharedVolumeA = callArgsA.volumes?.find(
+          (v: string) => v.includes('/workspace') && !v.includes(':ro')
         );
-        const sharedVolumeB = callArgsB.volumes?.find((v: string) =>
-          v.includes('/workspace') && !v.includes(':ro')
+        const sharedVolumeB = callArgsB.volumes?.find(
+          (v: string) => v.includes('/workspace') && !v.includes(':ro')
         );
 
         expect(sharedVolumeA).toBeUndefined();
@@ -177,7 +217,6 @@ describe('Property 10: Worker Container Isolation', () => {
       { numRuns: 100 }
     );
   });
-
 
   /**
    * Property 10.3: セキュリティオプションによる隔離強化
@@ -213,14 +252,14 @@ describe('Property 10: Worker Container Isolation', () => {
     await fc.assert(
       fc.asyncProperty(
         workerIdArb,
-        fc.stringOf(fc.constantFrom('a', 'b', 'c', '0', '1', '2', '-'), { minLength: 5, maxLength: 10 }),
+        fc.stringOf(fc.constantFrom('a', 'b', 'c', '0', '1', '2', '-'), {
+          minLength: 5,
+          maxLength: 10,
+        }),
         async (workerId, runId) => {
           const mockRuntime = createMockRuntime();
           const resultsDir = `/host/runtime/runs/${runId}`;
-          const container = new WorkerContainer(
-            { workerId, resultsDir },
-            mockRuntime
-          );
+          const container = new WorkerContainer({ workerId, resultsDir }, mockRuntime);
           await container.create();
 
           const callArgs = vi.mocked(mockRuntime.createContainer).mock.calls[0][0];
@@ -245,10 +284,7 @@ describe('Property 10: Worker Container Isolation', () => {
     await fc.assert(
       fc.asyncProperty(workerIdArb, fullyIsolatedConfigArb, async (workerId, isolation) => {
         const mockRuntime = createMockRuntime();
-        const container = new WorkerContainer(
-          { workerId, isolation },
-          mockRuntime
-        );
+        const container = new WorkerContainer({ workerId, isolation }, mockRuntime);
 
         // 複数回検証を実行
         const result1 = await container.verifyIsolation();
@@ -275,14 +311,13 @@ describe('Property 10: Worker Container Isolation', () => {
   it('Property 10.6: 複数のワーカーコンテナは相互に隔離される', async () => {
     await fc.assert(
       fc.asyncProperty(
-        fc.array(workerIdArb, { minLength: 2, maxLength: 4 })
-          .map(ids => [...new Set(ids)]) // 重複を除去
-          .filter(ids => ids.length >= 2),
+        fc
+          .array(workerIdArb, { minLength: 2, maxLength: 4 })
+          .map((ids) => [...new Set(ids)]) // 重複を除去
+          .filter((ids) => ids.length >= 2),
         async (workerIds) => {
           // 各設定でコンテナを作成
-          const containers = workerIds.map(workerId =>
-            createIsolatedWorkerContainer(workerId)
-          );
+          const containers = workerIds.map((workerId) => createIsolatedWorkerContainer(workerId));
 
           // すべてのペアで隔離を検証
           for (let i = 0; i < containers.length; i++) {
@@ -331,7 +366,6 @@ describe('Property 10: Worker Container Isolation', () => {
     );
   });
 });
-
 
 // =============================================================================
 // Property 11: Worker Container Cleanup
@@ -461,27 +495,31 @@ describe('Property 11: Worker Container Cleanup', () => {
    */
   it('Property 11.5: 破棄は冪等である（複数回呼び出しても安全）', async () => {
     await fc.assert(
-      fc.asyncProperty(workerIdArb, fc.integer({ min: 2, max: 5 }), async (workerId, destroyCount) => {
-        const mockRuntime = createMockRuntime();
-        const container = new WorkerContainer({ workerId }, mockRuntime);
+      fc.asyncProperty(
+        workerIdArb,
+        fc.integer({ min: 2, max: 5 }),
+        async (workerId, destroyCount) => {
+          const mockRuntime = createMockRuntime();
+          const container = new WorkerContainer({ workerId }, mockRuntime);
 
-        // コンテナを作成
-        await container.create();
+          // コンテナを作成
+          await container.create();
 
-        // 複数回破棄を呼び出す
-        const results: boolean[] = [];
-        for (let i = 0; i < destroyCount; i++) {
-          const result = await container.destroy();
-          results.push(result.success);
+          // 複数回破棄を呼び出す
+          const results: boolean[] = [];
+          for (let i = 0; i < destroyCount; i++) {
+            const result = await container.destroy();
+            results.push(result.success);
+          }
+
+          // すべての呼び出しが成功すること
+          expect(results.every((r) => r)).toBe(true);
+          expect(container.isDestroyed()).toBe(true);
+
+          // removeContainerは1回だけ呼ばれる
+          expect(vi.mocked(mockRuntime.removeContainer)).toHaveBeenCalledTimes(1);
         }
-
-        // すべての呼び出しが成功すること
-        expect(results.every(r => r)).toBe(true);
-        expect(container.isDestroyed()).toBe(true);
-
-        // removeContainerは1回だけ呼ばれる
-        expect(vi.mocked(mockRuntime.removeContainer)).toHaveBeenCalledTimes(1);
-      }),
+      ),
       { numRuns: 100 }
     );
   });
@@ -569,7 +607,6 @@ describe('Property 11: Worker Container Cleanup', () => {
     );
   });
 });
-
 
 // =============================================================================
 // エッジケーステスト
@@ -693,9 +730,11 @@ describe('Worker Container Edge Cases', () => {
           const info1 = container.getInfo();
           const originalWorkerId = info1!.workerId;
 
-          // 取得した情報を変更
-          (info1 as any).workerId = 'modified-worker-id';
-          (info1 as any).config.cpuLimit = '999';
+          // 取得した情報を変更（型安全性を無視してテスト）
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (info1 as Record<string, unknown>).workerId = 'modified-worker-id';
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (info1 as Record<string, unknown>).config = { cpuLimit: '999' };
 
           // 元の情報は変更されていない
           const info2 = container.getInfo();
@@ -755,9 +794,7 @@ describe('Worker Container Edge Cases', () => {
       await fc.assert(
         fc.asyncProperty(workerIdArb, async (workerId) => {
           const errorRuntime = createMockRuntime();
-          vi.mocked(errorRuntime.removeContainer).mockRejectedValue(
-            new Error('Container in use')
-          );
+          vi.mocked(errorRuntime.removeContainer).mockRejectedValue(new Error('Container in use'));
 
           const container = new WorkerContainer({ workerId }, errorRuntime);
           await container.create();

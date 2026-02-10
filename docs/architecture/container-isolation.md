@@ -66,10 +66,10 @@ Worker A                    Worker B
 
 ```typescript
 const DEFAULT_ISOLATION_CONFIG = {
-  networkMode: 'none',           // ネットワーク隔離
-  noNewPrivileges: true,         // 特権昇格禁止
-  dropAllCapabilities: true,     // 全capabilities削除
-  pidsLimit: 256,                // プロセス数制限
+  networkMode: 'none', // ネットワーク隔離
+  noNewPrivileges: true, // 特権昇格禁止
+  dropAllCapabilities: true, // 全capabilities削除
+  pidsLimit: 256, // プロセス数制限
   readOnlyRootFilesystem: false, // /workspaceへの書き込みが必要
   tmpfsMounts: ['/tmp', '/var/tmp'],
 };
@@ -77,12 +77,12 @@ const DEFAULT_ISOLATION_CONFIG = {
 
 ### 各オプションの説明
 
-| オプション | 説明 | セキュリティ効果 |
-|-----------|------|-----------------|
+| オプション                              | 説明                              | セキュリティ効果   |
+| --------------------------------------- | --------------------------------- | ------------------ |
 | `--security-opt=no-new-privileges:true` | setuid/setgidによる特権取得を禁止 | 特権昇格攻撃を防止 |
-| `--cap-drop=ALL` | 全てのLinux capabilitiesを削除 | 特権操作を制限 |
-| `--pids-limit=256` | プロセス数を制限 | フォーク爆弾を防止 |
-| `--tmpfs=/tmp:rw,noexec,nosuid` | 一時ファイル用の揮発性ストレージ | 永続化攻撃を防止 |
+| `--cap-drop=ALL`                        | 全てのLinux capabilitiesを削除    | 特権操作を制限     |
+| `--pids-limit=256`                      | プロセス数を制限                  | フォーク爆弾を防止 |
+| `--tmpfs=/tmp:rw,noexec,nosuid`         | 一時ファイル用の揮発性ストレージ  | 永続化攻撃を防止   |
 
 ## 隔離検証
 
@@ -158,7 +158,7 @@ const container = createWorkerContainer('worker-001', {
     networkMode: 'none',
     noNewPrivileges: true,
     dropAllCapabilities: true,
-    pidsLimit: 512,  // カスタム値
+    pidsLimit: 512, // カスタム値
   },
 });
 ```

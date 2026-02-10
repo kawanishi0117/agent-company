@@ -61,9 +61,10 @@ interface ApiResponse<T> {
 // 定数
 // =============================================================================
 
-const BACKLOG_DIR = path.join(process.cwd(), 'workflows', 'backlog');
-const RUNS_DIR = path.join(process.cwd(), 'runtime', 'runs');
-const REVIEW_STATE_FILE = path.join(process.cwd(), 'runtime', 'state', 'reviews.json');
+// GUIは gui/web/ から実行されるため、ルートへは2階層上がる必要がある
+const BACKLOG_DIR = path.join(process.cwd(), '..', '..', 'workflows', 'backlog');
+const RUNS_DIR = path.join(process.cwd(), '..', '..', 'runtime', 'runs');
+const REVIEW_STATE_FILE = path.join(process.cwd(), '..', '..', 'runtime', 'state', 'reviews.json');
 
 // =============================================================================
 // ユーティリティ関数
@@ -144,7 +145,10 @@ async function parseTicketFile(ticketPath: string): Promise<{
     const descriptionMatch = content.match(/## 指示内容\n\n([\s\S]*?)(?=\n##|$)/);
     const description = descriptionMatch
       ? descriptionMatch[1].trim()
-      : content.replace(/^---[\s\S]*?---/, '').trim().slice(0, 200);
+      : content
+          .replace(/^---[\s\S]*?---/, '')
+          .trim()
+          .slice(0, 200);
 
     return {
       id: frontMatter.id || path.basename(ticketPath, '.md'),
@@ -205,17 +209,30 @@ async function getReviewTasks(): Promise<ReviewTask[]> {
               runInfo = {
                 gitBranch: result.gitBranch || result.git_branch || `agent/${ticket.id}`,
                 completedAt: result.endTime || result.end_time || new Date().toISOString(),
-                fileChanges: (result.artifacts || []).map((a: { path?: string; type?: string; diff?: string; linesAdded?: number; linesRemoved?: number } | string) => ({
-                  path: typeof a === 'string' ? a : a.path || 'unknown',
-                  type: typeof a === 'string' ? 'modified' : a.type || 'modified',
-                  diff: typeof a === 'string' ? undefined : a.diff,
-                  linesAdded: typeof a === 'string' ? undefined : a.linesAdded,
-                  linesRemoved: typeof a === 'string' ? undefined : a.linesRemoved,
-                })),
-                qualityGates: result.qualityGates || result.quality_gates || {
-                  lint: { passed: true },
-                  test: { passed: true },
-                },
+                fileChanges: (result.artifacts || []).map(
+                  (
+                    a:
+                      | {
+                          path?: string;
+                          type?: string;
+                          diff?: string;
+                          linesAdded?: number;
+                          linesRemoved?: number;
+                        }
+                      | string
+                  ) => ({
+                    path: typeof a === 'string' ? a : a.path || 'unknown',
+                    type: typeof a === 'string' ? 'modified' : a.type || 'modified',
+                    diff: typeof a === 'string' ? undefined : a.diff,
+                    linesAdded: typeof a === 'string' ? undefined : a.linesAdded,
+                    linesRemoved: typeof a === 'string' ? undefined : a.linesRemoved,
+                  })
+                ),
+                qualityGates: result.qualityGates ||
+                  result.quality_gates || {
+                    lint: { passed: true },
+                    test: { passed: true },
+                  },
               };
               break;
             }
@@ -256,9 +273,7 @@ async function getReviewTasks(): Promise<ReviewTask[]> {
  */
 async function updateTicketStatus(ticketId: string, newStatus: string): Promise<void> {
   const files = await fs.readdir(BACKLOG_DIR);
-  const ticketFile = files.find(
-    (f) => f.startsWith(ticketId) && f.endsWith('.md')
-  );
+  const ticketFile = files.find((f) => f.startsWith(ticketId) && f.endsWith('.md'));
 
   if (!ticketFile) return;
 
@@ -266,16 +281,10 @@ async function updateTicketStatus(ticketId: string, newStatus: string): Promise<
   let content = await fs.readFile(ticketPath, 'utf-8');
 
   // ステータスを更新
-  content = content.replace(
-    /^(status:\s*).+$/m,
-    `$1${newStatus}`
-  );
+  content = content.replace(/^(status:\s*).+$/m, `$1${newStatus}`);
 
   // 更新日時を更新
-  content = content.replace(
-    /^(updated:\s*).+$/m,
-    `$1${new Date().toISOString()}`
-  );
+  content = content.replace(/^(updated:\s*).+$/m, `$1${new Date().toISOString()}`);
 
   await fs.writeFile(ticketPath, content);
 }
@@ -318,10 +327,7 @@ export async function POST(
     const { taskId, action, comment, filePath, line } = body;
 
     if (!taskId) {
-      return NextResponse.json(
-        { error: 'タスクIDは必須です' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'タスクIDは必須です' }, { status: 400 });
     }
 
     const reviewState = await loadReviewState();
@@ -360,10 +366,7 @@ export async function POST(
 
       case 'comment':
         if (!comment || typeof comment !== 'string') {
-          return NextResponse.json(
-            { error: 'コメント内容は必須です' },
-            { status: 400 }
-          );
+          return NextResponse.json({ error: 'コメント内容は必須です' }, { status: 400 });
         }
 
         // コメントを追加
@@ -383,10 +386,7 @@ export async function POST(
         break;
 
       default:
-        return NextResponse.json(
-          { error: `不明なアクション: ${action}` },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: `不明なアクション: ${action}` }, { status: 400 });
     }
 
     await saveReviewState(reviewState);
@@ -396,9 +396,6 @@ export async function POST(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : '不明なエラー';
-    return NextResponse.json(
-      { error: `操作に失敗しました: ${message}` },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: `操作に失敗しました: ${message}` }, { status: 500 });
   }
 }

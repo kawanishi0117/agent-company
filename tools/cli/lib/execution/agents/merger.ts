@@ -191,7 +191,7 @@ export class MergerAgent {
    */
   constructor(config: MergerAgentConfig) {
     this.agentId = config.agentId;
-    this.modelName = config.modelName ?? 'llama3';
+    this.modelName = config.modelName ?? 'llama3.2:1b';
     this.workspacePath = config.workspacePath ?? process.cwd();
     this.integrationBranch = config.integrationBranch ?? DEFAULT_INTEGRATION_BRANCH;
 

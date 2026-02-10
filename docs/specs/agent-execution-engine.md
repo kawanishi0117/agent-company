@@ -8,12 +8,12 @@ Agent Execution Engineは、AgentCompanyの中核となるエージェント実�
 
 ### 1. エージェント階層
 
-| エージェント | 役割 | 責務 |
-|-------------|------|------|
-| Manager Agent | 上司 | タスク分解、割り当て、進捗監視 |
-| Worker Agent | 部下 | コード生成、ファイル操作、テスト実行 |
-| Reviewer Agent | レビュアー | コードレビュー、コンフリクト解決 |
-| Merger Agent | マージ担当 | ブランチマージ、PR作成 |
+| エージェント   | 役割       | 責務                                 |
+| -------------- | ---------- | ------------------------------------ |
+| Manager Agent  | 上司       | タスク分解、割り当て、進捗監視       |
+| Worker Agent   | 部下       | コード生成、ファイル操作、テスト実行 |
+| Reviewer Agent | レビュアー | コードレビュー、コンフリクト解決     |
+| Merger Agent   | マージ担当 | ブランチマージ、PR作成               |
 
 ### 2. タスク分解
 
@@ -41,13 +41,13 @@ Agent Execution Engineは、AgentCompanyの中核となるエージェント実�
 
 ### 6. GUI
 
-| 画面 | パス | 機能 |
-|------|------|------|
-| Dashboard | `/dashboard` | リアルタイム監視、クイックアクション |
-| Command Center | `/command` | 指示入力、履歴表示 |
-| Task Detail | `/tasks/[id]` | タスク詳細、介入操作 |
-| Review | `/review` | 成果物プレビュー、承認/却下 |
-| Settings | `/settings` | システム設定 |
+| 画面           | パス          | 機能                                 |
+| -------------- | ------------- | ------------------------------------ |
+| Dashboard      | `/dashboard`  | リアルタイム監視、クイックアクション |
+| Command Center | `/command`    | 指示入力、履歴表示                   |
+| Task Detail    | `/tasks/[id]` | タスク詳細、介入操作                 |
+| Review         | `/review`     | 成果物プレビュー、承認/却下          |
+| Settings       | `/settings`   | システム設定                         |
 
 ### 7. CLI
 
@@ -86,27 +86,27 @@ npx tsx tools/cli/agentcompany.ts project add <name> <git-url>
 
 ### コンテナランタイム
 
-| 方式 | 説明 | 用途 |
-|------|------|------|
-| DoD | Docker-outside-of-Docker | ローカル開発（デフォルト） |
-| Rootless | Rootless Docker/Podman | セキュリティ重視 |
-| DIND | Docker-in-Docker | CI環境 |
+| 方式     | 説明                     | 用途                       |
+| -------- | ------------------------ | -------------------------- |
+| DoD      | Docker-outside-of-Docker | ローカル開発（デフォルト） |
+| Rootless | Rootless Docker/Podman   | セキュリティ重視           |
+| DIND     | Docker-in-Docker         | CI環境                     |
 
 ### Git認証
 
-| 方式 | 説明 | 用途 |
-|------|------|------|
-| Deploy Key | 読み取り専用キー | CI/CD（推奨） |
-| Token | スコープ付きトークン | 汎用 |
-| SSH Agent | SSH agent forwarding | 開発環境のみ |
+| 方式       | 説明                 | 用途          |
+| ---------- | -------------------- | ------------- |
+| Deploy Key | 読み取り専用キー     | CI/CD（推奨） |
+| Token      | スコープ付きトークン | 汎用          |
+| SSH Agent  | SSH agent forwarding | 開発環境のみ  |
 
 ### メッセージキュー
 
-| 方式 | 説明 | 用途 |
-|------|------|------|
-| File | ファイルベース | 小〜中規模（デフォルト） |
-| SQLite | SQLiteデータベース | 高スループット |
-| Redis | Redisキュー | 分散デプロイ |
+| 方式   | 説明               | 用途                     |
+| ------ | ------------------ | ------------------------ |
+| File   | ファイルベース     | 小〜中規模（デフォルト） |
+| SQLite | SQLiteデータベース | 高スループット           |
+| Redis  | Redisキュー        | 分散デプロイ             |
 
 ## ファイル構成
 

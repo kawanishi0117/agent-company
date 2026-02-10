@@ -3,9 +3,10 @@
  *
  * ワーカーエージェントのプール管理を担当する。
  * ワーカーの取得・解放、プール状態管理、並列実行制御を行う。
+ * WorkerTypeRegistryと連携してワーカータイプに基づく割り当てを行う。
  *
  * @module execution/worker-pool
- * @see Requirements: 9.1, 9.3, 9.4, 9.5
+ * @see Requirements: 9.1, 9.3, 9.4, 9.5, 3.1-3.8
  */
 
 import {
@@ -18,14 +19,12 @@ import {
   SystemConfig,
   DEFAULT_SYSTEM_CONFIG,
   ContainerRuntimeType,
+  WorkerType,
 } from './types';
-import {
-  WorkerContainer,
-  WorkerContainerConfig,
-  createWorkerContainer,
-} from './worker-container';
+import { WorkerContainer, WorkerContainerConfig, createWorkerContainer } from './worker-container';
 import { WorkerAgent, WorkerAgentConfig, createWorkerAgent } from './agents/worker';
 import { ContainerRuntime, createContainerRuntime } from './container-runtime';
+import { WorkerTypeRegistry, createWorkerTypeRegistry } from './worker-type-registry';
 
 // =============================================================================
 // 定数定義
@@ -153,11 +152,13 @@ export interface ReleaseWorkerResult {
  *
  * ワーカーエージェントのプール管理を担当する。
  * 最大同時実行数の制御、タスク完了時の次タスク割り当てを行う。
+ * WorkerTypeRegistryと連携してワーカータイプに基づく割り当てを行う。
  *
  * @see Requirement 9.1: THE Worker_Pool SHALL limit concurrent workers to configurable max (default: 3)
  * @see Requirement 9.3: THE Worker_Pool SHALL manage worker lifecycle (create, assign, release, destroy)
  * @see Requirement 9.4: WHEN task completes, THE Worker_Pool SHALL assign next pending task to freed worker
  * @see Requirement 9.5: THE Worker_Pool SHALL support dynamic scaling within max limit
+ * @see Requirement 3.8: WHEN assigning a Grandchild_Ticket, THE Manager_Agent SHALL select worker type based on task requirements
  */
 export class WorkerPool {
   /** プール設定 */
@@ -171,6 +172,9 @@ export class WorkerPool {
 
   /** コンテナランタイム */
   private containerRuntime: ContainerRuntime;
+
+  /** ワーカータイプレジストリ */
+  private workerTypeRegistry: WorkerTypeRegistry;
 
   /** ワーカーID生成用カウンター */
   private workerIdCounter = 0;
@@ -196,6 +200,9 @@ export class WorkerPool {
     this.containerRuntime = createContainerRuntime({
       containerRuntime: this.config.containerRuntime,
     });
+
+    // ワーカータイプレジストリを初期化
+    this.workerTypeRegistry = createWorkerTypeRegistry();
   }
 
   // ===========================================================================
@@ -496,6 +503,88 @@ export class WorkerPool {
   }
 
   // ===========================================================================
+  // ワーカータイプ管理
+  // ===========================================================================
+
+  /**
+   * タスク内容からワーカータイプを推定
+   *
+   * @param taskDescription - タスクの説明
+   * @returns 推定されたワーカータイプ
+   *
+   * @see Requirement 3.8: WHEN assigning a Grandchild_Ticket, THE Manager_Agent SHALL select worker type based on task requirements
+   */
+  matchWorkerTypeForTask(taskDescription: string): WorkerType {
+    return this.workerTypeRegistry.matchWorkerType(taskDescription);
+  }
+
+  /**
+   * ワーカータイプに基づいてワーカーを取得
+   *
+   * 指定されたワーカータイプに適したワーカーを取得する。
+   * 適切なワーカーがいない場合は新規作成を試みる。
+   *
+   * @param workerType - ワーカータイプ
+   * @param options - 取得オプション
+   * @returns ワーカーエージェント（取得できない場合はnull）
+   *
+   * @see Requirement 3.8: WHEN assigning a Grandchild_Ticket, THE Manager_Agent SHALL select worker type based on task requirements
+   */
+  async getWorkerByType(
+    workerType: WorkerType,
+    options?: AcquireWorkerOptions
+  ): Promise<WorkerAgent | null> {
+    if (this.stopped) {
+      return null;
+    }
+
+    // ワーカータイプの能力を取得（将来のマッチング機能で使用予定）
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _requiredCapabilities = this.workerTypeRegistry.getCapabilities(workerType);
+
+    // 該当する能力を持つアイドルワーカーを探す
+    const idleWorker = this.findIdleWorkerByType(workerType);
+    if (idleWorker) {
+      idleWorker.status = 'working';
+      idleWorker.runId = options?.runId;
+      idleWorker.lastActiveAt = new Date().toISOString();
+      return idleWorker.agent;
+    }
+
+    // 最大ワーカー数に達していない場合は新規作成
+    if (this.workers.size < this.config.maxWorkers) {
+      const newWorker = await this.createWorkerWithType(workerType, options);
+      if (newWorker) {
+        newWorker.status = 'working';
+        newWorker.runId = options?.runId;
+        return newWorker.agent;
+      }
+    }
+
+    // 取得できない場合はnull
+    return null;
+  }
+
+  /**
+   * ワーカータイプレジストリを取得
+   *
+   * @returns WorkerTypeRegistryインスタンス
+   */
+  getWorkerTypeRegistry(): WorkerTypeRegistry {
+    return this.workerTypeRegistry;
+  }
+
+  /**
+   * ワーカータイプの設定を取得
+   *
+   * @param workerType - ワーカータイプ
+   * @returns ワーカータイプ設定
+   */
+  getWorkerTypeConfig(workerType: WorkerType): import('./types').WorkerTypeConfig {
+    return this.workerTypeRegistry.getConfig(workerType);
+  }
+
+  // ===========================================================================
   // コンテナ管理
   // ===========================================================================
 
@@ -516,11 +605,15 @@ export class WorkerPool {
     }
 
     // コンテナを作成
-    const container = createWorkerContainer(workerId, {
-      cpuLimit: this.config.workerCpuLimit,
-      memoryLimit: this.config.workerMemoryLimit,
-      ...config,
-    }, this.containerRuntime);
+    const container = createWorkerContainer(
+      workerId,
+      {
+        cpuLimit: this.config.workerCpuLimit,
+        memoryLimit: this.config.workerMemoryLimit,
+        ...config,
+      },
+      this.containerRuntime
+    );
 
     const result = await container.createAndStart();
     if (!result.success) {
@@ -608,8 +701,8 @@ export class WorkerPool {
 
       // 能力タグのチェック
       if (requiredCapabilities && requiredCapabilities.length > 0) {
-        const hasAllCapabilities = requiredCapabilities.every(
-          (cap) => workerInfo.capabilities.includes(cap)
+        const hasAllCapabilities = requiredCapabilities.every((cap) =>
+          workerInfo.capabilities.includes(cap)
         );
         if (!hasAllCapabilities) {
           continue;
@@ -617,6 +710,30 @@ export class WorkerPool {
       }
 
       return workerInfo;
+    }
+    return undefined;
+  }
+
+  /**
+   * ワーカータイプに基づいてアイドル状態のワーカーを探す
+   * @param workerType - ワーカータイプ
+   * @returns ワーカー情報（見つからない場合はundefined）
+   */
+  private findIdleWorkerByType(workerType: WorkerType): WorkerInfo | undefined {
+    const requiredCapabilities = this.workerTypeRegistry.getCapabilities(workerType);
+
+    for (const workerInfo of this.workers.values()) {
+      if (workerInfo.status !== 'idle') {
+        continue;
+      }
+
+      // ワーカータイプの能力を持っているかチェック
+      const hasRequiredCapabilities = requiredCapabilities.some((cap) =>
+        workerInfo.capabilities.includes(cap)
+      );
+      if (hasRequiredCapabilities) {
+        return workerInfo;
+      }
     }
     return undefined;
   }
@@ -650,11 +767,76 @@ export class WorkerPool {
     // コンテナを使用する場合は作成
     if (this.config.useContainers) {
       try {
-        const container = createWorkerContainer(workerId, {
-          cpuLimit: this.config.workerCpuLimit,
-          memoryLimit: this.config.workerMemoryLimit,
-          ...options?.containerConfig,
-        }, this.containerRuntime);
+        const container = createWorkerContainer(
+          workerId,
+          {
+            cpuLimit: this.config.workerCpuLimit,
+            memoryLimit: this.config.workerMemoryLimit,
+            ...options?.containerConfig,
+          },
+          this.containerRuntime
+        );
+
+        const result = await container.createAndStart();
+        if (result.success) {
+          workerInfo.container = container;
+        }
+      } catch (error) {
+        // コンテナ作成に失敗してもワーカーは使用可能
+        console.warn(`コンテナ作成に失敗: ${error}`);
+      }
+    }
+
+    this.workers.set(workerId, workerInfo);
+    return workerInfo;
+  }
+
+  /**
+   * ワーカータイプに基づいて新しいワーカーを作成
+   * @param workerType - ワーカータイプ
+   * @param options - 取得オプション
+   * @returns ワーカー情報
+   *
+   * @see Requirement 3.8: WHEN assigning a Grandchild_Ticket, THE Manager_Agent SHALL select worker type based on task requirements
+   */
+  private async createWorkerWithType(
+    workerType: WorkerType,
+    options?: AcquireWorkerOptions
+  ): Promise<WorkerInfo | null> {
+    const workerId = this.generateWorkerId();
+    const typeConfig = this.workerTypeRegistry.getConfig(workerType);
+
+    // ワーカータイプの設定に基づいてエージェントを作成
+    const agentConfig: WorkerAgentConfig = {
+      agentId: workerId,
+      adapterName: typeConfig.aiConfig?.adapter ?? this.config.defaultAdapter,
+      modelName: typeConfig.aiConfig?.model ?? this.config.defaultModel,
+    };
+    const agent = createWorkerAgent(agentConfig);
+
+    const now = new Date().toISOString();
+    const workerInfo: WorkerInfo = {
+      workerId,
+      agent,
+      status: 'idle',
+      createdAt: now,
+      lastActiveAt: now,
+      // ワーカータイプの能力を設定
+      capabilities: [...typeConfig.capabilities],
+    };
+
+    // コンテナを使用する場合は作成
+    if (this.config.useContainers) {
+      try {
+        const container = createWorkerContainer(
+          workerId,
+          {
+            cpuLimit: this.config.workerCpuLimit,
+            memoryLimit: this.config.workerMemoryLimit,
+            ...options?.containerConfig,
+          },
+          this.containerRuntime
+        );
 
         const result = await container.createAndStart();
         if (result.success) {
@@ -686,8 +868,8 @@ export class WorkerPool {
       }
 
       // 能力タグのチェック
-      const hasAllCapabilities = pendingTask.requiredCapabilities.every(
-        (cap) => workerCapabilities.includes(cap)
+      const hasAllCapabilities = pendingTask.requiredCapabilities.every((cap) =>
+        workerCapabilities.includes(cap)
       );
       if (hasAllCapabilities) {
         return this.pendingTasks.splice(i, 1)[0];
@@ -721,7 +903,6 @@ export class WorkerPool {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
-
 
 // =============================================================================
 // ファクトリ関数

@@ -17,8 +17,6 @@ import {
   SystemConfig,
   DEFAULT_SYSTEM_CONFIG,
   ContainerRuntimeType,
-  MessageQueueType,
-  GitCredentialType,
   VALID_CONTAINER_RUNTIMES,
   VALID_MESSAGE_QUEUE_TYPES,
   VALID_GIT_CREDENTIAL_TYPES,
@@ -84,7 +82,7 @@ describe('DEFAULT_SYSTEM_CONFIG', () => {
    */
   it('デフォルトのAI設定が正しい', () => {
     expect(DEFAULT_SYSTEM_CONFIG.defaultAiAdapter).toBe('ollama');
-    expect(DEFAULT_SYSTEM_CONFIG.defaultModel).toBe('llama3');
+    expect(DEFAULT_SYSTEM_CONFIG.defaultModel).toBe('llama3.2:1b');
   });
 
   /**
@@ -293,14 +291,11 @@ describe('validateSystemConfig', () => {
   /**
    * 有効なGit認証種別でバリデーションが成功することを確認
    */
-  it.each(VALID_GIT_CREDENTIAL_TYPES)(
-    'Git認証種別 "%s" でバリデーションが成功する',
-    (credType) => {
-      const config = { gitCredentialType: credType };
-      const result = validateSystemConfig(config);
-      expect(result.valid).toBe(true);
-    }
-  );
+  it.each(VALID_GIT_CREDENTIAL_TYPES)('Git認証種別 "%s" でバリデーションが成功する', (credType) => {
+    const config = { gitCredentialType: credType };
+    const result = validateSystemConfig(config);
+    expect(result.valid).toBe(true);
+  });
 });
 
 // =============================================================================

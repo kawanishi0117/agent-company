@@ -572,7 +572,11 @@ export class ToolExecutor {
    * @param entry - ディレクトリエントリ
    * @returns エントリタイプ
    */
-  private getEntryType(entry: { isFile(): boolean; isDirectory(): boolean; isSymbolicLink(): boolean }): DirectoryEntry['type'] {
+  private getEntryType(entry: {
+    isFile(): boolean;
+    isDirectory(): boolean;
+    isSymbolicLink(): boolean;
+  }): DirectoryEntry['type'] {
     if (entry.isFile()) return 'file';
     if (entry.isDirectory()) return 'directory';
     if (entry.isSymbolicLink()) return 'symlink';
@@ -694,7 +698,9 @@ export class ToolExecutor {
 export function applyEditsToContent(content: string, edits: FileEdit[]): ToolResult<string> {
   const executor = new ToolExecutor();
   // プライベートメソッドにアクセスするためのワークアラウンド
-  return (executor as unknown as { applyEdits(content: string, edits: FileEdit[]): ToolResult<string> }).applyEdits(content, edits);
+  return (
+    executor as unknown as { applyEdits(content: string, edits: FileEdit[]): ToolResult<string> }
+  ).applyEdits(content, edits);
 }
 
 // =============================================================================

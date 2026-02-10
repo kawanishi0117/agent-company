@@ -18,6 +18,8 @@ import {
   ExecuteOptions,
   CommandResult,
   RunId,
+  // CommandRejectionReasonは将来のコマンド拒否機能で使用予定
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   CommandRejectionReason,
 } from './types';
 
@@ -60,7 +62,7 @@ const INTERACTIVE_COMMANDS = [
   'mongo',
   'redis-cli',
   'python', // 引数なしの場合はREPL
-  'node',   // 引数なしの場合はREPL
+  'node', // 引数なしの場合はREPL
   'irb',
   'pry',
 ];
@@ -645,10 +647,7 @@ export class ProcessMonitor {
    * @returns フォーマットされたログ行
    */
   private formatLogEntry(entry: CommandLogEntry): string {
-    const parts: string[] = [
-      `[${entry.timestamp}]`,
-      entry.command,
-    ];
+    const parts: string[] = [`[${entry.timestamp}]`, entry.command];
 
     if (entry.cwd) {
       parts.push(`(cwd: ${entry.cwd})`);

@@ -1,11 +1,18 @@
 /**
  * Error Handler プロパティテスト
  *
- * Property 26: Retry with Exponential Backoff
+ * Property 20: Exponential Backoff Retry
+ * - 任意のワーカー失敗に対して、システムは1s, 2s, 4sの遅延でリトライする
+ * - 最大3回試行後に失敗としてマークする
+ *
+ * Property 21: Error Audit Logging
+ * - 任意のエラーに対して、エラー詳細が `runtime/runs/<run-id>/errors.log` に記録される
+ *
+ * Property 26: Retry with Exponential Backoff (Legacy)
  * - 任意のAI接続失敗に対して、システムは1s, 2s, 4sの遅延でリトライする
  * - 全てのリトライが失敗した場合、エスカレーションが発生する
  *
- * **Validates: Requirements 13.1**
+ * **Validates: Requirements 11.1, 11.2, 11.5, 13.1**
  *
  * @module tests/execution/error-handler.property.test
  */
@@ -13,15 +20,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fc from 'fast-check';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import {
   ErrorHandler,
   createErrorHandler,
-  DEFAULT_RETRY_CONFIG,
   RetryConfig,
-  RetryResult,
   EscalationInfo,
   ErrorCategory,
+  FailureHandlingContext,
 } from '../../tools/cli/lib/execution/error-handler';
 
 // =============================================================================
@@ -56,7 +61,7 @@ vi.mock('fs/promises', async () => {
  * リトライ設定を生成するArbitrary
  */
 const retryConfigArb: fc.Arbitrary<RetryConfig> = fc.record({
-  maxRetries: fc.integer({ min: 0, max: 10 }),
+  maxAttempts: fc.integer({ min: 1, max: 10 }),
   initialDelayMs: fc.integer({ min: 100, max: 5000 }),
   backoffMultiplier: fc.double({ min: 1.1, max: 4.0, noNaN: true }),
   maxDelayMs: fc.integer({ min: 1000, max: 30000 }),
@@ -99,9 +104,22 @@ const errorCategoryArb: fc.Arbitrary<ErrorCategory> = fc.constantFrom(
 );
 
 /**
- * 失敗回数を生成するArbitrary
+ * チケットIDを生成するArbitrary
  */
-const failCountArb: fc.Arbitrary<number> = fc.integer({ min: 0, max: 15 });
+const ticketIdArb: fc.Arbitrary<string> = fc
+  .tuple(
+    fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz'), {
+      minLength: 3,
+      maxLength: 8,
+    }),
+    fc.integer({ min: 1, max: 999 }),
+    fc.integer({ min: 1, max: 99 }),
+    fc.integer({ min: 1, max: 999 })
+  )
+  .map(
+    ([proj, parent, child, grandchild]) =>
+      `${proj}-${parent.toString().padStart(3, '0')}-${child.toString().padStart(2, '0')}-${grandchild.toString().padStart(3, '0')}`
+  );
 
 /**
  * 試行番号を生成するArbitrary（バックオフ計算用）
@@ -182,28 +200,24 @@ describe('Property 26: Retry with Exponential Backoff', () => {
    */
   it('Property 26.1: 指数バックオフの遅延時間が正しく計算される', () => {
     fc.assert(
-      fc.property(
-        retryConfigArb,
-        attemptNumberArb,
-        (config, attempt) => {
-          const delay = errorHandler.calculateBackoffDelay(attempt, config);
+      fc.property(retryConfigArb, attemptNumberArb, (config, attempt) => {
+        const delay = errorHandler.calculateBackoffDelay(attempt, config);
 
-          // 遅延時間は正の数
-          expect(delay).toBeGreaterThan(0);
+        // 遅延時間は正の数
+        expect(delay).toBeGreaterThan(0);
 
-          // 遅延時間は最大値を超えない
-          expect(delay).toBeLessThanOrEqual(config.maxDelayMs);
+        // 遅延時間は最大値を超えない
+        expect(delay).toBeLessThanOrEqual(config.maxDelayMs);
 
-          // 期待される遅延時間を計算
-          const expectedDelay = Math.min(
-            config.initialDelayMs * Math.pow(config.backoffMultiplier, attempt),
-            config.maxDelayMs
-          );
+        // 期待される遅延時間を計算
+        const expectedDelay = Math.min(
+          config.initialDelayMs * Math.pow(config.backoffMultiplier, attempt),
+          config.maxDelayMs
+        );
 
-          // 計算結果が一致
-          expect(delay).toBeCloseTo(expectedDelay, 5);
-        }
-      ),
+        // 計算結果が一致
+        expect(delay).toBeCloseTo(expectedDelay, 5);
+      }),
       { numRuns: 100 }
     );
   });
@@ -495,14 +509,10 @@ describe('Retry Edge Cases (Property-Based)', () => {
    */
   it('遅延時間は最大値を超えない', () => {
     fc.assert(
-      fc.property(
-        retryConfigArb,
-        fc.integer({ min: 0, max: 100 }),
-        (config, attempt) => {
-          const delay = errorHandler.calculateBackoffDelay(attempt, config);
-          expect(delay).toBeLessThanOrEqual(config.maxDelayMs);
-        }
-      ),
+      fc.property(retryConfigArb, fc.integer({ min: 0, max: 100 }), (config, attempt) => {
+        const delay = errorHandler.calculateBackoffDelay(attempt, config);
+        expect(delay).toBeLessThanOrEqual(config.maxDelayMs);
+      }),
       { numRuns: 100 }
     );
   });
@@ -587,6 +597,231 @@ describe('Retry Edge Cases (Property-Based)', () => {
 
           // カスタム設定が適用される
           expect(getAttempts()).toBe(customMaxRetries + 1);
+        }
+      ),
+      { numRuns: 50 }
+    );
+  });
+});
+
+// =============================================================================
+// Property 20: Exponential Backoff Retry (簡略化版)
+// =============================================================================
+
+describe('Property 20: Exponential Backoff Retry', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Property 20.1: ワーカー失敗時の指数バックオフ遅延シーケンス
+   * デフォルト設定では、遅延時間は[1000, 2000]ms（1s, 2s）となる
+   *
+   * **Validates: Requirements 11.1**
+   */
+  it('Property 20.1: ワーカー失敗時の遅延シーケンスが1s, 2sである', () => {
+    const handler = createErrorHandler();
+    const delays = handler.getBackoffDelaySequence();
+
+    // デフォルト設定での遅延シーケンス（maxAttempts=3なので2回のリトライ遅延）
+    expect(delays).toEqual([1000, 2000]);
+  });
+
+  /**
+   * Property 20.2: 指数バックオフの計算が正しい
+   * 任意の試行回数に対して、遅延時間は指数関数的に増加する
+   *
+   * **Validates: Requirements 11.1**
+   */
+  it('Property 20.2: 指数バックオフの計算が正しい', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 10 }), (attempt) => {
+        const handler = createErrorHandler();
+        const delay = handler.calculateBackoffDelay(attempt);
+
+        // 期待される遅延時間を計算
+        const expectedDelay = Math.min(1000 * Math.pow(2, attempt), 4000);
+
+        expect(delay).toBe(expectedDelay);
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  /**
+   * Property 20.3: 失敗通知情報の作成
+   * 任意のコンテキストに対して、失敗通知情報が正しく作成される
+   *
+   * **Validates: Requirements 11.2**
+   */
+  it('Property 20.3: 失敗通知情報が正しく作成される', () => {
+    fc.assert(
+      fc.property(
+        runIdArb,
+        agentIdArb,
+        ticketIdArb,
+        agentIdArb,
+        fc.string({ minLength: 1, maxLength: 50 }),
+        (runId, workerId, ticketId, managerAgentId, errorMessage) => {
+          const handler = createErrorHandler({
+            runtimeBasePath: TEST_RUNTIME_BASE,
+          });
+
+          const context: FailureHandlingContext = {
+            runId,
+            workerId,
+            ticketId,
+            managerAgentId,
+          };
+
+          const notification = handler.createFailureNotification(
+            context,
+            new Error(errorMessage),
+            3,
+            new Date().toISOString()
+          );
+
+          // 通知情報が正しい
+          expect(notification.ticketId).toBe(ticketId);
+          expect(notification.workerId).toBe(workerId);
+          expect(notification.runId).toBe(runId);
+          expect(notification.attempts).toBe(3);
+          expect(notification.error.message).toBe(errorMessage);
+          expect(['reassign', 'escalate', 'manual_review']).toContain(
+            notification.recommendedAction
+          );
+        }
+      ),
+      { numRuns: 50 }
+    );
+  });
+});
+
+// =============================================================================
+// Property 21: Error Audit Logging
+// =============================================================================
+
+describe('Property 21: Error Audit Logging', () => {
+  let mockAppendFile: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAppendFile = vi.mocked(fs.appendFile);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Property 21.1: エラー発生時のログ記録
+   * 任意のエラーに対して、エラー詳細が `runtime/runs/<run-id>/errors.log` に記録される
+   *
+   * **Validates: Requirements 11.5**
+   */
+  it('Property 21.1: エラー発生時にerrors.logに記録される', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        runIdArb,
+        fc.string({ minLength: 1, maxLength: 100 }),
+        async (runId, errorMessage) => {
+          mockAppendFile.mockClear();
+
+          const handler = createErrorHandler({
+            runtimeBasePath: TEST_RUNTIME_BASE,
+          });
+
+          const errorInfo = handler.createErrorInfo(new Error(errorMessage), 'unknown', true);
+
+          await handler.logError(runId, errorInfo);
+
+          // appendFileが呼び出された
+          expect(mockAppendFile).toHaveBeenCalled();
+
+          // errors.logに書き込まれた
+          const callArgs = mockAppendFile.mock.calls[0];
+          const logPath = callArgs[0] as string;
+          expect(logPath).toContain('errors.log');
+
+          // エラーメッセージが含まれている
+          expect(callArgs[1]).toContain(errorMessage);
+        }
+      ),
+      { numRuns: 50 }
+    );
+  });
+
+  /**
+   * Property 21.2: エラーログのフォーマット
+   * 任意のエラーに対して、ログエントリにはタイムスタンプ、コード、メッセージが含まれる
+   *
+   * **Validates: Requirements 11.5**
+   */
+  it('Property 21.2: エラーログに必要な情報が含まれる', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        runIdArb,
+        fc.string({ minLength: 1, maxLength: 50 }),
+        errorCategoryArb,
+        async (runId, errorMessage, category) => {
+          mockAppendFile.mockClear();
+
+          const handler = createErrorHandler({
+            runtimeBasePath: TEST_RUNTIME_BASE,
+          });
+
+          const errorInfo = handler.createErrorInfo(new Error(errorMessage), category, true);
+
+          await handler.logError(runId, errorInfo);
+
+          // ログエントリの内容を確認
+          const logEntry = mockAppendFile.mock.calls[0][1] as string;
+
+          // タイムスタンプが含まれる（ISO8601形式）
+          expect(logEntry).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+
+          // エラーコードが含まれる
+          expect(logEntry).toMatch(/\[.*_ERROR\]/);
+
+          // 回復可能性が含まれる
+          expect(logEntry).toMatch(/\[(RECOVERABLE|FATAL)\]/);
+
+          // エラーメッセージが含まれる
+          expect(logEntry).toContain(errorMessage);
+        }
+      ),
+      { numRuns: 50 }
+    );
+  });
+
+  /**
+   * Property 21.3: エラー情報の作成
+   * 任意のエラーに対して、ErrorInfoオブジェクトが正しく作成される
+   *
+   * **Validates: Requirements 11.5**
+   */
+  it('Property 21.3: エラー情報が正しく作成される', () => {
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 1, maxLength: 100 }),
+        errorCategoryArb,
+        fc.boolean(),
+        (errorMessage, category, recoverable) => {
+          const handler = createErrorHandler({
+            runtimeBasePath: TEST_RUNTIME_BASE,
+          });
+
+          const errorInfo = handler.createErrorInfo(new Error(errorMessage), category, recoverable);
+
+          // ErrorInfoが正しく作成される
+          expect(errorInfo.message).toBe(errorMessage);
+          expect(errorInfo.recoverable).toBe(recoverable);
+          expect(errorInfo.timestamp).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+          expect(errorInfo.code).toContain('ERROR');
         }
       ),
       { numRuns: 50 }

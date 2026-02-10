@@ -445,22 +445,15 @@ export class TaskDecomposer implements ITaskDecomposer {
     const title = `# ${subTask.title}`;
 
     // 目的セクション
-    const purpose = [
-      '## 目的',
-      '',
-      subTask.description,
-    ].join('\n');
+    const purpose = ['## 目的', '', subTask.description].join('\n');
 
     // DoD（受け入れ基準）セクション
-    const dodItems = subTask.acceptanceCriteria.length > 0
-      ? subTask.acceptanceCriteria.map((c) => `- [ ] ${c}`).join('\n')
-      : '- [ ] タスクが完了している';
+    const dodItems =
+      subTask.acceptanceCriteria.length > 0
+        ? subTask.acceptanceCriteria.map((c) => `- [ ] ${c}`).join('\n')
+        : '- [ ] タスクが完了している';
 
-    const dod = [
-      '## DoD (Definition of Done)',
-      '',
-      dodItems,
-    ].join('\n');
+    const dod = ['## DoD (Definition of Done)', '', dodItems].join('\n');
 
     // 範囲セクション（空のプレースホルダー）
     const scope = [
@@ -481,11 +474,7 @@ export class TaskDecomposer implements ITaskDecomposer {
     ].join('\n');
 
     // ロールバックセクション（空のプレースホルダー）
-    const rollback = [
-      '## ロールバック',
-      '',
-      '1. 変更を元に戻す',
-    ].join('\n');
+    const rollback = ['## ロールバック', '', '1. 変更を元に戻す'].join('\n');
 
     // 作業ログセクション
     const workLog = [
@@ -675,7 +664,11 @@ ${instruction}
 
       // 工数見積もりの正規化
       let estimatedEffort: 'small' | 'medium' | 'large' = 'medium';
-      if (t.estimatedEffort === 'small' || t.estimatedEffort === 'medium' || t.estimatedEffort === 'large') {
+      if (
+        t.estimatedEffort === 'small' ||
+        t.estimatedEffort === 'medium' ||
+        t.estimatedEffort === 'large'
+      ) {
         estimatedEffort = t.estimatedEffort;
       }
 
@@ -691,11 +684,7 @@ ${instruction}
   /**
    * AISubTaskResponseをSubTaskに変換
    */
-  private convertToSubTask(
-    aiTask: AISubTaskResponse,
-    parentId: string,
-    index: number
-  ): SubTask {
+  private convertToSubTask(aiTask: AISubTaskResponse, parentId: string, index: number): SubTask {
     const now = new Date().toISOString();
     const subId = `${parentId}-${index.toString().padStart(3, '0')}`;
 

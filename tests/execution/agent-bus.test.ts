@@ -7,18 +7,11 @@
  * @see Requirements: 10.1, 10.2
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import {
-  AgentBus,
-  createAgentBus,
-  IAgentBus,
-} from '../../tools/cli/lib/execution/agent-bus';
-import {
-  FileMessageQueue,
-  IMessageQueue,
-} from '../../tools/cli/lib/execution/message-queue';
+import { AgentBus, createAgentBus } from '../../tools/cli/lib/execution/agent-bus';
+import { FileMessageQueue } from '../../tools/cli/lib/execution/message-queue';
 import { AgentMessage, AgentMessageType } from '../../tools/cli/lib/execution/types';
 
 // =============================================================================
@@ -147,13 +140,13 @@ describe('AgentBus', () => {
 
     it('should throw error for message without type', async () => {
       const message = createTestMessage();
-      (message as any).type = undefined;
+      (message as unknown as Record<string, unknown>).type = undefined;
       await expect(agentBus.send(message)).rejects.toThrow('Message type is required');
     });
 
     it('should throw error for invalid message type', async () => {
       const message = createTestMessage();
-      (message as any).type = 'invalid_type';
+      (message as unknown as Record<string, unknown>).type = 'invalid_type';
       await expect(agentBus.send(message)).rejects.toThrow('Invalid message type');
     });
 
@@ -171,7 +164,7 @@ describe('AgentBus', () => {
 
     it('should throw error for message without timestamp', async () => {
       const message = createTestMessage();
-      (message as any).timestamp = undefined;
+      (message as unknown as Record<string, unknown>).timestamp = undefined;
       await expect(agentBus.send(message)).rejects.toThrow('Message timestamp is required');
     });
 
@@ -234,8 +227,12 @@ describe('AgentBus', () => {
 
     it('should poll multiple messages', async () => {
       // 複数のメッセージを送信
-      const message1 = createTestMessage('task_assign', 'manager-001', 'worker-001', { taskId: 'task-001' });
-      const message2 = createTestMessage('status_request', 'manager-001', 'worker-001', { requestId: 'req-001' });
+      const message1 = createTestMessage('task_assign', 'manager-001', 'worker-001', {
+        taskId: 'task-001',
+      });
+      const message2 = createTestMessage('status_request', 'manager-001', 'worker-001', {
+        requestId: 'req-001',
+      });
 
       await agentBus.send(message1);
       await agentBus.send(message2);
@@ -545,11 +542,7 @@ describe('AgentBus', () => {
         };
 
         // マネージャーがタスク割り当てメッセージを送信
-        const assignMessage = agentBus.createTaskAssignMessage(
-          managerId,
-          workerId,
-          taskPayload
-        );
+        const assignMessage = agentBus.createTaskAssignMessage(managerId, workerId, taskPayload);
         await agentBus.send(assignMessage);
 
         // ワーカーがメッセージを受信
@@ -585,10 +578,14 @@ describe('AgentBus', () => {
         const worker2Messages = await agentBus.poll(worker2Id, 1000);
 
         expect(worker1Messages.length).toBe(1);
-        expect((worker1Messages[0].payload as any).taskId).toBe('task-api-endpoint');
+        expect((worker1Messages[0].payload as Record<string, unknown>).taskId).toBe(
+          'task-api-endpoint'
+        );
 
         expect(worker2Messages.length).toBe(1);
-        expect((worker2Messages[0].payload as any).taskId).toBe('task-database-migration');
+        expect((worker2Messages[0].payload as Record<string, unknown>).taskId).toBe(
+          'task-database-migration'
+        );
       });
 
       it('should support multiple task assignments to same worker', async () => {
@@ -665,11 +662,7 @@ describe('AgentBus', () => {
         };
 
         // ワーカーがタスク失敗メッセージを送信
-        const failedMessage = agentBus.createTaskFailedMessage(
-          workerId,
-          managerId,
-          errorPayload
-        );
+        const failedMessage = agentBus.createTaskFailedMessage(workerId, managerId, errorPayload);
         await agentBus.send(failedMessage);
 
         // マネージャーがメッセージを受信
@@ -680,7 +673,17 @@ describe('AgentBus', () => {
         expect(receivedMessages[0].type).toBe('task_failed');
         expect(receivedMessages[0].from).toBe(workerId);
         expect(receivedMessages[0].to).toBe(managerId);
-        expect((receivedMessages[0].payload as any).error.code).toBe('BUILD_ERROR');
+        expect(
+          (receivedMessages[0].payload as Record<string, unknown>).error as Record<string, unknown>
+        ).toBeDefined();
+        expect(
+          (
+            (receivedMessages[0].payload as Record<string, unknown>).error as Record<
+              string,
+              unknown
+            >
+          ).code
+        ).toBe('BUILD_ERROR');
       });
 
       it('should handle mixed complete and failed notifications from multiple workers', async () => {
@@ -754,7 +757,7 @@ describe('AgentBus', () => {
         expect(receivedMessages[0].type).toBe('escalate');
         expect(receivedMessages[0].from).toBe(workerId);
         expect(receivedMessages[0].to).toBe(managerId);
-        expect((receivedMessages[0].payload as any).issue).toBe(
+        expect((receivedMessages[0].payload as Record<string, unknown>).issue).toBe(
           'Need guidance on architecture decision'
         );
       });
@@ -792,7 +795,7 @@ describe('AgentBus', () => {
         expect(seniorMessages.length).toBe(1);
         expect(seniorMessages[0].type).toBe('escalate');
         expect(seniorMessages[0].from).toBe(managerId);
-        expect((seniorMessages[0].payload as any).severity).toBe('critical');
+        expect((seniorMessages[0].payload as Record<string, unknown>).severity).toBe('critical');
       });
 
       it('should handle multiple escalations from different workers', async () => {
@@ -859,7 +862,7 @@ describe('AgentBus', () => {
         const managerMessages = await agentBus.poll(managerId, 1000);
         expect(managerMessages.length).toBe(1);
         expect(managerMessages[0].type).toBe('status_response');
-        expect((managerMessages[0].payload as any).progress).toBe(65);
+        expect((managerMessages[0].payload as Record<string, unknown>).progress).toBe(65);
       });
     });
   });
@@ -914,7 +917,10 @@ describe('Message History Logging (Requirement 10.8)', () => {
 
       // ログファイルが作成されていることを確認
       const logPath = path.join(TEST_LOG_RUNTIME_PATH, runId, 'messages.log');
-      const exists = await fs.access(logPath).then(() => true).catch(() => false);
+      const exists = await fs
+        .access(logPath)
+        .then(() => true)
+        .catch(() => false);
       expect(exists).toBe(true);
     });
 
@@ -1127,7 +1133,7 @@ describe('Message History Logging (Requirement 10.8)', () => {
 
       // メッセージの内容が正しいことを確認
       const foundMessage = history.find(
-        (m) => (m.payload as any).taskId === 'task-read-test'
+        (m) => (m.payload as Record<string, unknown>).taskId === 'task-read-test'
       );
       expect(foundMessage).toBeDefined();
       expect(foundMessage?.type).toBe('task_assign');

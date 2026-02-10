@@ -12,11 +12,8 @@ import * as path from 'path';
 import {
   QualityGate,
   createQualityGate,
-  QualityGateConfig,
   QualityGateExecutionResult,
-  GateResult,
 } from '../../tools/cli/lib/execution/quality-gate';
-import { QualityGateResult } from '../../tools/cli/lib/execution/types';
 
 // =============================================================================
 // テスト用定数
@@ -65,9 +62,7 @@ describe('QualityGate', () => {
     vi.clearAllMocks();
 
     // Process Monitorのモックを設定
-    const { createProcessMonitor } = await import(
-      '../../tools/cli/lib/execution/process-monitor'
-    );
+    const { createProcessMonitor } = await import('../../tools/cli/lib/execution/process-monitor');
     mockExecute = vi.fn();
     (createProcessMonitor as ReturnType<typeof vi.fn>).mockReturnValue({
       execute: mockExecute,
@@ -257,9 +252,7 @@ describe('QualityGate', () => {
     });
 
     it('テストファイルが存在しない場合、スキップする', async () => {
-      (fs.access as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error('ENOENT')
-      );
+      (fs.access as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('ENOENT'));
 
       const result = await qualityGate.runTest(TEST_RUN_ID);
 
@@ -430,10 +423,9 @@ describe('QualityGate', () => {
       await qualityGate.execute(TEST_RUN_ID);
 
       // mkdirが呼ばれたことを確認
-      expect(fs.mkdir).toHaveBeenCalledWith(
-        path.join(RUNS_BASE_DIR, TEST_RUN_ID),
-        { recursive: true }
-      );
+      expect(fs.mkdir).toHaveBeenCalledWith(path.join(RUNS_BASE_DIR, TEST_RUN_ID), {
+        recursive: true,
+      });
 
       // appendFileが呼ばれたことを確認（複数回）
       expect(fs.appendFile).toHaveBeenCalled();
@@ -704,21 +696,21 @@ describe('QualityGate', () => {
   });
 });
 
-
 // =============================================================================
 // 結果報告機能テスト
 // =============================================================================
 
 describe('QualityGateReporter', () => {
-  let reporter: ReturnType<typeof import('../../tools/cli/lib/execution/quality-gate').createQualityGateReporter>;
+  let reporter: ReturnType<
+    typeof import('../../tools/cli/lib/execution/quality-gate').createQualityGateReporter
+  >;
 
   beforeEach(async () => {
     vi.clearAllMocks();
 
     // QualityGateReporterをインポート
-    const { createQualityGateReporter } = await import(
-      '../../tools/cli/lib/execution/quality-gate'
-    );
+    const { createQualityGateReporter } =
+      await import('../../tools/cli/lib/execution/quality-gate');
     reporter = createQualityGateReporter(TEST_RUN_ID);
   });
 

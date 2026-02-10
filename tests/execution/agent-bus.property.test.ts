@@ -17,15 +17,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fc from 'fast-check';
 import * as fs from 'fs/promises';
-import * as path from 'path';
-import {
-  AgentBus,
-  createAgentBus,
-} from '../../tools/cli/lib/execution/agent-bus';
-import {
-  FileMessageQueue,
-  IMessageQueue,
-} from '../../tools/cli/lib/execution/message-queue';
+import { AgentBus, createAgentBus } from '../../tools/cli/lib/execution/agent-bus';
+import { FileMessageQueue } from '../../tools/cli/lib/execution/message-queue';
 import {
   AgentMessage,
   AgentMessageType,
@@ -46,7 +39,6 @@ const TEST_QUEUE_BASE_PATH = 'runtime/state/test-agent-bus-property';
  * テスト用のランタイムベースパス
  */
 const TEST_RUNTIME_BASE_PATH = 'runtime/runs/test-agent-bus-property';
-
 
 // =============================================================================
 // ジェネレータ（Arbitrary）定義
@@ -124,7 +116,6 @@ const payloadArb: fc.Arbitrary<unknown> = fc.oneof(
   fc.constant(null)
 );
 
-
 /**
  * 有効なAgentMessageを生成するArbitrary
  * - 送信元と送信先が異なることを保証
@@ -181,7 +172,6 @@ async function cleanupDirectory(dirPath: string): Promise<void> {
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
 
 // =============================================================================
 // Property 18: Message Delivery Guarantee テスト
@@ -246,7 +236,6 @@ describe('Property 18: Message Delivery Guarantee', () => {
     );
   });
 
-
   /**
    * Property 18.2: 任意のメッセージがメッセージ履歴にログされる
    *
@@ -273,10 +262,7 @@ describe('Property 18: Message Delivery Guarantee', () => {
 
         // 検証: 履歴に送信したメッセージが含まれていること
         const loggedMessage = history.find(
-          (m) =>
-            m.type === message.type &&
-            m.from === message.from &&
-            m.to === message.to
+          (m) => m.type === message.type && m.from === message.from && m.to === message.to
         );
         expect(loggedMessage).toBeDefined();
       }),
@@ -315,7 +301,6 @@ describe('Property 18: Message Delivery Guarantee', () => {
       { numRuns: 50 }
     );
   });
-
 
   /**
    * Property 18.4: task_complete/task_failedメッセージがワーカーからマネージャーに配信される
@@ -390,7 +375,6 @@ describe('Property 18: Message Delivery Guarantee', () => {
     );
   });
 
-
   /**
    * Property 18.6: 複数のメッセージが順序を保って配信される
    *
@@ -437,7 +421,6 @@ describe('Property 18: Message Delivery Guarantee', () => {
     );
   });
 });
-
 
 // =============================================================================
 // Property 28: Message Queue Abstraction テスト
@@ -497,7 +480,6 @@ describe('Property 28: Message Queue Abstraction', () => {
       await cleanupDirectory(runtimePath);
     }
   });
-
 
   /**
    * Property 28.2: 異なるキュー設定でも同じインターフェースで動作する
@@ -568,7 +550,6 @@ describe('Property 28: Message Queue Abstraction', () => {
     }
   });
 
-
   /**
    * Property 28.3: pull/pollモデルでワーカーは受信ポートを必要としない
    *
@@ -627,7 +608,6 @@ describe('Property 28: Message Queue Abstraction', () => {
       await cleanupDirectory(runtimePath);
     }
   }, 30000); // タイムアウトを30秒に設定
-
 
   /**
    * Property 28.4: メッセージキューの切り替えが可能
@@ -691,7 +671,6 @@ describe('Property 28: Message Queue Abstraction', () => {
     }
   });
 });
-
 
 // =============================================================================
 // エッジケースのユニットテスト
@@ -780,10 +759,10 @@ describe('Agent Bus Property Tests - Edge Cases', () => {
     const received = await agentBus.poll('worker-001', 2000);
 
     expect(received.length).toBe(1);
-    expect((received[0].payload as any).description).toBe(
+    expect((received[0].payload as Record<string, unknown>).description).toBe(
       'これは日本語のタスクです。絵文字も含む🚀'
     );
-    expect((received[0].payload as any).tags).toContain('🎉');
+    expect((received[0].payload as Record<string, unknown>).tags).toContain('🎉');
   });
 
   /**
@@ -814,7 +793,7 @@ describe('Agent Bus Property Tests - Edge Cases', () => {
     const received = await agentBus.poll('worker-001', 3000);
 
     expect(received.length).toBe(1);
-    expect((received[0].payload as any).items.length).toBe(100);
+    expect((received[0].payload as Record<string, unknown[]>).items.length).toBe(100);
   });
 
   /**

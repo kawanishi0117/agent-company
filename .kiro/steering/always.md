@@ -38,12 +38,12 @@ spec（`.kiro/specs/`）のタスク完了時、以下を必ず実施：
 
 意思決定前に必ず確認：
 
-| ドキュメント                        | 内容                           |
-| ----------------------------------- | ------------------------------ |
-| `docs/company/policies.md`          | 会社ポリシー、依存管理ルール   |
-| `docs/company/definition-of-done.md`| 成果物の完了基準               |
-| `docs/company/review-standards.md`  | レビュー基準、判定条件         |
-| `docs/company/waiver-policy.md`     | 例外承認ルール                 |
+| ドキュメント                         | 内容                         |
+| ------------------------------------ | ---------------------------- |
+| `docs/company/policies.md`           | 会社ポリシー、依存管理ルール |
+| `docs/company/definition-of-done.md` | 成果物の完了基準             |
+| `docs/company/review-standards.md`   | レビュー基準、判定条件       |
+| `docs/company/waiver-policy.md`      | 例外承認ルール               |
 
 ### R2. 例外はWaiverを発行
 
@@ -77,12 +77,12 @@ spec（`.kiro/specs/`）のタスク完了時、以下を必ず実施：
 
 ## テスト規約
 
-| 種別           | 場所                   | 命名規則               |
-| -------------- | ---------------------- | ---------------------- |
-| ユニットテスト | `tests/`               | `*.test.ts`            |
-| Property-based | `tests/`               | `*.property.test.ts`   |
-| E2Eテスト      | `e2e/`                 | `*.spec.ts`            |
-| GUIテスト      | `gui/web/lib/parsers/` | `*.test.ts`            |
+| 種別           | 場所                   | 命名規則             |
+| -------------- | ---------------------- | -------------------- |
+| ユニットテスト | `tests/`               | `*.test.ts`          |
+| Property-based | `tests/`               | `*.property.test.ts` |
+| E2Eテスト      | `e2e/`                 | `*.spec.ts`          |
+| GUIテスト      | `gui/web/lib/parsers/` | `*.test.ts`          |
 
 ## ドキュメント更新ルール
 
@@ -122,11 +122,13 @@ make ci     # 全ゲート統合
 ## Git規約
 
 ### ブランチ命名
+
 - `feature/<ticket-id>-<description>`
 - `fix/<ticket-id>-<description>`
 - `hotfix/<description>`
 
 ### コミットタイプ
+
 | type     | 用途             |
 | -------- | ---------------- |
 | feat     | 新機能           |

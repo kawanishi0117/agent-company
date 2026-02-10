@@ -6,9 +6,8 @@
  * @see Requirements: 4.5, 4.6, 4.7, 4.8, 4.9
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 
 // =============================================================================
 // モック設定
@@ -212,11 +211,7 @@ describe('MergerAgent', () => {
     });
 
     it('mergeToIntegrationで統合ブランチにマージできる', async () => {
-      const result = await merger.mergeToIntegration(
-        testRunId,
-        'feature/test',
-        'TICKET-001'
-      );
+      const result = await merger.mergeToIntegration(testRunId, 'feature/test', 'TICKET-001');
 
       expect(result.success).toBe(true);
       expect(result.targetBranch).toBe('develop');
@@ -279,10 +274,7 @@ describe('MergerAgent', () => {
 
       await merger.merge(request);
 
-      expect(mockGitManager.merge).toHaveBeenCalledWith(
-        'feature/test',
-        'Custom merge message'
-      );
+      expect(mockGitManager.merge).toHaveBeenCalledWith('feature/test', 'Custom merge message');
     });
   });
 

@@ -11,14 +11,14 @@ AIエージェントを「会社」として運用するためのフレームワ
 
 ## 主要機能
 
-| 機能 | 説明 |
-|------|------|
+| 機能                   | 説明                                              |
+| ---------------------- | ------------------------------------------------- |
 | Agent Execution Engine | タスク分解 → 並列実行 → レビュー → マージの自動化 |
-| Docker隔離環境 | ワーカーごとに独立したコンテナで安全に実行 |
-| 品質ゲート | lint/test/e2eの強制、PASS/FAIL/WAIVER判定 |
-| allowlist依存管理 | 許可されたパッケージのみインストール可能 |
-| GUI ダッシュボード | Backlog/Runs/Reports/Settingsの可視化 |
-| 採用システム | JD生成 → 面接 → 試用 → Registry登録 |
+| Docker隔離環境         | ワーカーごとに独立したコンテナで安全に実行        |
+| 品質ゲート             | lint/test/e2eの強制、PASS/FAIL/WAIVER判定         |
+| allowlist依存管理      | 許可されたパッケージのみインストール可能          |
+| GUI ダッシュボード     | Backlog/Runs/Reports/Settingsの可視化             |
+| 採用システム           | JD生成 → 面接 → 試用 → Registry登録               |
 
 ## クイックスタート
 
@@ -80,13 +80,13 @@ agent-company/
 
 ### Make
 
-| コマンド | 説明 |
-|----------|------|
-| `make install` | 依存インストール |
-| `make lint` | 静的解析（ESLint + Prettier） |
-| `make test` | ユニットテスト（Vitest） |
-| `make e2e` | E2Eテスト（Playwright） |
-| `make ci` | 全品質ゲート実行 |
+| コマンド       | 説明                          |
+| -------------- | ----------------------------- |
+| `make install` | 依存インストール              |
+| `make lint`    | 静的解析（ESLint + Prettier） |
+| `make test`    | ユニットテスト（Vitest）      |
+| `make e2e`     | E2Eテスト（Playwright）       |
+| `make ci`      | 全品質ゲート実行              |
 
 ### CLI
 
@@ -129,15 +129,15 @@ docker compose -f infra/docker/compose.yaml down
 
 ## GUI ダッシュボード
 
-| 画面 | パス | 説明 |
-|------|------|------|
-| Dashboard | `/dashboard` | リアルタイム実行状況 |
-| Command Center | `/command` | タスク投入・制御 |
-| Backlog | `/backlog` | カンバンボード |
-| Runs | `/runs` | 実行履歴・成果物 |
-| Reports | `/reports` | 日次/週次レポート |
-| Review | `/review` | コードレビュー |
-| Settings | `/settings` | システム設定 |
+| 画面           | パス         | 説明                 |
+| -------------- | ------------ | -------------------- |
+| Dashboard      | `/dashboard` | リアルタイム実行状況 |
+| Command Center | `/command`   | タスク投入・制御     |
+| Backlog        | `/backlog`   | カンバンボード       |
+| Runs           | `/runs`      | 実行履歴・成果物     |
+| Reports        | `/reports`   | 日次/週次レポート    |
+| Review         | `/review`    | コードレビュー       |
+| Settings       | `/settings`  | システム設定         |
 
 詳細は [gui/web/README.md](gui/web/README.md) を参照。
 
@@ -145,13 +145,13 @@ docker compose -f infra/docker/compose.yaml down
 
 ### 固定エージェント
 
-| エージェント | 役割 | 定義ファイル |
-|--------------|------|--------------|
-| COO/PM | バックログ管理、アサイン、レポート生成 | `agents/registry/coo_pm.yaml` |
-| Quality Authority | PASS/FAIL/WAIVER判定 | `agents/registry/quality_authority.yaml` |
-| Hiring Manager | 採用プロセス管理 | `agents/registry/hiring_manager.yaml` |
-| Reviewer | コードレビュー | `agents/registry/reviewer.yaml` |
-| Merger | ブランチマージ | `agents/registry/merger.yaml` |
+| エージェント      | 役割                                   | 定義ファイル                             |
+| ----------------- | -------------------------------------- | ---------------------------------------- |
+| COO/PM            | バックログ管理、アサイン、レポート生成 | `agents/registry/coo_pm.yaml`            |
+| Quality Authority | PASS/FAIL/WAIVER判定                   | `agents/registry/quality_authority.yaml` |
+| Hiring Manager    | 採用プロセス管理                       | `agents/registry/hiring_manager.yaml`    |
+| Reviewer          | コードレビュー                         | `agents/registry/reviewer.yaml`          |
+| Merger            | ブランチマージ                         | `agents/registry/merger.yaml`            |
 
 ### エージェント定義
 
@@ -180,28 +180,28 @@ escalation:
 
 ## ドキュメント
 
-| ドキュメント | 説明 |
-|--------------|------|
-| [MVP.md](MVP.md) | MVPロードマップ |
-| [QUICKSTART.md](QUICKSTART.md) | クイックスタートガイド |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | 開発者向けガイド |
-| [docs/specs/](docs/specs/) | 機能仕様書 |
-| [docs/architecture/](docs/architecture/) | アーキテクチャ設計 |
-| [docs/company/](docs/company/) | 会社ポリシー |
-| [tools/cli/README.md](tools/cli/README.md) | CLI詳細 |
-| [gui/web/README.md](gui/web/README.md) | GUI詳細 |
-| [infra/docker/README.md](infra/docker/README.md) | Docker詳細 |
+| ドキュメント                                     | 説明                   |
+| ------------------------------------------------ | ---------------------- |
+| [MVP.md](MVP.md)                                 | MVPロードマップ        |
+| [QUICKSTART.md](QUICKSTART.md)                   | クイックスタートガイド |
+| [CONTRIBUTING.md](CONTRIBUTING.md)               | 開発者向けガイド       |
+| [docs/specs/](docs/specs/)                       | 機能仕様書             |
+| [docs/architecture/](docs/architecture/)         | アーキテクチャ設計     |
+| [docs/company/](docs/company/)                   | 会社ポリシー           |
+| [tools/cli/README.md](tools/cli/README.md)       | CLI詳細                |
+| [gui/web/README.md](gui/web/README.md)           | GUI詳細                |
+| [infra/docker/README.md](infra/docker/README.md) | Docker詳細             |
 
 ## 技術スタック
 
-| カテゴリ | 技術 |
-|----------|------|
-| 言語 | TypeScript 5.3+ |
-| ランタイム | Node.js 20+ |
-| GUI | Next.js 14 (App Router), Tailwind CSS |
-| テスト | Vitest, Playwright, fast-check |
-| コンテナ | Docker, Docker Compose |
-| AI | Ollama (ローカルLLM) |
+| カテゴリ   | 技術                                  |
+| ---------- | ------------------------------------- |
+| 言語       | TypeScript 5.3+                       |
+| ランタイム | Node.js 20+                           |
+| GUI        | Next.js 14 (App Router), Tailwind CSS |
+| テスト     | Vitest, Playwright, fast-check        |
+| コンテナ   | Docker, Docker Compose                |
+| AI         | Ollama (ローカルLLM)                  |
 
 ## ライセンス
 

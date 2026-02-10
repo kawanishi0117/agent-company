@@ -36,19 +36,21 @@ make ci
 
 ```markdown
 ---
-id: "NNNN"
-title: "タイトル"
-status: "todo"
-assignee: ""
-priority: "medium"
+id: 'NNNN'
+title: 'タイトル'
+status: 'todo'
+assignee: ''
+priority: 'medium'
 ---
 
 # タイトル
 
 ## 概要
+
 [何をするか]
 
 ## 受け入れ基準
+
 - [ ] 基準1
 - [ ] 基準2
 ```
@@ -149,12 +151,12 @@ import { Button } from '@/components/ui/Button';
 
 ### ファイル配置
 
-| 種別 | 場所 | 命名規則 |
-|------|------|----------|
-| ユニットテスト | `tests/` | `*.test.ts` |
-| Property-based | `tests/` | `*.property.test.ts` |
-| E2Eテスト | `e2e/` | `*.spec.ts` |
-| GUIテスト | `gui/web/lib/parsers/` | `*.test.ts` |
+| 種別           | 場所                   | 命名規則             |
+| -------------- | ---------------------- | -------------------- |
+| ユニットテスト | `tests/`               | `*.test.ts`          |
+| Property-based | `tests/`               | `*.property.test.ts` |
+| E2Eテスト      | `e2e/`                 | `*.spec.ts`          |
+| GUIテスト      | `gui/web/lib/parsers/` | `*.test.ts`          |
 
 ### テスト構造
 
@@ -189,13 +191,10 @@ import * as fc from 'fast-check';
 
 it('任意の有効な入力で正しく動作する', () => {
   fc.assert(
-    fc.property(
-      fc.string({ minLength: 1 }),
-      (input) => {
-        const result = validate(input);
-        return result.valid === true;
-      }
-    )
+    fc.property(fc.string({ minLength: 1 }), (input) => {
+      const result = validate(input);
+      return result.valid === true;
+    })
   );
 });
 ```
@@ -218,17 +217,18 @@ it('任意の有効な入力で正しく動作する', () => {
 <footer>
 ```
 
-| type | 用途 |
-|------|------|
-| feat | 新機能 |
-| fix | バグ修正 |
-| docs | ドキュメント |
-| style | フォーマット |
+| type     | 用途             |
+| -------- | ---------------- |
+| feat     | 新機能           |
+| fix      | バグ修正         |
+| docs     | ドキュメント     |
+| style    | フォーマット     |
 | refactor | リファクタリング |
-| test | テスト |
-| chore | ビルド・設定 |
+| test     | テスト           |
+| chore    | ビルド・設定     |
 
 例：
+
 ```
 feat(execution): タスク分解機能を追加
 
@@ -243,14 +243,14 @@ Closes #123
 
 コード変更時は対応するドキュメントも更新してください。
 
-| 変更内容 | 更新先 |
-|----------|--------|
-| 新機能 | `docs/architecture/` または該当README |
-| CLI追加 | `tools/cli/README.md` |
-| Docker変更 | `infra/docker/README.md` |
-| 会社ルール | `docs/company/` |
+| 変更内容     | 更新先                                          |
+| ------------ | ----------------------------------------------- |
+| 新機能       | `docs/architecture/` または該当README           |
+| CLI追加      | `tools/cli/README.md`                           |
+| Docker変更   | `infra/docker/README.md`                        |
+| 会社ルール   | `docs/company/`                                 |
 | エージェント | `agents/registry/` + `docs/playbooks/hiring.md` |
-| GUI | `gui/web/README.md` |
+| GUI          | `gui/web/README.md`                             |
 
 ## 禁止事項
 
@@ -271,6 +271,7 @@ npx tsx tools/cli/agentcompany.ts waiver create "例外理由"
 ```
 
 必須項目：
+
 - 期限
 - 理由
 - 代替策

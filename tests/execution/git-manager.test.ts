@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import { GitManager } from '../../tools/cli/lib/execution/git-manager';
 import { ProcessMonitor } from '../../tools/cli/lib/execution/process-monitor';
 import type { CommandResult } from '../../tools/cli/lib/execution/types';
@@ -52,9 +53,8 @@ describe('GitManager', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    // 一時ディレクトリを作成
-    tempDir = path.join('runtime', 'test-runs', `test-${Date.now()}`);
-    await fs.mkdir(tempDir, { recursive: true });
+    // システムの一時ディレクトリを使用（Windowsでのファイルシステム競合を回避）
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'git-manager-test-'));
 
     // ProcessMonitorのモックを作成
     mockProcessMonitor = new ProcessMonitor(tempDir);
@@ -74,7 +74,6 @@ describe('GitManager', () => {
     }
     vi.restoreAllMocks();
   });
-
 
   // ===========================================================================
   // ブランチ名・コミットメッセージ生成テスト
@@ -225,9 +224,12 @@ describe('GitManager', () => {
 
     it('SSH agent forwardingは明示的許可が必要', () => {
       expect(() => {
-        gitManager.setCredentialProvider({
-          type: 'ssh_agent',
-        }, false); // 許可なし
+        gitManager.setCredentialProvider(
+          {
+            type: 'ssh_agent',
+          },
+          false
+        ); // 許可なし
       }).toThrow('Git認証設定が無効です');
     });
 
@@ -237,9 +239,12 @@ describe('GitManager', () => {
       process.env.SSH_AUTH_SOCK = '/tmp/ssh-agent.sock';
 
       expect(() => {
-        gitManager.setCredentialProvider({
-          type: 'ssh_agent',
-        }, true); // 許可あり
+        gitManager.setCredentialProvider(
+          {
+            type: 'ssh_agent',
+          },
+          true
+        ); // 許可あり
       }).not.toThrow();
 
       process.env.SSH_AUTH_SOCK = originalEnv;
@@ -309,12 +314,12 @@ describe('GitManager', () => {
 
     it('ブランチ作成失敗時にエラーを投げる', async () => {
       vi.mocked(mockProcessMonitor.execute).mockResolvedValue(
-        failureResult('fatal: A branch named \'agent/T-1-new-feature\' already exists')
+        failureResult("fatal: A branch named 'agent/T-1-new-feature' already exists")
       );
 
-      await expect(
-        gitManager.createBranch('agent/T-1-new-feature')
-      ).rejects.toThrow('git checkout -b failed');
+      await expect(gitManager.createBranch('agent/T-1-new-feature')).rejects.toThrow(
+        'git checkout -b failed'
+      );
     });
   });
 
@@ -336,12 +341,10 @@ describe('GitManager', () => {
 
     it('チェックアウト失敗時にエラーを投げる', async () => {
       vi.mocked(mockProcessMonitor.execute).mockResolvedValue(
-        failureResult('error: pathspec \'nonexistent\' did not match any file(s)')
+        failureResult("error: pathspec 'nonexistent' did not match any file(s)")
       );
 
-      await expect(
-        gitManager.checkout('nonexistent')
-      ).rejects.toThrow('git checkout failed');
+      await expect(gitManager.checkout('nonexistent')).rejects.toThrow('git checkout failed');
     });
   });
 
@@ -366,10 +369,7 @@ describe('GitManager', () => {
 
       await gitManager.stage(['.'], { cwd: '/workspace/repo' });
 
-      expect(mockProcessMonitor.execute).toHaveBeenCalledWith(
-        'git add "."',
-        expect.any(Object)
-      );
+      expect(mockProcessMonitor.execute).toHaveBeenCalledWith('git add "."', expect.any(Object));
     });
   });
 
@@ -406,13 +406,9 @@ describe('GitManager', () => {
     });
 
     it('コミット失敗時にエラーを投げる', async () => {
-      vi.mocked(mockProcessMonitor.execute).mockResolvedValue(
-        failureResult('nothing to commit')
-      );
+      vi.mocked(mockProcessMonitor.execute).mockResolvedValue(failureResult('nothing to commit'));
 
-      await expect(
-        gitManager.commit('[T-1] Empty commit')
-      ).rejects.toThrow('git commit failed');
+      await expect(gitManager.commit('[T-1] Empty commit')).rejects.toThrow('git commit failed');
     });
   });
 
@@ -437,9 +433,7 @@ describe('GitManager', () => {
         failureResult('error: failed to push some refs')
       );
 
-      await expect(
-        gitManager.push('agent/T-1-new-feature')
-      ).rejects.toThrow('git push failed');
+      await expect(gitManager.push('agent/T-1-new-feature')).rejects.toThrow('git push failed');
     });
   });
 
@@ -818,6 +812,10 @@ describe('GitManager', () => {
      */
 
     it('Git操作がログファイルに記録される', async () => {
+      // ログディレクトリを確実に作成
+      const logDir = path.join(tempDir, 'test-run-id');
+      await fs.mkdir(logDir, { recursive: true });
+
       vi.mocked(mockProcessMonitor.execute).mockResolvedValue(successResult());
 
       await gitManager.createBranch('test-branch');
@@ -832,9 +830,11 @@ describe('GitManager', () => {
     });
 
     it('失敗した操作もログに記録される', async () => {
-      vi.mocked(mockProcessMonitor.execute).mockResolvedValue(
-        failureResult('error message')
-      );
+      // ログディレクトリを確実に作成
+      const logDir = path.join(tempDir, 'test-run-id');
+      await fs.mkdir(logDir, { recursive: true });
+
+      vi.mocked(mockProcessMonitor.execute).mockResolvedValue(failureResult('error message'));
 
       await expect(gitManager.createBranch('test-branch')).rejects.toThrow();
 
@@ -847,6 +847,10 @@ describe('GitManager', () => {
     });
 
     it('複数のGit操作が順番にログに記録される', async () => {
+      // ログディレクトリを確実に作成
+      const logDir = path.join(tempDir, 'test-run-id');
+      await fs.mkdir(logDir, { recursive: true });
+
       vi.mocked(mockProcessMonitor.execute)
         .mockResolvedValueOnce(successResult()) // createBranch
         .mockResolvedValueOnce(successResult()) // stage
@@ -870,6 +874,10 @@ describe('GitManager', () => {
     });
 
     it('ログにタイムスタンプが含まれる', async () => {
+      // ログディレクトリを確実に作成
+      const logDir = path.join(tempDir, 'test-run-id');
+      await fs.mkdir(logDir, { recursive: true });
+
       vi.mocked(mockProcessMonitor.execute).mockResolvedValue(successResult());
 
       await gitManager.createBranch('test-branch');
@@ -883,6 +891,10 @@ describe('GitManager', () => {
     });
 
     it('ログに実行時間が含まれる', async () => {
+      // ログディレクトリを確実に作成
+      const logDir = path.join(tempDir, 'test-run-id');
+      await fs.mkdir(logDir, { recursive: true });
+
       vi.mocked(mockProcessMonitor.execute).mockResolvedValue(successResult());
 
       await gitManager.createBranch('test-branch');
@@ -908,6 +920,10 @@ describe('GitManager', () => {
     });
 
     it('clone操作がログに記録される', async () => {
+      // ログディレクトリを確実に作成
+      const logDir = path.join(tempDir, 'test-run-id');
+      await fs.mkdir(logDir, { recursive: true });
+
       vi.mocked(mockProcessMonitor.execute).mockResolvedValue(successResult());
 
       await gitManager.clone('https://github.com/user/repo.git', '/workspace/repo');
@@ -923,6 +939,10 @@ describe('GitManager', () => {
     });
 
     it('checkout操作がログに記録される', async () => {
+      // ログディレクトリを確実に作成
+      const logDir = path.join(tempDir, 'test-run-id');
+      await fs.mkdir(logDir, { recursive: true });
+
       vi.mocked(mockProcessMonitor.execute).mockResolvedValue(successResult());
 
       await gitManager.checkout('main');
@@ -937,6 +957,10 @@ describe('GitManager', () => {
     });
 
     it('push操作がログに記録される', async () => {
+      // ログディレクトリを確実に作成
+      const logDir = path.join(tempDir, 'test-run-id');
+      await fs.mkdir(logDir, { recursive: true });
+
       vi.mocked(mockProcessMonitor.execute).mockResolvedValue(successResult());
 
       await gitManager.push('feature-branch');
@@ -951,6 +975,10 @@ describe('GitManager', () => {
     });
 
     it('getStatus操作がログに記録される', async () => {
+      // ログディレクトリを確実に作成
+      const logDir = path.join(tempDir, 'test-run-id');
+      await fs.mkdir(logDir, { recursive: true });
+
       vi.mocked(mockProcessMonitor.execute)
         .mockResolvedValueOnce(successResult('main'))
         .mockResolvedValueOnce(successResult(''));
@@ -967,6 +995,10 @@ describe('GitManager', () => {
     });
 
     it('validateKnownHosts操作がログに記録される', async () => {
+      // ログディレクトリを確実に作成
+      const logDir = path.join(tempDir, 'test-run-id');
+      await fs.mkdir(logDir, { recursive: true });
+
       const knownHostsPath = path.join(tempDir, 'known_hosts');
       gitManager.setKnownHostsPath(knownHostsPath);
 

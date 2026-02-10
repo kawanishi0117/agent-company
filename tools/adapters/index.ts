@@ -18,13 +18,12 @@ import {
   FallbackConfig,
   AdapterError,
   AdapterFallbackError,
-  AdapterConnectionError,
   ChatOptions,
   ChatWithToolsOptions,
   AdapterResponse,
   ToolCallResponse,
 } from './base.js';
-import { OllamaAdapter, createOllamaAdapter } from './ollama.js';
+import { createOllamaAdapter } from './ollama.js';
 
 // ============================================================
 // アダプタファクトリ登録
@@ -109,10 +108,7 @@ export class AdapterRegistry {
    */
   setDefaultAdapter(name: string): void {
     if (!ADAPTER_FACTORIES[name]) {
-      throw new AdapterError(
-        `アダプタ '${name}' は登録されていません`,
-        'ADAPTER_NOT_FOUND'
-      );
+      throw new AdapterError(`アダプタ '${name}' は登録されていません`, 'ADAPTER_NOT_FOUND');
     }
     this.defaultAdapterName = name;
   }

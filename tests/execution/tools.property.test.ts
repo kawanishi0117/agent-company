@@ -44,13 +44,24 @@ const TEST_RUN_ID = 'test-tools-property-001';
  * - 英数字、ハイフン、アンダースコア、ドットのみ
  * - 先頭がドットでない
  * - 空でない
+ * - Windowsで無効なファイル名を除外
  */
 const validFileNameArb: fc.Arbitrary<string> = fc
   .stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789-_.'.split('')), {
     minLength: 1,
     maxLength: 50,
   })
-  .filter((s) => !s.startsWith('.') && !s.startsWith('-') && s.length > 0);
+  .filter((s) => {
+    // 基本的なフィルタ
+    if (s.startsWith('.') || s.startsWith('-') || s.length === 0) return false;
+    // ドットのみのファイル名を除外
+    if (s === '.' || s === '..') return false;
+    // 末尾がドットのファイル名を除外（Windowsで問題になる）
+    if (s.endsWith('.')) return false;
+    // 末尾がスペースのファイル名を除外（Windowsで問題になる）
+    if (s.endsWith(' ')) return false;
+    return true;
+  });
 
 /**
  * 有効なファイルパスを生成するArbitrary
@@ -82,10 +93,11 @@ const multiLineContentArb: fc.Arbitrary<string> = fc
   .map((lines) => lines.join('\n'));
 
 /**
- * 有効なreplace編集を生成するArbitrary
+ * 有効なreplace編集を生成するArbitrary（将来の拡張用）
  * @param lineCount - ファイルの行数
  */
-const validReplaceEditArb = (lineCount: number): fc.Arbitrary<FileEdit> => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _validReplaceEditArb = (lineCount: number): fc.Arbitrary<FileEdit> => {
   if (lineCount === 0) {
     // 空ファイルの場合は編集不可
     return fc.constant({ type: 'insert' as const, startLine: 1, content: '' });
@@ -105,10 +117,11 @@ const validReplaceEditArb = (lineCount: number): fc.Arbitrary<FileEdit> => {
 };
 
 /**
- * 有効なinsert編集を生成するArbitrary
+ * 有効なinsert編集を生成するArbitrary（将来の拡張用）
  * @param lineCount - ファイルの行数
  */
-const validInsertEditArb = (lineCount: number): fc.Arbitrary<FileEdit> => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _validInsertEditArb = (lineCount: number): fc.Arbitrary<FileEdit> => {
   return fc
     .tuple(
       fc.integer({ min: 1, max: Math.max(1, lineCount + 1) }),
@@ -122,19 +135,17 @@ const validInsertEditArb = (lineCount: number): fc.Arbitrary<FileEdit> => {
 };
 
 /**
- * 有効なdelete編集を生成するArbitrary
+ * 有効なdelete編集を生成するArbitrary（将来の拡張用）
  * @param lineCount - ファイルの行数
  */
-const validDeleteEditArb = (lineCount: number): fc.Arbitrary<FileEdit> => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _validDeleteEditArb = (lineCount: number): fc.Arbitrary<FileEdit> => {
   if (lineCount === 0) {
     // 空ファイルの場合は削除不可
     return fc.constant({ type: 'insert' as const, startLine: 1, content: '' });
   }
   return fc
-    .tuple(
-      fc.integer({ min: 1, max: lineCount }),
-      fc.integer({ min: 1, max: lineCount })
-    )
+    .tuple(fc.integer({ min: 1, max: lineCount }), fc.integer({ min: 1, max: lineCount }))
     .map(([start, end]) => ({
       type: 'delete' as const,
       startLine: Math.min(start, end),
@@ -360,9 +371,7 @@ describe('Property 17: File Edit Consistency', () => {
         const endLine = Math.min(startLine + Math.floor(Math.random() * 3), lineCount);
         const newContent = 'REPLACED_CONTENT';
 
-        const edits: FileEdit[] = [
-          { type: 'replace', startLine, endLine, content: newContent },
-        ];
+        const edits: FileEdit[] = [{ type: 'replace', startLine, endLine, content: newContent }];
 
         // 編集を適用
         const editResult = await toolExecutor.editFile(fileName, edits);
@@ -406,9 +415,7 @@ describe('Property 17: File Edit Consistency', () => {
         const insertLine = Math.floor(Math.random() * (lineCount + 1)) + 1;
         const newContent = 'INSERTED_LINE';
 
-        const edits: FileEdit[] = [
-          { type: 'insert', startLine: insertLine, content: newContent },
-        ];
+        const edits: FileEdit[] = [{ type: 'insert', startLine: insertLine, content: newContent }];
 
         // 編集を適用
         const editResult = await toolExecutor.editFile(fileName, edits);
@@ -458,9 +465,7 @@ describe('Property 17: File Edit Consistency', () => {
         const maxEndLine = Math.min(startLine + Math.floor(Math.random() * 2), lineCount - 1);
         const endLine = Math.max(startLine, maxEndLine);
 
-        const edits: FileEdit[] = [
-          { type: 'delete', startLine, endLine },
-        ];
+        const edits: FileEdit[] = [{ type: 'delete', startLine, endLine }];
 
         // 編集を適用
         const editResult = await toolExecutor.editFile(fileName, edits);
@@ -551,9 +556,7 @@ describe('applyEditsToContent Property Tests', () => {
         const endLine = Math.min(startLine + Math.floor(Math.random() * 3), lineCount);
         const newContent = 'NEW\nCONTENT';
 
-        const edits: FileEdit[] = [
-          { type: 'replace', startLine, endLine, content: newContent },
-        ];
+        const edits: FileEdit[] = [{ type: 'replace', startLine, endLine, content: newContent }];
 
         const result = applyEditsToContent(content, edits);
 
@@ -581,9 +584,7 @@ describe('applyEditsToContent Property Tests', () => {
         const insertLine = Math.floor(Math.random() * (lineCount + 1)) + 1;
         const newContent = 'SINGLE_LINE';
 
-        const edits: FileEdit[] = [
-          { type: 'insert', startLine: insertLine, content: newContent },
-        ];
+        const edits: FileEdit[] = [{ type: 'insert', startLine: insertLine, content: newContent }];
 
         const result = applyEditsToContent(content, edits);
 
@@ -613,9 +614,7 @@ describe('applyEditsToContent Property Tests', () => {
         const maxEndLine = Math.min(startLine + Math.floor(Math.random() * 2), lineCount - 1);
         const endLine = Math.max(startLine, maxEndLine);
 
-        const edits: FileEdit[] = [
-          { type: 'delete', startLine, endLine },
-        ];
+        const edits: FileEdit[] = [{ type: 'delete', startLine, endLine }];
 
         const result = applyEditsToContent(content, edits);
 

@@ -38,12 +38,7 @@ import {
   ContainerCreateOptions,
   createContainerRuntime,
 } from './container-runtime';
-import {
-  AgentId,
-  ContainerId,
-  SystemConfig,
-  DEFAULT_SYSTEM_CONFIG,
-} from './types';
+import { AgentId, ContainerId, SystemConfig, DEFAULT_SYSTEM_CONFIG } from './types';
 
 // =============================================================================
 // 定数定義
@@ -157,9 +152,9 @@ export const DEFAULT_ISOLATION_CONFIG: ContainerIsolationConfig = {
  * ワーカーコンテナの状態
  */
 export type WorkerContainerState =
-  | 'created'    // 作成済み（未起動）
-  | 'running'    // 実行中
-  | 'stopped'    // 停止済み
+  | 'created' // 作成済み（未起動）
+  | 'running' // 実行中
+  | 'stopped' // 停止済み
   | 'destroyed'; // 破棄済み
 
 /**
@@ -855,7 +850,9 @@ export class WorkerContainer {
     // ネットワーク隔離の検証
     const networkIsolated = isolation.networkMode === 'none';
     if (!networkIsolated) {
-      errors.push(`Network isolation not enabled: networkMode='${isolation.networkMode}' (expected 'none')`);
+      errors.push(
+        `Network isolation not enabled: networkMode='${isolation.networkMode}' (expected 'none')`
+      );
     }
 
     // ファイルシステム隔離の検証
@@ -1018,8 +1015,8 @@ export async function verifyContainerIsolation(
   const networkIsolated = isolationA.networkIsolated && isolationB.networkIsolated;
   if (!networkIsolated) {
     errors.push('Network isolation not enabled for both containers');
-    errors.push(...isolationA.errors.filter(e => e.includes('Network')));
-    errors.push(...isolationB.errors.filter(e => e.includes('Network')));
+    errors.push(...isolationA.errors.filter((e) => e.includes('Network')));
+    errors.push(...isolationB.errors.filter((e) => e.includes('Network')));
   }
 
   // ファイルシステム隔離の検証

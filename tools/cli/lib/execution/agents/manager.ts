@@ -617,7 +617,7 @@ export class ManagerAgent implements IManagerAgent {
    */
   constructor(config: ManagerAgentConfig) {
     this.agentId = config.agentId;
-    this.modelName = config.modelName ?? 'llama3';
+    this.modelName = config.modelName ?? 'llama3.2:1b';
     this._pollInterval = config.pollInterval ?? DEFAULT_POLL_INTERVAL;
     this.pollTimeout = config.pollTimeout ?? DEFAULT_POLL_TIMEOUT;
     this.runtimeBasePath = RUNTIME_BASE_PATH;

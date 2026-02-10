@@ -12,12 +12,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import {
-  AgentId,
-  AgentMessage,
-  AgentMessageType,
-  RunId,
-} from './types';
+import { AgentId, AgentMessage, AgentMessageType, RunId } from './types';
 import {
   IMessageQueue,
   FileMessageQueue,
@@ -332,11 +327,7 @@ export class AgentBus implements IAgentBus {
    * @param taskPayload - タスク情報
    * @returns タスク割り当てメッセージ
    */
-  createTaskAssignMessage(
-    from: AgentId,
-    to: AgentId,
-    taskPayload: unknown
-  ): AgentMessage {
+  createTaskAssignMessage(from: AgentId, to: AgentId, taskPayload: unknown): AgentMessage {
     return this.createMessage('task_assign', from, to, taskPayload);
   }
 
@@ -347,11 +338,7 @@ export class AgentBus implements IAgentBus {
    * @param resultPayload - 結果情報
    * @returns タスク完了メッセージ
    */
-  createTaskCompleteMessage(
-    from: AgentId,
-    to: AgentId,
-    resultPayload: unknown
-  ): AgentMessage {
+  createTaskCompleteMessage(from: AgentId, to: AgentId, resultPayload: unknown): AgentMessage {
     return this.createMessage('task_complete', from, to, resultPayload);
   }
 
@@ -362,11 +349,7 @@ export class AgentBus implements IAgentBus {
    * @param errorPayload - エラー情報
    * @returns タスク失敗メッセージ
    */
-  createTaskFailedMessage(
-    from: AgentId,
-    to: AgentId,
-    errorPayload: unknown
-  ): AgentMessage {
+  createTaskFailedMessage(from: AgentId, to: AgentId, errorPayload: unknown): AgentMessage {
     return this.createMessage('task_failed', from, to, errorPayload);
   }
 
@@ -377,11 +360,7 @@ export class AgentBus implements IAgentBus {
    * @param escalationPayload - エスカレーション情報
    * @returns エスカレーションメッセージ
    */
-  createEscalateMessage(
-    from: AgentId,
-    to: AgentId,
-    escalationPayload: unknown
-  ): AgentMessage {
+  createEscalateMessage(from: AgentId, to: AgentId, escalationPayload: unknown): AgentMessage {
     return this.createMessage('escalate', from, to, escalationPayload);
   }
 
@@ -392,11 +371,7 @@ export class AgentBus implements IAgentBus {
    * @param requestPayload - 要求情報
    * @returns ステータス要求メッセージ
    */
-  createStatusRequestMessage(
-    from: AgentId,
-    to: AgentId,
-    requestPayload: unknown
-  ): AgentMessage {
+  createStatusRequestMessage(from: AgentId, to: AgentId, requestPayload: unknown): AgentMessage {
     return this.createMessage('status_request', from, to, requestPayload);
   }
 
@@ -407,12 +382,55 @@ export class AgentBus implements IAgentBus {
    * @param responsePayload - 応答情報
    * @returns ステータス応答メッセージ
    */
-  createStatusResponseMessage(
+  createStatusResponseMessage(from: AgentId, to: AgentId, responsePayload: unknown): AgentMessage {
+    return this.createMessage('status_response', from, to, responsePayload);
+  }
+
+  /**
+   * レビュー要求メッセージを作成
+   * @param from - 送信元エージェントID（通常はワーカー）
+   * @param to - 送信先エージェントID（通常はレビューア）
+   * @param reviewPayload - レビュー情報（チケットID、変更内容など）
+   * @returns レビュー要求メッセージ
+   *
+   * @see Requirement 5.1: THE Worker_Agent SHALL request review from Reviewer_Agent upon task completion
+   */
+  createReviewRequestMessage(from: AgentId, to: AgentId, reviewPayload: unknown): AgentMessage {
+    return this.createMessage('review_request', from, to, reviewPayload);
+  }
+
+  /**
+   * レビュー応答メッセージを作成
+   * @param from - 送信元エージェントID（通常はレビューア）
+   * @param to - 送信先エージェントID（通常はワーカーまたはマネージャー）
+   * @param reviewResultPayload - レビュー結果（承認/却下、フィードバックなど）
+   * @returns レビュー応答メッセージ
+   *
+   * @see Requirement 5.2: THE Reviewer_Agent SHALL provide review decision: approve, request_changes, reject
+   */
+  createReviewResponseMessage(
     from: AgentId,
     to: AgentId,
-    responsePayload: unknown
+    reviewResultPayload: unknown
   ): AgentMessage {
-    return this.createMessage('status_response', from, to, responsePayload);
+    return this.createMessage('review_response', from, to, reviewResultPayload);
+  }
+
+  /**
+   * コンフリクトエスカレーションメッセージを作成
+   * @param from - 送信元エージェントID（通常はマージャー）
+   * @param to - 送信先エージェントID（通常はレビューア）
+   * @param conflictPayload - コンフリクト情報（ファイル、詳細など）
+   * @returns コンフリクトエスカレーションメッセージ
+   *
+   * @see Requirement 4.6: WHEN merge conflict cannot be auto-resolved, THE Merger_Agent SHALL escalate to Reviewer_Agent
+   */
+  createConflictEscalateMessage(
+    from: AgentId,
+    to: AgentId,
+    conflictPayload: unknown
+  ): AgentMessage {
+    return this.createMessage('conflict_escalate', from, to, conflictPayload);
   }
 
   // ===========================================================================
@@ -484,6 +502,7 @@ export class AgentBus implements IAgentBus {
    * @param type - メッセージ種別
    * @returns 有効な場合はtrue
    * @see Requirement 10.2: THE Agent_Bus SHALL support message types
+   * @see Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 4.6
    */
   private isValidMessageType(type: string): type is AgentMessageType {
     const validTypes: AgentMessageType[] = [
@@ -493,6 +512,9 @@ export class AgentBus implements IAgentBus {
       'escalate',
       'status_request',
       'status_response',
+      'review_request',
+      'review_response',
+      'conflict_escalate',
     ];
     return validTypes.includes(type as AgentMessageType);
   }
@@ -580,9 +602,7 @@ export class AgentBus implements IAgentBus {
   private parseLogEntry(line: string): AgentMessage | null {
     try {
       // フォーマット: [timestamp] TYPE from -> to | payload
-      const match = line.match(
-        /^\[([^\]]+)\]\s+(\S+)\s+(\S+)\s+->\s+(\S+)\s+\|\s+(.+)$/
-      );
+      const match = line.match(/^\[([^\]]+)\]\s+(\S+)\s+(\S+)\s+->\s+(\S+)\s+\|\s+(.+)$/);
 
       if (!match) {
         return null;

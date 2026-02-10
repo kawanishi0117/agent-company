@@ -95,14 +95,14 @@ cd gui/web && npm run dev
 # http://localhost:3000 でアクセス
 ```
 
-| 画面 | URL | 説明 |
-|------|-----|------|
-| Dashboard | `/dashboard` | リアルタイム実行状況 |
-| Command Center | `/command` | タスク投入 |
-| Backlog | `/backlog` | カンバンボード |
-| Runs | `/runs` | 実行履歴 |
-| Reports | `/reports` | レポート |
-| Settings | `/settings` | 設定 |
+| 画面           | URL          | 説明                 |
+| -------------- | ------------ | -------------------- |
+| Dashboard      | `/dashboard` | リアルタイム実行状況 |
+| Command Center | `/command`   | タスク投入           |
+| Backlog        | `/backlog`   | カンバンボード       |
+| Runs           | `/runs`      | 実行履歴             |
+| Reports        | `/reports`   | レポート             |
+| Settings       | `/settings`  | 設定                 |
 
 ## Docker内での実行
 
@@ -123,11 +123,11 @@ docker compose -f infra/docker/compose.yaml exec workspace npx tsx tools/cli/age
 
 ```markdown
 ---
-id: "0002"
-title: "新機能の実装"
-status: "todo"
-assignee: ""
-priority: "medium"
+id: '0002'
+title: '新機能の実装'
+status: 'todo'
+assignee: ''
+priority: 'medium'
 ---
 
 # 新機能の実装

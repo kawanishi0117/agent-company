@@ -11,13 +11,7 @@
  */
 
 import { spawn } from 'child_process';
-import * as path from 'path';
-import {
-  ContainerId,
-  ContainerRuntimeType,
-  SystemConfig,
-  DEFAULT_SYSTEM_CONFIG,
-} from './types';
+import { ContainerId, ContainerRuntimeType, SystemConfig, DEFAULT_SYSTEM_CONFIG } from './types';
 
 // =============================================================================
 // 定数定義
@@ -28,9 +22,7 @@ import {
  * @description プラットフォームに応じたデフォルトパス
  */
 const DEFAULT_DOCKER_SOCKET_PATH =
-  process.platform === 'win32'
-    ? '//./pipe/docker_engine'
-    : '/var/run/docker.sock';
+  process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock';
 
 /**
  * 許可されたDockerコマンドのデフォルトリスト
@@ -50,27 +42,27 @@ export const DEFAULT_ALLOWED_DOCKER_COMMANDS: readonly string[] = [
  * @description セキュリティ上の理由から常に拒否されるコマンド
  */
 const DANGEROUS_DOCKER_COMMANDS: readonly string[] = [
-  'exec',      // コンテナ内でコマンド実行（他ワーカーへの干渉可能）
-  'cp',        // ファイルコピー（ホストファイルシステムへのアクセス可能）
-  'export',    // コンテナのエクスポート
-  'import',    // イメージのインポート
-  'load',      // イメージのロード
-  'save',      // イメージの保存
-  'commit',    // コンテナからイメージ作成
-  'push',      // イメージのプッシュ
-  'pull',      // イメージのプル（制御されていないイメージの取得）
-  'build',     // イメージのビルド
-  'network',   // ネットワーク操作
-  'volume',    // ボリューム操作
-  'system',    // システム操作
-  'swarm',     // Swarm操作
-  'node',      // ノード操作
-  'service',   // サービス操作
-  'stack',     // スタック操作
-  'secret',    // シークレット操作
-  'config',    // コンフィグ操作
-  'plugin',    // プラグイン操作
-  'trust',     // 信頼操作
+  'exec', // コンテナ内でコマンド実行（他ワーカーへの干渉可能）
+  'cp', // ファイルコピー（ホストファイルシステムへのアクセス可能）
+  'export', // コンテナのエクスポート
+  'import', // イメージのインポート
+  'load', // イメージのロード
+  'save', // イメージの保存
+  'commit', // コンテナからイメージ作成
+  'push', // イメージのプッシュ
+  'pull', // イメージのプル（制御されていないイメージの取得）
+  'build', // イメージのビルド
+  'network', // ネットワーク操作
+  'volume', // ボリューム操作
+  'system', // システム操作
+  'swarm', // Swarm操作
+  'node', // ノード操作
+  'service', // サービス操作
+  'stack', // スタック操作
+  'secret', // シークレット操作
+  'config', // コンフィグ操作
+  'plugin', // プラグイン操作
+  'trust', // 信頼操作
 ] as const;
 
 // =============================================================================
@@ -199,9 +191,7 @@ export class ContainerRuntime {
     return {
       ...this.config,
       // allowedCommandsは配列なのでディープコピーを返す
-      allowedCommands: this.config.allowedCommands
-        ? [...this.config.allowedCommands]
-        : undefined,
+      allowedCommands: this.config.allowedCommands ? [...this.config.allowedCommands] : undefined,
     };
   }
 

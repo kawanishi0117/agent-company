@@ -110,7 +110,9 @@ const dangerousCommandArb: fc.Arbitrary<string> = fc.constantFrom(...DANGEROUS_C
 /**
  * 許可されていないが危険でもないコマンドを生成するArbitrary
  */
-const nonAllowedSafeCommandArb: fc.Arbitrary<string> = fc.constantFrom(...NON_ALLOWED_SAFE_COMMANDS);
+const nonAllowedSafeCommandArb: fc.Arbitrary<string> = fc.constantFrom(
+  ...NON_ALLOWED_SAFE_COMMANDS
+);
 
 /**
  * コンテナランタイム種別を生成するArbitrary
@@ -126,9 +128,30 @@ const dockerOptionsArb: fc.Arbitrary<string[]> = fc.array(
     fc.constant('--detach'),
     fc.constant('-it'),
     fc.constant('--rm'),
-    fc.tuple(fc.constant('-p'), fc.stringOf(fc.constantFrom('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':'), { minLength: 3, maxLength: 9 })).map(([opt, val]) => `${opt} ${val}`),
-    fc.tuple(fc.constant('-e'), fc.stringOf(fc.constantFrom('A', 'B', 'C', '=', '1', '2', '3'), { minLength: 3, maxLength: 10 })).map(([opt, val]) => `${opt} ${val}`),
-    fc.tuple(fc.constant('--name'), fc.stringOf(fc.constantFrom('a', 'b', 'c', '-', '_'), { minLength: 3, maxLength: 10 })).map(([opt, val]) => `${opt} ${val}`),
+    fc
+      .tuple(
+        fc.constant('-p'),
+        fc.stringOf(fc.constantFrom('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':'), {
+          minLength: 3,
+          maxLength: 9,
+        })
+      )
+      .map(([opt, val]) => `${opt} ${val}`),
+    fc
+      .tuple(
+        fc.constant('-e'),
+        fc.stringOf(fc.constantFrom('A', 'B', 'C', '=', '1', '2', '3'), {
+          minLength: 3,
+          maxLength: 10,
+        })
+      )
+      .map(([opt, val]) => `${opt} ${val}`),
+    fc
+      .tuple(
+        fc.constant('--name'),
+        fc.stringOf(fc.constantFrom('a', 'b', 'c', '-', '_'), { minLength: 3, maxLength: 10 })
+      )
+      .map(([opt, val]) => `${opt} ${val}`)
   ),
   { minLength: 0, maxLength: 3 }
 );
@@ -150,7 +173,7 @@ const imageNameArb: fc.Arbitrary<string> = fc.oneof(
   fc.constant('ubuntu'),
   fc.constant('node:18'),
   fc.constant('python:3.11'),
-  fc.constant('redis:latest'),
+  fc.constant('redis:latest')
 );
 
 /**
@@ -610,9 +633,7 @@ describe('Container Runtime Edge Cases', () => {
     });
 
     it('-c オプション付きコマンドを正しく解析する', () => {
-      const result = containerRuntime.validateDockerCommand(
-        'docker -c my-context run nginx'
-      );
+      const result = containerRuntime.validateDockerCommand('docker -c my-context run nginx');
       expect(result.valid).toBe(true);
       expect(result.detectedCommand).toBe('run');
     });

@@ -6,10 +6,7 @@
  * @see Requirements: 21.1, 21.2, 21.3, 21.4, 21.5, 21.6, 21.7
  */
 
-import {
-  createOrchestrator,
-  OrchestratorError,
-} from '../lib/execution/orchestrator.js';
+import { createOrchestrator, OrchestratorError } from '../lib/execution/orchestrator.js';
 import { StateManager } from '../lib/execution/state-manager.js';
 import { DEFAULT_SYSTEM_CONFIG, Project } from '../lib/execution/types.js';
 import { getAdapter } from '../../adapters/index.js';
@@ -197,13 +194,9 @@ async function executeTask(ticketId: string, options: ExecuteOptions): Promise<v
     const projectId = options.project ?? 'default';
 
     // タスクを送信
-    const taskId = await orchestrator.submitTask(
-      `チケット ${ticketId} を実行`,
-      projectId,
-      {
-        autoDecompose: !options.decompose,
-      }
-    );
+    const taskId = await orchestrator.submitTask(`チケット ${ticketId} を実行`, projectId, {
+      autoDecompose: !options.decompose,
+    });
 
     // eslint-disable-next-line no-console
     console.log(`\n✅ タスクを送信しました`);
@@ -268,10 +261,7 @@ async function decomposeTask(ticketId: string, options: ExecuteOptions): Promise
     };
 
     // タスクを分解
-    const result = await decomposer.decompose(
-      `チケット ${ticketId} を実行`,
-      projectContext
-    );
+    const result = await decomposer.decompose(`チケット ${ticketId} を実行`, projectContext);
 
     // eslint-disable-next-line no-console
     console.log(`\n✅ タスク分解完了`);

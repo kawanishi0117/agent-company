@@ -7,7 +7,7 @@
  * @see Requirements: 9.1, 9.3, 9.4, 9.5
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   WorkerPool,
   createWorkerPool,
@@ -15,10 +15,8 @@ import {
   describeWorkerStatus,
   describePoolStatus,
   DEFAULT_MAX_WORKERS,
-  WorkerPoolConfig,
-  WorkerInfo,
 } from '../../tools/cli/lib/execution/worker-pool';
-import { SubTask, PoolStatus, DEFAULT_SYSTEM_CONFIG } from '../../tools/cli/lib/execution/types';
+import { SubTask, PoolStatus } from '../../tools/cli/lib/execution/types';
 
 // =============================================================================
 // テストヘルパー
@@ -127,7 +125,7 @@ describe('WorkerPool', () => {
     it('利用可能なワーカーを取得できる', async () => {
       const worker = await pool.getAvailableWorker();
       expect(worker).not.toBeNull();
-      
+
       const status = pool.getPoolStatus();
       expect(status.totalWorkers).toBe(1);
       expect(status.activeWorkers).toBe(1);
@@ -140,8 +138,8 @@ describe('WorkerPool', () => {
         workers.push(worker);
       }
 
-      expect(workers.every(w => w !== null)).toBe(true);
-      
+      expect(workers.every((w) => w !== null)).toBe(true);
+
       const status = pool.getPoolStatus();
       expect(status.totalWorkers).toBe(3);
       expect(status.activeWorkers).toBe(3);
@@ -204,14 +202,14 @@ describe('WorkerPool', () => {
     it('保留中タスクをクリアできる', () => {
       const task = createTestSubTask('task-1');
       pool.addPendingTask(task, 'run-1');
-      
+
       pool.clearPendingTasks();
       expect(pool.getPendingTaskCount()).toBe(0);
     });
 
     it('ワーカー解放時に保留中タスクが割り当てられる', async () => {
-      // ワーカーを取得
-      const worker = await pool.getAvailableWorker();
+      // ワーカーを取得（戻り値は使用しないが、ワーカーを確保するために呼び出す）
+      await pool.getAvailableWorker();
       const allWorkers = pool.getAllWorkers();
       const workerId = allWorkers[0].workerId;
 
@@ -221,7 +219,7 @@ describe('WorkerPool', () => {
 
       // ワーカーを解放
       const result = await pool.releaseWorker(workerId);
-      
+
       expect(result.success).toBe(true);
       expect(result.nextTask).toBeDefined();
       expect(result.nextTask?.id).toBe('pending-task');
@@ -237,9 +235,9 @@ describe('WorkerPool', () => {
     it('ワーカー情報を取得できる', async () => {
       await pool.getAvailableWorker();
       const allWorkers = pool.getAllWorkers();
-      
+
       expect(allWorkers.length).toBe(1);
-      
+
       const workerInfo = pool.getWorkerInfo(allWorkers[0].workerId);
       expect(workerInfo).toBeDefined();
       expect(workerInfo?.status).toBe('working');
@@ -261,9 +259,10 @@ describe('WorkerPool', () => {
     });
 
     it('アイドルワーカー数を取得できる', async () => {
-      const worker = await pool.getAvailableWorker();
+      // ワーカーを取得（戻り値は使用しないが、ワーカーを確保するために呼び出す）
+      await pool.getAvailableWorker();
       const allWorkers = pool.getAllWorkers();
-      
+
       await pool.releaseWorker(allWorkers[0].workerId);
 
       expect(pool.getIdleWorkerCount()).toBe(1);
@@ -282,7 +281,7 @@ describe('WorkerPool', () => {
       const success = pool.assignTaskToWorker(workerId, task, 'run-assign');
 
       expect(success).toBe(true);
-      
+
       const workerInfo = pool.getWorkerInfo(workerId);
       expect(workerInfo?.status).toBe('working');
       expect(workerInfo?.currentTask?.id).toBe('assigned-task');
@@ -315,7 +314,7 @@ describe('WorkerPool', () => {
 
     it('停止後はワーカーを取得できない', async () => {
       await pool.stop();
-      
+
       const worker = await pool.getAvailableWorker();
       expect(worker).toBeNull();
     });

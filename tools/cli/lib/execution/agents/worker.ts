@@ -35,6 +35,10 @@ import {
   ToolCallResponse,
 } from '../../../../adapters/base';
 import { getAdapter, globalRegistry } from '../../../../adapters/index';
+import type {
+  QualityGateResult as IntegrationQualityGateResult,
+  QualityGateFeedback,
+} from '../quality-gate-integration';
 
 // =============================================================================
 // 定数定義
@@ -45,6 +49,12 @@ import { getAdapter, globalRegistry } from '../../../../adapters/index';
  * @see Requirement 11.3: THE conversation loop SHALL continue until AI signals completion or max iterations (30)
  */
 export const MAX_ITERATIONS = 30;
+
+/**
+ * 品質ゲートフィードバックループの最大リトライ回数
+ * @see Requirement 4.5: THE Worker_Agent SHALL attempt to fix issues based on quality gate feedback
+ */
+export const MAX_QUALITY_GATE_RETRIES = 3;
 
 /**
  * 会話履歴保存ディレクトリのベースパス
@@ -83,6 +93,8 @@ export interface WorkerAgentConfig {
   maxIterations?: number;
   /** コマンドタイムアウト（秒） */
   commandTimeout?: number;
+  /** 品質ゲートフィードバックループの最大リトライ回数 */
+  maxQualityGateRetries?: number;
 }
 
 /**
@@ -111,6 +123,22 @@ export interface ConversationLoopResult {
   artifacts: ArtifactInfo[];
   /** エラー一覧 */
   errors: ErrorInfo[];
+  /** 品質ゲート結果（品質ゲート実行時のみ） */
+  qualityGateResult?: IntegrationQualityGateResult;
+  /** 品質ゲートリトライ回数 */
+  qualityGateRetries: number;
+}
+
+/**
+ * 品質ゲートフィードバックループ結果
+ * @description 品質ゲートフィードバックループの実行結果
+ * @see Requirements: 4.4, 4.5
+ */
+interface QualityGateFeedbackLoopResult {
+  /** 最終的な会話ループ結果（修正ループを含む） */
+  loopResult: ConversationLoopResult;
+  /** 最終的な品質ゲート結果（null = 品質ゲート未実行） */
+  qualityGateResult: IntegrationQualityGateResult | null;
 }
 
 // =============================================================================
@@ -304,6 +332,31 @@ export class WorkerAgent {
   /** タスク完了フラグ */
   private taskCompleted: boolean = false;
 
+  /** 品質ゲートフィードバックループの最大リトライ回数 */
+  private maxQualityGateRetries: number;
+
+  /**
+   * 品質ゲートコールバック
+   * @description コード変更完了時に自動実行される品質チェック
+   * @see Requirement 4.1: WHEN a Worker_Agent completes code changes, THE System SHALL run lint automatically
+   * @see Requirement 4.4: IF quality gate fails, THE System SHALL notify Worker_Agent with failure details
+   */
+  private qualityGateCallback?: (workspacePath: string) => Promise<IntegrationQualityGateResult>;
+
+  /**
+   * 品質ゲートフィードバック生成コールバック
+   * @description 品質ゲート失敗時にフィードバックを生成する
+   * @see Requirement 4.5: THE Worker_Agent SHALL attempt to fix issues based on quality gate feedback
+   */
+  private qualityGateFeedbackGenerator?: (results: IntegrationQualityGateResult) => QualityGateFeedback;
+
+  /**
+   * 品質ゲート結果保存コールバック
+   * @description 品質ゲート結果をquality.jsonに保存する
+   * @see Requirement 4.3: THE System SHALL record quality gate results to quality.json
+   */
+  private qualityGateResultSaver?: (runId: RunId, results: IntegrationQualityGateResult) => Promise<void>;
+
   /**
    * コンストラクタ
    * @param config - Worker Agent設定
@@ -311,7 +364,8 @@ export class WorkerAgent {
   constructor(config: WorkerAgentConfig) {
     this.agentId = config.agentId;
     this.maxIterations = config.maxIterations ?? MAX_ITERATIONS;
-    this.modelName = config.modelName ?? 'llama3';
+    this.maxQualityGateRetries = config.maxQualityGateRetries ?? MAX_QUALITY_GATE_RETRIES;
+    this.modelName = config.modelName ?? 'llama3.2:1b';
 
     // AIアダプタを取得
     const adapterName = config.adapterName ?? 'ollama';
@@ -395,12 +449,21 @@ export class WorkerAgent {
       // 会話ループを実行
       const loopResult = await this.runConversationLoop();
 
+      // 品質ゲートフィードバックループを実行
+      // @see Requirement 4.1: WHEN a Worker_Agent completes code changes, THE System SHALL run lint automatically
+      // @see Requirement 4.4: IF quality gate fails, THE System SHALL notify Worker_Agent with failure details
+      // @see Requirement 4.5: THE Worker_Agent SHALL attempt to fix issues based on quality gate feedback
+      const qualityResult = await this.runQualityGateFeedbackLoop(
+        loopResult,
+        options.runId
+      );
+
       // 会話履歴を保存
       await this.saveConversationHistory(options.runId);
 
-      // 実行結果を構築
+      // 実行結果を構築（品質ゲート結果を反映）
       const endTime = new Date().toISOString();
-      const status: ExecutionStatus = loopResult.completed ? 'success' : 'partial';
+      const status = this.determineExecutionStatus(qualityResult.loopResult, qualityResult.qualityGateResult);
 
       return this.buildExecutionResult(
         options.runId,
@@ -408,7 +471,7 @@ export class WorkerAgent {
         status,
         startTime,
         endTime,
-        loopResult,
+        qualityResult.loopResult,
         errors
       );
     } catch (error) {
@@ -426,7 +489,7 @@ export class WorkerAgent {
         'error',
         startTime,
         endTime,
-        { completed: false, finalResponse: '', iterations: 0, artifacts: [], errors: [] },
+        { completed: false, finalResponse: '', iterations: 0, artifacts: [], errors: [], qualityGateRetries: 0 },
         errors
       );
     } finally {
@@ -504,6 +567,7 @@ export class WorkerAgent {
       iterations,
       artifacts: [...this.collectedArtifacts],
       errors,
+      qualityGateRetries: 0,
     };
   }
 
@@ -931,12 +995,24 @@ ${task.description}
     loopResult: ConversationLoopResult,
     errors: ErrorInfo[]
   ): ExecutionResult {
-    // デフォルトの品質ゲート結果
-    const qualityGates: QualityGateResult = {
-      lint: { passed: false, output: '' },
-      test: { passed: false, output: '' },
-      overall: false,
-    };
+    // 品質ゲート結果を構築（品質ゲートが実行された場合はその結果を使用）
+    const qualityGates: QualityGateResult = loopResult.qualityGateResult
+      ? {
+          lint: {
+            passed: loopResult.qualityGateResult.lint.passed,
+            output: loopResult.qualityGateResult.lint.output,
+          },
+          test: {
+            passed: loopResult.qualityGateResult.test.passed,
+            output: loopResult.qualityGateResult.test.output,
+          },
+          overall: loopResult.qualityGateResult.overall,
+        }
+      : {
+          lint: { passed: false, output: '' },
+          test: { passed: false, output: '' },
+          overall: false,
+        };
 
     return {
       runId,
@@ -953,6 +1029,278 @@ ${task.description}
       conversationTurns: loopResult.iterations,
       tokensUsed: this.conversationHistory?.totalTokens ?? 0,
     };
+  }
+
+  // ===========================================================================
+  // 品質ゲート統合
+  // ===========================================================================
+
+  /**
+   * 品質ゲートコールバックを設定
+   *
+   * コード変更完了時に自動的に品質チェックを実行するコールバックを設定する。
+   *
+   * @param callback - 品質チェック実行コールバック
+   *
+   * @see Requirement 4.1: WHEN a Worker_Agent completes code changes, THE System SHALL run lint automatically
+   */
+  setQualityGateCallback(
+    callback: (workspacePath: string) => Promise<IntegrationQualityGateResult>
+  ): void {
+    this.qualityGateCallback = callback;
+  }
+
+  /**
+   * 品質ゲートフィードバック生成コールバックを設定
+   *
+   * @param generator - フィードバック生成コールバック
+   *
+   * @see Requirement 4.4: IF quality gate fails, THE System SHALL notify Worker_Agent with failure details
+   */
+  setQualityGateFeedbackGenerator(
+    generator: (results: IntegrationQualityGateResult) => QualityGateFeedback
+  ): void {
+    this.qualityGateFeedbackGenerator = generator;
+  }
+
+  /**
+   * 品質ゲート結果保存コールバックを設定
+   *
+   * @param saver - 結果保存コールバック
+   *
+   * @see Requirement 4.3: THE System SHALL record quality gate results to quality.json
+   */
+  setQualityGateResultSaver(
+    saver: (runId: RunId, results: IntegrationQualityGateResult) => Promise<void>
+  ): void {
+    this.qualityGateResultSaver = saver;
+  }
+
+  /**
+   * 品質ゲートを実行し、結果に基づいてフィードバックを返す
+   *
+   * コード変更完了後に呼び出され、lint → test の順序で品質チェックを実行する。
+   * 失敗時はフィードバックメッセージを生成してWorkerAgentの会話に追加する。
+   *
+   * @param workspacePath - ワークスペースのパス
+   * @param runId - 実行ID
+   * @returns 品質ゲート結果（コールバック未設定時はnull）
+   *
+   * @see Requirement 4.1: THE System SHALL run lint automatically
+   * @see Requirement 4.2: WHEN lint passes, THE System SHALL run tests automatically
+   * @see Requirement 4.4: IF quality gate fails, THE System SHALL notify Worker_Agent with failure details
+   * @see Requirement 4.5: THE Worker_Agent SHALL attempt to fix issues based on quality gate feedback
+   */
+  async runQualityGate(
+    workspacePath: string,
+    runId: RunId
+  ): Promise<IntegrationQualityGateResult | null> {
+    if (!this.qualityGateCallback) {
+      return null;
+    }
+
+    // 品質チェック実行
+    const results = await this.qualityGateCallback(workspacePath);
+
+    // 結果を保存
+    if (this.qualityGateResultSaver) {
+      await this.qualityGateResultSaver(runId, results);
+    }
+
+    // 失敗時はフィードバックを会話に追加
+    if (!results.overall && this.qualityGateFeedbackGenerator) {
+      const feedback = this.qualityGateFeedbackGenerator(results);
+      this.addMessage('user', feedback.message);
+    }
+
+    return results;
+  }
+
+  // ===========================================================================
+  // 品質ゲートフィードバックループ
+  // ===========================================================================
+
+  /**
+   * 品質ゲートフィードバックループを実行
+   *
+   * 会話ループ完了後に品質ゲートを実行し、失敗時はフィードバックを
+   * AIに送信して修正を試みる。最大リトライ回数まで繰り返す。
+   *
+   * @param initialLoopResult - 初回の会話ループ結果
+   * @param runId - 実行ID
+   * @returns 品質ゲートフィードバックループの結果
+   *
+   * @see Requirement 4.1: WHEN a Worker_Agent completes code changes, THE System SHALL run lint automatically
+   * @see Requirement 4.4: IF quality gate fails, THE System SHALL notify Worker_Agent with failure details
+   * @see Requirement 4.5: THE Worker_Agent SHALL attempt to fix issues based on quality gate feedback
+   */
+  private async runQualityGateFeedbackLoop(
+    initialLoopResult: ConversationLoopResult,
+    runId: RunId
+  ): Promise<QualityGateFeedbackLoopResult> {
+    // 品質ゲートコールバックが未設定の場合はスキップ
+    if (!this.qualityGateCallback) {
+      return {
+        loopResult: initialLoopResult,
+        qualityGateResult: null,
+      };
+    }
+
+    let currentLoopResult = initialLoopResult;
+    let qualityGateResult: IntegrationQualityGateResult | null = null;
+    let retryCount = 0;
+
+    // ワークスペースパスを取得
+    const workspacePath = this.toolExecutor.getContext().workspacePath ?? '.';
+
+    while (retryCount <= this.maxQualityGateRetries) {
+      // 品質ゲートを実行
+      qualityGateResult = await this.qualityGateCallback(workspacePath);
+
+      // 結果を保存
+      if (this.qualityGateResultSaver) {
+        await this.qualityGateResultSaver(runId, qualityGateResult);
+      }
+
+      // 品質ゲート通過の場合はループ終了
+      if (qualityGateResult.overall) {
+        break;
+      }
+
+      // 最大リトライ回数に達した場合はループ終了
+      if (retryCount >= this.maxQualityGateRetries) {
+        break;
+      }
+
+      // フィードバックを生成してAIに送信
+      if (this.qualityGateFeedbackGenerator) {
+        const feedback = this.qualityGateFeedbackGenerator(qualityGateResult);
+        this.addMessage('user', feedback.message);
+      } else {
+        // デフォルトのフィードバックメッセージ
+        this.addMessage('user', this.buildDefaultQualityGateFeedback(qualityGateResult));
+      }
+
+      // タスク完了フラグをリセットして修正ループを実行
+      this.taskCompleted = false;
+      const fixLoopResult = await this.runConversationLoop();
+
+      // 修正ループの結果をマージ
+      currentLoopResult = this.mergeLoopResults(currentLoopResult, fixLoopResult);
+
+      retryCount++;
+    }
+
+    // 品質ゲートリトライ回数を記録
+    currentLoopResult.qualityGateResult = qualityGateResult ?? undefined;
+    currentLoopResult.qualityGateRetries = retryCount;
+
+    return {
+      loopResult: currentLoopResult,
+      qualityGateResult,
+    };
+  }
+
+  /**
+   * デフォルトの品質ゲートフィードバックメッセージを構築
+   *
+   * @param results - 品質ゲート結果
+   * @returns フィードバックメッセージ
+   */
+  private buildDefaultQualityGateFeedback(results: IntegrationQualityGateResult): string {
+    const parts: string[] = ['品質ゲートに失敗しました。以下の問題を修正してください：'];
+
+    if (!results.lint.passed) {
+      parts.push(`\n【Lint失敗】\n${results.lint.output.substring(0, 500)}`);
+    }
+
+    if (!results.test.passed && results.lint.passed) {
+      parts.push(`\n【テスト失敗】\n${results.test.output.substring(0, 500)}`);
+    }
+
+    parts.push('\n修正後、task_completeツールで完了を報告してください。');
+
+    return parts.join('\n');
+  }
+
+  /**
+   * 2つの会話ループ結果をマージ
+   *
+   * @param original - 元の会話ループ結果
+   * @param fix - 修正ループの結果
+   * @returns マージされた結果
+   */
+  private mergeLoopResults(
+    original: ConversationLoopResult,
+    fix: ConversationLoopResult
+  ): ConversationLoopResult {
+    // 成果物をマージ（重複排除）
+    const mergedArtifacts = [...original.artifacts];
+    for (const artifact of fix.artifacts) {
+      const existingIndex = mergedArtifacts.findIndex((a) => a.path === artifact.path);
+      if (existingIndex >= 0) {
+        mergedArtifacts[existingIndex] = artifact;
+      } else {
+        mergedArtifacts.push(artifact);
+      }
+    }
+
+    return {
+      completed: fix.completed || original.completed,
+      finalResponse: fix.finalResponse || original.finalResponse,
+      iterations: original.iterations + fix.iterations,
+      artifacts: mergedArtifacts,
+      errors: [...original.errors, ...fix.errors],
+      qualityGateRetries: original.qualityGateRetries + fix.qualityGateRetries,
+    };
+  }
+
+  /**
+   * 実行ステータスを決定
+   *
+   * 会話ループ結果と品質ゲート結果に基づいて最終的な実行ステータスを決定する。
+   *
+   * @param loopResult - 会話ループ結果
+   * @param qualityGateResult - 品質ゲート結果（null = 品質ゲート未実行）
+   * @returns 実行ステータス
+   *
+   * @see Requirement 4.4: IF quality gate fails, status SHALL reflect failure
+   * @see Requirement 11.5: IF max iterations reached, status SHALL be partial
+   */
+  private determineExecutionStatus(
+    loopResult: ConversationLoopResult,
+    qualityGateResult: IntegrationQualityGateResult | null
+  ): ExecutionStatus {
+    // 品質ゲートが実行され、失敗した場合
+    if (qualityGateResult && !qualityGateResult.overall) {
+      return 'quality_failed';
+    }
+
+    // 会話ループが完了した場合
+    if (loopResult.completed) {
+      return 'success';
+    }
+
+    // 最大イテレーション到達で部分完了
+    return 'partial';
+  }
+
+  // ===========================================================================
+  // 成果物取得
+  // ===========================================================================
+
+  /**
+   * 収集された成果物一覧を取得
+   *
+   * ExecutionReporterが成果物を収集する際に使用する。
+   *
+   * @returns 成果物情報の配列
+   *
+   * @see Requirement 5.1: WHEN a task completes, THE System SHALL collect all artifacts
+   * @see Requirement 5.4: THE System SHALL preserve all modified files
+   */
+  getCollectedArtifacts(): ArtifactInfo[] {
+    return [...this.collectedArtifacts];
   }
 
   // ===========================================================================

@@ -67,18 +67,56 @@ import {
 /**
  * 有効なブランチ名を生成
  */
-const validBranchNameArb = fc.stringOf(
-  fc.constantFrom(
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '_', '/'
-  ),
-  { minLength: 3, maxLength: 50 }
-).filter((s) => {
-  // 保護されたブランチ名を除外
-  const lower = s.toLowerCase();
-  return lower !== 'main' && lower !== 'master' && !s.startsWith('/') && !s.endsWith('/');
-});
+const validBranchNameArb = fc
+  .stringOf(
+    fc.constantFrom(
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+      'f',
+      'g',
+      'h',
+      'i',
+      'j',
+      'k',
+      'l',
+      'm',
+      'n',
+      'o',
+      'p',
+      'q',
+      'r',
+      's',
+      't',
+      'u',
+      'v',
+      'w',
+      'x',
+      'y',
+      'z',
+      '0',
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      '-',
+      '_',
+      '/'
+    ),
+    { minLength: 3, maxLength: 50 }
+  )
+  .filter((s) => {
+    // 保護されたブランチ名を除外
+    const lower = s.toLowerCase();
+    return lower !== 'main' && lower !== 'master' && !s.startsWith('/') && !s.endsWith('/');
+  });
 
 /**
  * 保護されたブランチ名を生成
@@ -89,28 +127,39 @@ const protectedBranchArb = fc.constantFrom('main', 'master', 'Main', 'Master', '
  * 非保護ブランチ名を生成
  */
 const nonProtectedBranchArb = fc.constantFrom(
-  'develop', 'staging', 'release', 'feature/test', 'hotfix/fix',
-  'dev', 'qa', 'uat', 'integration'
+  'develop',
+  'staging',
+  'release',
+  'feature/test',
+  'hotfix/fix',
+  'dev',
+  'qa',
+  'uat',
+  'integration'
 );
 
 /**
  * チケットIDを生成
  */
-const ticketIdArb = fc.tuple(
-  fc.constantFrom('TICKET', 'ISSUE', 'BUG', 'FEAT', 'TASK'),
-  fc.integer({ min: 1, max: 9999 })
-).map(([prefix, num]) => `${prefix}-${num.toString().padStart(4, '0')}`);
+const ticketIdArb = fc
+  .tuple(
+    fc.constantFrom('TICKET', 'ISSUE', 'BUG', 'FEAT', 'TASK'),
+    fc.integer({ min: 1, max: 9999 })
+  )
+  .map(([prefix, num]) => `${prefix}-${num.toString().padStart(4, '0')}`);
 
 /**
  * 実行IDを生成
  */
-const runIdArb = fc.tuple(
-  fc.date({ min: new Date('2024-01-01'), max: new Date('2026-12-31') }),
-  fc.hexaString({ minLength: 4, maxLength: 4 })
-).map(([date, suffix]) => {
-  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '-');
-  return `${dateStr}-${suffix}`;
-});
+const runIdArb = fc
+  .tuple(
+    fc.date({ min: new Date('2024-01-01'), max: new Date('2026-12-31') }),
+    fc.hexaString({ minLength: 4, maxLength: 4 })
+  )
+  .map(([date, suffix]) => {
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '-');
+    return `${dateStr}-${suffix}`;
+  });
 
 // =============================================================================
 // Property 8: Merge Branch Restriction

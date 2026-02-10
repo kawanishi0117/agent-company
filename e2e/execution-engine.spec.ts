@@ -50,10 +50,7 @@ test.describe('Agent Execution Engine', () => {
     });
 
     test('should have CLI command files', async () => {
-      const commandFiles = [
-        'tools/cli/commands/execute.ts',
-        'tools/cli/commands/project.ts',
-      ];
+      const commandFiles = ['tools/cli/commands/execute.ts', 'tools/cli/commands/project.ts'];
 
       for (const file of commandFiles) {
         const stat = await fs.stat(file);
@@ -75,10 +72,7 @@ test.describe('Agent Execution Engine', () => {
     });
 
     test('should have prompt templates', async () => {
-      const promptFiles = [
-        'agents/prompts/roles/manager.md',
-        'agents/prompts/roles/worker.md',
-      ];
+      const promptFiles = ['agents/prompts/roles/manager.md', 'agents/prompts/roles/worker.md'];
 
       for (const file of promptFiles) {
         const stat = await fs.stat(file);

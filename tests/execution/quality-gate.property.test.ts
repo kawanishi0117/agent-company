@@ -14,13 +14,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fc from 'fast-check';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import {
   QualityGate,
   createQualityGate,
-  QualityGateConfig,
   QualityGateExecutionResult,
-  GateResult,
 } from '../../tools/cli/lib/execution/quality-gate';
 
 // =============================================================================
@@ -31,11 +28,6 @@ import {
  * テスト用の一時ディレクトリ
  */
 const TEST_WORKSPACE = 'test-workspace-quality-gate-property';
-
-/**
- * 実行ログのベースディレクトリ
- */
-const RUNS_BASE_DIR = 'runtime/runs';
 
 // =============================================================================
 // モック設定
@@ -150,9 +142,11 @@ const workspacePathArb: fc.Arbitrary<string> = fc
   .map((name) => `/workspace/${name}`);
 
 /**
- * カスタムコマンドを生成するArbitrary
+ * カスタムコマンドを生成するArbitrary（将来の拡張用）
+ * @description 現在は未使用だが、将来の品質ゲートテスト拡張時に使用予定
  */
-const customCommandArb: fc.Arbitrary<string> = fc.constantFrom(
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _customCommandArb: fc.Arbitrary<string> = fc.constantFrom(
   'make lint',
   'npm run lint',
   'yarn lint',
@@ -238,9 +232,7 @@ describe('Property 25: Quality Gate Execution Order', () => {
     vi.clearAllMocks();
 
     // Process Monitorのモックを設定
-    const { createProcessMonitor } = await import(
-      '../../tools/cli/lib/execution/process-monitor'
-    );
+    const { createProcessMonitor } = await import('../../tools/cli/lib/execution/process-monitor');
     mockExecute = vi.fn();
     (createProcessMonitor as ReturnType<typeof vi.fn>).mockReturnValue({
       execute: mockExecute,
@@ -272,11 +264,15 @@ describe('Property 25: Quality Gate Execution Order', () => {
         (fs.access as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
         // Lint成功、テスト成功のシナリオ
-        setupMockExecute(mockExecute, {
-          lintPasses: true,
-          testPasses: true,
-          testFilesExist: true,
-        }, tracker);
+        setupMockExecute(
+          mockExecute,
+          {
+            lintPasses: true,
+            testPasses: true,
+            testFilesExist: true,
+          },
+          tracker
+        );
 
         const qualityGate = createQualityGate({
           workspacePath: TEST_WORKSPACE,
@@ -317,11 +313,15 @@ describe('Property 25: Quality Gate Execution Order', () => {
         (fs.access as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
         // Lint失敗のシナリオ
-        setupMockExecute(mockExecute, {
-          lintPasses: false,
-          testPasses: true,
-          testFilesExist: true,
-        }, tracker);
+        setupMockExecute(
+          mockExecute,
+          {
+            lintPasses: false,
+            testPasses: true,
+            testFilesExist: true,
+          },
+          tracker
+        );
 
         const qualityGate = createQualityGate({
           workspacePath: TEST_WORKSPACE,
@@ -362,11 +362,15 @@ describe('Property 25: Quality Gate Execution Order', () => {
         (fs.access as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
         // Lint成功のシナリオ
-        setupMockExecute(mockExecute, {
-          lintPasses: true,
-          testPasses: true,
-          testFilesExist: true,
-        }, tracker);
+        setupMockExecute(
+          mockExecute,
+          {
+            lintPasses: true,
+            testPasses: true,
+            testFilesExist: true,
+          },
+          tracker
+        );
 
         const qualityGate = createQualityGate({
           workspacePath: TEST_WORKSPACE,
@@ -406,11 +410,15 @@ describe('Property 25: Quality Gate Execution Order', () => {
         (fs.access as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('ENOENT'));
 
         // Lint成功のシナリオ
-        setupMockExecute(mockExecute, {
-          lintPasses: true,
-          testPasses: true,
-          testFilesExist: false,
-        }, tracker);
+        setupMockExecute(
+          mockExecute,
+          {
+            lintPasses: true,
+            testPasses: true,
+            testFilesExist: false,
+          },
+          tracker
+        );
 
         const qualityGate = createQualityGate({
           workspacePath: TEST_WORKSPACE,
@@ -443,43 +451,43 @@ describe('Property 25: Quality Gate Execution Order', () => {
    */
   it('Property 25.5: 実行順序は常に一貫している', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        runIdArb,
-        fc.integer({ min: 2, max: 5 }),
-        async (runId, iterations) => {
-          const executionOrders: string[][] = [];
+      fc.asyncProperty(runIdArb, fc.integer({ min: 2, max: 5 }), async (runId, iterations) => {
+        const executionOrders: string[][] = [];
 
-          // テストファイルが存在するようにモック
-          (fs.access as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+        // テストファイルが存在するようにモック
+        (fs.access as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
-          for (let i = 0; i < iterations; i++) {
-            const tracker = createExecutionTracker();
+        for (let i = 0; i < iterations; i++) {
+          const tracker = createExecutionTracker();
 
-            // Lint成功、テスト成功のシナリオ
-            setupMockExecute(mockExecute, {
+          // Lint成功、テスト成功のシナリオ
+          setupMockExecute(
+            mockExecute,
+            {
               lintPasses: true,
               testPasses: true,
               testFilesExist: true,
-            }, tracker);
+            },
+            tracker
+          );
 
-            const qualityGate = createQualityGate({
-              workspacePath: TEST_WORKSPACE,
-            });
+          const qualityGate = createQualityGate({
+            workspacePath: TEST_WORKSPACE,
+          });
 
-            await qualityGate.execute(`${runId}-${i}`);
-            executionOrders.push([...tracker.executionOrder]);
-          }
-
-          // すべての実行順序が同じであること
-          for (let i = 1; i < executionOrders.length; i++) {
-            expect(executionOrders[i]).toEqual(executionOrders[0]);
-          }
-
-          // 順序がlint → testであること
-          expect(executionOrders[0][0]).toBe('lint');
-          expect(executionOrders[0][1]).toBe('test');
+          await qualityGate.execute(`${runId}-${i}`);
+          executionOrders.push([...tracker.executionOrder]);
         }
-      ),
+
+        // すべての実行順序が同じであること
+        for (let i = 1; i < executionOrders.length; i++) {
+          expect(executionOrders[i]).toEqual(executionOrders[0]);
+        }
+
+        // 順序がlint → testであること
+        expect(executionOrders[0][0]).toBe('lint');
+        expect(executionOrders[0][1]).toBe('test');
+      }),
       { numRuns: 50 }
     );
   });
@@ -492,49 +500,49 @@ describe('Property 25: Quality Gate Execution Order', () => {
    */
   it('Property 25.6: スキップ設定が正しく尊重される', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        runIdArb,
-        qualityGateConfigArb,
-        async (runId, config) => {
-          const tracker = createExecutionTracker();
+      fc.asyncProperty(runIdArb, qualityGateConfigArb, async (runId, config) => {
+        const tracker = createExecutionTracker();
 
-          // テストファイルが存在するようにモック
-          (fs.access as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+        // テストファイルが存在するようにモック
+        (fs.access as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
-          // Lint成功、テスト成功のシナリオ
-          setupMockExecute(mockExecute, {
+        // Lint成功、テスト成功のシナリオ
+        setupMockExecute(
+          mockExecute,
+          {
             lintPasses: true,
             testPasses: true,
             testFilesExist: true,
-          }, tracker);
+          },
+          tracker
+        );
 
-          const qualityGate = createQualityGate({
-            workspacePath: TEST_WORKSPACE,
-            skipLint: config.skipLint,
-            skipTest: config.skipTest,
-            timeout: config.timeout,
-          });
+        const qualityGate = createQualityGate({
+          workspacePath: TEST_WORKSPACE,
+          skipLint: config.skipLint,
+          skipTest: config.skipTest,
+          timeout: config.timeout,
+        });
 
-          const result = await qualityGate.execute(runId);
+        const result = await qualityGate.execute(runId);
 
-          // skipLint設定の検証
-          if (config.skipLint) {
-            expect(result.lint.executed).toBe(false);
-            expect(result.lint.skipReason).toBe('設定によりスキップ');
-          }
-
-          // skipTest設定の検証
-          if (config.skipTest) {
-            expect(result.test.executed).toBe(false);
-            expect(result.test.skipReason).toBe('設定によりスキップ');
-          }
-
-          // 両方スキップの場合は成功
-          if (config.skipLint && config.skipTest) {
-            expect(result.success).toBe(true);
-          }
+        // skipLint設定の検証
+        if (config.skipLint) {
+          expect(result.lint.executed).toBe(false);
+          expect(result.lint.skipReason).toBe('設定によりスキップ');
         }
-      ),
+
+        // skipTest設定の検証
+        if (config.skipTest) {
+          expect(result.test.executed).toBe(false);
+          expect(result.test.skipReason).toBe('設定によりスキップ');
+        }
+
+        // 両方スキップの場合は成功
+        if (config.skipLint && config.skipTest) {
+          expect(result.success).toBe(true);
+        }
+      }),
       { numRuns: 100 }
     );
   });
@@ -547,50 +555,46 @@ describe('Property 25: Quality Gate Execution Order', () => {
    */
   it('Property 25.7: 結果の整合性が保たれる', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        runIdArb,
-        commandResultArb,
-        async (runId, params) => {
-          const tracker = createExecutionTracker();
+      fc.asyncProperty(runIdArb, commandResultArb, async (runId, params) => {
+        const tracker = createExecutionTracker();
 
-          // テストファイルの存在をパラメータに基づいて設定
-          if (params.testFilesExist) {
-            (fs.access as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-          } else {
-            (fs.access as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('ENOENT'));
-          }
-
-          setupMockExecute(mockExecute, params, tracker);
-
-          const qualityGate = createQualityGate({
-            workspacePath: TEST_WORKSPACE,
-          });
-
-          const result = await qualityGate.execute(runId);
-
-          // 整合性チェック1: successはlint.passedとtest.passedの論理積
-          const expectedSuccess = result.lint.passed && result.test.passed;
-          expect(result.success).toBe(expectedSuccess);
-
-          // 整合性チェック2: Lint失敗時はテストは実行されない
-          if (result.lint.executed && !result.lint.passed) {
-            expect(result.test.executed).toBe(false);
-          }
-
-          // 整合性チェック3: 実行時間は非負
-          expect(result.durationMs).toBeGreaterThanOrEqual(0);
-          expect(result.lint.durationMs).toBeGreaterThanOrEqual(0);
-          expect(result.test.durationMs).toBeGreaterThanOrEqual(0);
-
-          // 整合性チェック4: エラー情報の整合性
-          if (!result.lint.passed && result.lint.executed) {
-            expect(result.errors.some(e => e.code === 'LINT_FAILED')).toBe(true);
-          }
-          if (!result.test.passed && result.test.executed) {
-            expect(result.errors.some(e => e.code === 'TEST_FAILED')).toBe(true);
-          }
+        // テストファイルの存在をパラメータに基づいて設定
+        if (params.testFilesExist) {
+          (fs.access as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+        } else {
+          (fs.access as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('ENOENT'));
         }
-      ),
+
+        setupMockExecute(mockExecute, params, tracker);
+
+        const qualityGate = createQualityGate({
+          workspacePath: TEST_WORKSPACE,
+        });
+
+        const result = await qualityGate.execute(runId);
+
+        // 整合性チェック1: successはlint.passedとtest.passedの論理積
+        const expectedSuccess = result.lint.passed && result.test.passed;
+        expect(result.success).toBe(expectedSuccess);
+
+        // 整合性チェック2: Lint失敗時はテストは実行されない
+        if (result.lint.executed && !result.lint.passed) {
+          expect(result.test.executed).toBe(false);
+        }
+
+        // 整合性チェック3: 実行時間は非負
+        expect(result.durationMs).toBeGreaterThanOrEqual(0);
+        expect(result.lint.durationMs).toBeGreaterThanOrEqual(0);
+        expect(result.test.durationMs).toBeGreaterThanOrEqual(0);
+
+        // 整合性チェック4: エラー情報の整合性
+        if (!result.lint.passed && result.lint.executed) {
+          expect(result.errors.some((e) => e.code === 'LINT_FAILED')).toBe(true);
+        }
+        if (!result.test.passed && result.test.executed) {
+          expect(result.errors.some((e) => e.code === 'TEST_FAILED')).toBe(true);
+        }
+      }),
       { numRuns: 100 }
     );
   });
@@ -606,9 +610,7 @@ describe('Quality Gate Edge Cases (Property-Based)', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    const { createProcessMonitor } = await import(
-      '../../tools/cli/lib/execution/process-monitor'
-    );
+    const { createProcessMonitor } = await import('../../tools/cli/lib/execution/process-monitor');
     mockExecute = vi.fn();
     (createProcessMonitor as ReturnType<typeof vi.fn>).mockReturnValue({
       execute: mockExecute,
@@ -687,36 +689,36 @@ describe('Quality Gate Edge Cases (Property-Based)', () => {
    */
   it('任意のワークスペースパスで動作する', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        runIdArb,
-        workspacePathArb,
-        async (runId, workspacePath) => {
-          const tracker = createExecutionTracker();
+      fc.asyncProperty(runIdArb, workspacePathArb, async (runId, workspacePath) => {
+        const tracker = createExecutionTracker();
 
-          // テストファイルが存在するようにモック
-          (fs.access as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+        // テストファイルが存在するようにモック
+        (fs.access as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
-          setupMockExecute(mockExecute, {
+        setupMockExecute(
+          mockExecute,
+          {
             lintPasses: true,
             testPasses: true,
             testFilesExist: true,
-          }, tracker);
+          },
+          tracker
+        );
 
-          const qualityGate = createQualityGate({
-            workspacePath,
-          });
+        const qualityGate = createQualityGate({
+          workspacePath,
+        });
 
-          const result = await qualityGate.execute(runId);
+        const result = await qualityGate.execute(runId);
 
-          // 正常に実行されること
-          expect(result).toBeDefined();
-          expect(result.lint).toBeDefined();
-          expect(result.test).toBeDefined();
+        // 正常に実行されること
+        expect(result).toBeDefined();
+        expect(result.lint).toBeDefined();
+        expect(result.test).toBeDefined();
 
-          // 実行順序が正しいこと
-          expect(tracker.executionOrder[0]).toBe('lint');
-        }
-      ),
+        // 実行順序が正しいこと
+        expect(tracker.executionOrder[0]).toBe('lint');
+      }),
       { numRuns: 100 }
     );
   });

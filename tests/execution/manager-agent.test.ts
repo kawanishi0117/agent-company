@@ -17,20 +17,10 @@ import {
   ManagerAgentConfig,
   ManagerAgentError,
   WorkerSpec,
-  WorkerInfo,
-  WorkloadInfo,
-  ScalingConfig,
   Escalation,
   Issue,
-  ProgressReport,
 } from '../../tools/cli/lib/execution/agents/manager';
-import {
-  Task,
-  SubTask,
-  TaskStatus,
-  SubTaskStatus,
-  Project,
-} from '../../tools/cli/lib/execution/types';
+import { Task, SubTask, TaskStatus, SubTaskStatus } from '../../tools/cli/lib/execution/types';
 import { AgentBus, createAgentBus } from '../../tools/cli/lib/execution/agent-bus';
 import { StateManager } from '../../tools/cli/lib/execution/state-manager';
 
@@ -64,7 +54,6 @@ vi.mock('../../tools/adapters/index', () => ({
     isAvailable: vi.fn().mockResolvedValue(true),
   })),
 }));
-
 
 // =============================================================================
 // テストヘルパー
@@ -156,7 +145,6 @@ describe('ManagerAgent', () => {
     vi.clearAllMocks();
   });
 
-
   // ===========================================================================
   // 基本機能テスト
   // ===========================================================================
@@ -197,9 +185,7 @@ describe('ManagerAgent', () => {
     });
 
     it('タスクがnullの場合はエラーをスローする', async () => {
-      await expect(manager.receiveTask(null as unknown as Task)).rejects.toThrow(
-        ManagerAgentError
-      );
+      await expect(manager.receiveTask(null as unknown as Task)).rejects.toThrow(ManagerAgentError);
     });
 
     it('指示が空の場合はエラーをスローする', async () => {
@@ -212,7 +198,6 @@ describe('ManagerAgent', () => {
       await expect(manager.receiveTask(task)).rejects.toThrow(ManagerAgentError);
     });
   });
-
 
   // ===========================================================================
   // タスク分解テスト
@@ -297,16 +282,14 @@ describe('ManagerAgent', () => {
     });
 
     it('サブタスクがnullの場合はエラーをスローする', async () => {
-      await expect(
-        manager.assignTask(null as unknown as SubTask, 'worker-001')
-      ).rejects.toThrow(ManagerAgentError);
+      await expect(manager.assignTask(null as unknown as SubTask, 'worker-001')).rejects.toThrow(
+        ManagerAgentError
+      );
     });
 
     it('ワーカーIDが空の場合はエラーをスローする', async () => {
       const subTask = createTestSubTask();
-      await expect(manager.assignTask(subTask, '')).rejects.toThrow(
-        ManagerAgentError
-      );
+      await expect(manager.assignTask(subTask, '')).rejects.toThrow(ManagerAgentError);
     });
 
     it('複数のタスクを並列で割り当てできる', async () => {
@@ -328,7 +311,6 @@ describe('ManagerAgent', () => {
       expect(assignments.get('worker-002')?.id).toBe('subtask-002');
     });
   });
-
 
   // ===========================================================================
   // 進捗監視テスト
@@ -422,12 +404,11 @@ describe('ManagerAgent', () => {
     });
 
     it('エスカレーションがnullの場合はエラーをスローする', async () => {
-      await expect(
-        manager.handleEscalation(null as unknown as Escalation)
-      ).rejects.toThrow(ManagerAgentError);
+      await expect(manager.handleEscalation(null as unknown as Escalation)).rejects.toThrow(
+        ManagerAgentError
+      );
     });
   });
-
 
   // ===========================================================================
   // サポート提供テスト
@@ -456,9 +437,7 @@ describe('ManagerAgent', () => {
         attemptCount: 1,
       };
 
-      await expect(manager.provideSupport('', issue)).rejects.toThrow(
-        ManagerAgentError
-      );
+      await expect(manager.provideSupport('', issue)).rejects.toThrow(ManagerAgentError);
     });
 
     it('問題説明が空の場合はエラーをスローする', async () => {
@@ -467,9 +446,7 @@ describe('ManagerAgent', () => {
         attemptCount: 1,
       };
 
-      await expect(manager.provideSupport('worker-001', issue)).rejects.toThrow(
-        ManagerAgentError
-      );
+      await expect(manager.provideSupport('worker-001', issue)).rejects.toThrow(ManagerAgentError);
     });
   });
 
@@ -498,9 +475,9 @@ describe('ManagerAgent', () => {
       });
 
       it('ワーカー仕様がnullの場合はエラーをスローする', async () => {
-        await expect(
-          manager.hireWorker(null as unknown as WorkerSpec)
-        ).rejects.toThrow(ManagerAgentError);
+        await expect(manager.hireWorker(null as unknown as WorkerSpec)).rejects.toThrow(
+          ManagerAgentError
+        );
       });
 
       it('ワーカー名が空の場合はエラーをスローする', async () => {
@@ -541,9 +518,9 @@ describe('ManagerAgent', () => {
         await manager.hireWorker({ name: 'Worker 2', capabilities: [] });
 
         // 3人目は失敗
-        await expect(
-          manager.hireWorker({ name: 'Worker 3', capabilities: [] })
-        ).rejects.toThrow(ManagerAgentError);
+        await expect(manager.hireWorker({ name: 'Worker 3', capabilities: [] })).rejects.toThrow(
+          ManagerAgentError
+        );
       });
     });
 
@@ -595,9 +572,7 @@ describe('ManagerAgent', () => {
       });
 
       it('登録されていないワーカーを解雇しようとするとエラー', async () => {
-        await expect(manager.fireWorker('non-existent-worker')).rejects.toThrow(
-          ManagerAgentError
-        );
+        await expect(manager.fireWorker('non-existent-worker')).rejects.toThrow(ManagerAgentError);
       });
 
       it('ワーカーIDが空の場合はエラーをスローする', async () => {
@@ -927,7 +902,7 @@ describe('ManagerAgent', () => {
         const idleWorkers = manager.getIdleWorkers();
 
         expect(idleWorkers.length).toBe(2);
-        expect(idleWorkers.every(w => w.status === 'idle')).toBe(true);
+        expect(idleWorkers.every((w) => w.status === 'idle')).toBe(true);
       });
 
       it('タスク割り当て中のワーカーはアイドルに含まれない', async () => {
@@ -944,7 +919,7 @@ describe('ManagerAgent', () => {
 
         const idleWorkers = manager.getIdleWorkers();
 
-        expect(idleWorkers.find(w => w.id === workerId)).toBeUndefined();
+        expect(idleWorkers.find((w) => w.id === workerId)).toBeUndefined();
       });
     });
 
@@ -965,7 +940,6 @@ describe('ManagerAgent', () => {
       });
     });
   });
-
 
   // ===========================================================================
   // 状態取得テスト

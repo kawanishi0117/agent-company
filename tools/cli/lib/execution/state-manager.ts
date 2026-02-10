@@ -5,7 +5,7 @@
  * 前回の作業状態を復元できるようにする。
  *
  * @module execution/state-manager
- * @see Requirements: 14.1, 14.2, 14.3, 14.4, 14.6
+ * @see Requirements: 9.2, 9.3, 9.4, 9.5, 14.1, 14.2, 14.3, 14.4, 14.6
  */
 
 import * as fs from 'fs/promises';
@@ -15,6 +15,12 @@ import {
   SystemConfig,
   DEFAULT_SYSTEM_CONFIG,
   RunId,
+  ExecutionPersistenceData,
+  WorkerState,
+  ConversationHistory,
+  // TicketStatusは将来の状態管理拡張で使用予定
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  TicketStatus,
 } from './types';
 
 // =============================================================================
@@ -28,14 +34,16 @@ import {
 const STATE_BASE_DIR = 'runtime/state';
 
 /**
- * 実行状態保存ディレクトリ
+ * 実行状態保存ディレクトリ（将来の拡張用）
  */
-const RUNS_DIR = path.join(STATE_BASE_DIR, 'runs');
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _RUNS_DIR = path.join(STATE_BASE_DIR, 'runs');
 
 /**
- * システム設定ファイルパス
+ * システム設定ファイルパス（将来の拡張用）
  */
-const CONFIG_FILE = path.join(STATE_BASE_DIR, 'config.json');
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _CONFIG_FILE = path.join(STATE_BASE_DIR, 'config.json');
 
 // =============================================================================
 // 型定義
@@ -71,6 +79,56 @@ export interface RunInfo {
   lastUpdated: string;
   /** 成果物数 */
   artifactCount: number;
+}
+
+/**
+ * 一時停止・再開結果
+ * @description pauseExecution/resumeExecutionメソッドの戻り値
+ * @see Requirements: 9.4, 9.5
+ */
+export interface PauseResumeResult {
+  /** 操作が成功したか */
+  success: boolean;
+  /** 実行ID */
+  runId: string;
+  /** 操作前のステータス */
+  previousStatus: 'running' | 'paused' | 'completed' | 'failed';
+  /** 操作後のステータス */
+  newStatus: 'running' | 'paused' | 'completed' | 'failed';
+  /** メッセージ（成功時） */
+  message?: string;
+  /** エラーメッセージ（失敗時） */
+  error?: string;
+  /** 復元されたワーカー状態のID一覧（再開時） */
+  restoredWorkerStates?: string[];
+  /** 復元された会話履歴のID一覧（再開時） */
+  restoredConversationHistories?: string[];
+}
+
+/**
+ * 実行復元結果
+ * @description restoreExecutionメソッドの戻り値
+ * @see Requirement 9.3
+ */
+export interface RestoreExecutionResult {
+  /** 操作が成功したか */
+  success: boolean;
+  /** 実行ID */
+  runId: string;
+  /** チケットID（成功時） */
+  ticketId?: string;
+  /** ステータス（成功時） */
+  status?: 'running' | 'paused' | 'completed' | 'failed';
+  /** ワーカー状態マップ（成功時） */
+  workerStates?: Record<string, WorkerState>;
+  /** 会話履歴マップ（成功時） */
+  conversationHistories?: Record<string, ConversationHistory>;
+  /** Gitブランチマップ（成功時） */
+  gitBranches?: Record<string, string>;
+  /** 最終更新日時（成功時） */
+  lastUpdated?: string;
+  /** エラーメッセージ（失敗時） */
+  error?: string;
 }
 
 // =============================================================================
@@ -433,6 +491,370 @@ export class StateManager {
       }
       throw error;
     }
+  }
+
+  // ===========================================================================
+  // 実行永続化（Task 12.1）
+  // @see Requirement 9.2: THE System SHALL persist execution state to `runtime/state/runs/<run-id>/state.json`
+  // ===========================================================================
+
+  /**
+   * 実行永続化ディレクトリのパスを取得
+   * @param runId - 実行ID
+   * @returns 実行永続化ディレクトリのパス
+   */
+  private getExecutionDir(runId: RunId): string {
+    return path.join(this.baseDir, 'runs', runId);
+  }
+
+  /**
+   * 実行永続化データを保存
+   *
+   * ワーカー状態、会話履歴、Gitブランチ情報を含む完全な実行状態を永続化する。
+   *
+   * @param data - 実行永続化データ
+   * @throws ファイル書き込みエラー
+   *
+   * @see Requirement 9.2: THE System SHALL persist execution state to `runtime/state/runs/<run-id>/state.json`
+   */
+  async saveExecutionData(data: ExecutionPersistenceData): Promise<void> {
+    const execDir = this.getExecutionDir(data.runId);
+    await fs.mkdir(execDir, { recursive: true });
+
+    const statePath = path.join(execDir, 'state.json');
+    const stateJson = JSON.stringify(data, null, 2);
+    await fs.writeFile(statePath, stateJson, 'utf-8');
+  }
+
+  /**
+   * 実行永続化データを読み込み
+   *
+   * @param runId - 実行ID
+   * @returns 実行永続化データ（存在しない場合はnull）
+   *
+   * @see Requirement 9.3: WHEN system restarts, THE System SHALL restore in-progress tickets
+   */
+  async loadExecutionData(runId: RunId): Promise<ExecutionPersistenceData | null> {
+    const statePath = path.join(this.getExecutionDir(runId), 'state.json');
+
+    try {
+      const stateJson = await fs.readFile(statePath, 'utf-8');
+      return JSON.parse(stateJson) as ExecutionPersistenceData;
+    } catch (error) {
+      if (this.isFileNotFoundError(error)) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * ワーカー状態を更新
+   *
+   * @param runId - 実行ID
+   * @param workerId - ワーカーID
+   * @param state - ワーカー状態
+   *
+   * @see Requirement 9.2
+   */
+  async updateWorkerState(runId: RunId, workerId: string, state: WorkerState): Promise<void> {
+    const data = await this.loadExecutionData(runId);
+    if (!data) {
+      throw new Error(`実行データが見つかりません: ${runId}`);
+    }
+
+    data.workerStates[workerId] = state;
+    data.lastUpdated = new Date().toISOString();
+    await this.saveExecutionData(data);
+  }
+
+  /**
+   * 会話履歴を更新
+   *
+   * @param runId - 実行ID
+   * @param agentId - エージェントID
+   * @param history - 会話履歴
+   *
+   * @see Requirement 9.5: WHEN a ticket is paused, THE System SHALL preserve all worker state and conversation history
+   */
+  async updateConversationHistory(
+    runId: RunId,
+    agentId: string,
+    history: ConversationHistory
+  ): Promise<void> {
+    const data = await this.loadExecutionData(runId);
+    if (!data) {
+      throw new Error(`実行データが見つかりません: ${runId}`);
+    }
+
+    data.conversationHistories[agentId] = history;
+    data.lastUpdated = new Date().toISOString();
+    await this.saveExecutionData(data);
+  }
+
+  // ===========================================================================
+  // 一時停止・再開機能（Task 12.2）
+  // @see Requirements: 9.4, 9.5
+  // ===========================================================================
+
+  /**
+   * チケット実行を一時停止
+   *
+   * 実行状態を'paused'に変更し、全てのワーカー状態と会話履歴を保存する。
+   *
+   * @param runId - 実行ID
+   * @returns 一時停止結果
+   *
+   * @see Requirement 9.4: THE System SHALL support manual pause and resume of ticket execution
+   * @see Requirement 9.5: WHEN a ticket is paused, THE System SHALL preserve all worker state and conversation history
+   */
+  async pauseExecution(runId: RunId): Promise<PauseResumeResult> {
+    const data = await this.loadExecutionData(runId);
+    if (!data) {
+      return {
+        success: false,
+        runId,
+        previousStatus: 'running',
+        newStatus: 'running',
+        error: `実行データが見つかりません: ${runId}`,
+      };
+    }
+
+    // 既に一時停止中の場合
+    if (data.status === 'paused') {
+      return {
+        success: true,
+        runId,
+        previousStatus: 'paused',
+        newStatus: 'paused',
+        message: '既に一時停止中です',
+      };
+    }
+
+    // 完了または失敗の場合は一時停止不可
+    if (data.status === 'completed' || data.status === 'failed') {
+      return {
+        success: false,
+        runId,
+        previousStatus: data.status,
+        newStatus: data.status,
+        error: `${data.status}状態の実行は一時停止できません`,
+      };
+    }
+
+    const previousStatus = data.status;
+    data.status = 'paused';
+    data.lastUpdated = new Date().toISOString();
+
+    await this.saveExecutionData(data);
+
+    return {
+      success: true,
+      runId,
+      previousStatus,
+      newStatus: 'paused',
+      message: '実行を一時停止しました',
+    };
+  }
+
+  /**
+   * チケット実行を再開
+   *
+   * 一時停止中の実行を再開し、保存されたワーカー状態と会話履歴を復元する。
+   *
+   * @param runId - 実行ID
+   * @returns 再開結果
+   *
+   * @see Requirement 9.4: THE System SHALL support manual pause and resume of ticket execution
+   */
+  async resumeExecution(runId: RunId): Promise<PauseResumeResult> {
+    const data = await this.loadExecutionData(runId);
+    if (!data) {
+      return {
+        success: false,
+        runId,
+        previousStatus: 'paused',
+        newStatus: 'paused',
+        error: `実行データが見つかりません: ${runId}`,
+      };
+    }
+
+    // 一時停止中でない場合
+    if (data.status !== 'paused') {
+      return {
+        success: false,
+        runId,
+        previousStatus: data.status,
+        newStatus: data.status,
+        error: `一時停止中でない実行は再開できません（現在のステータス: ${data.status}）`,
+      };
+    }
+
+    const previousStatus = data.status;
+    data.status = 'running';
+    data.lastUpdated = new Date().toISOString();
+
+    await this.saveExecutionData(data);
+
+    return {
+      success: true,
+      runId,
+      previousStatus,
+      newStatus: 'running',
+      message: '実行を再開しました',
+      restoredWorkerStates: Object.keys(data.workerStates),
+      restoredConversationHistories: Object.keys(data.conversationHistories),
+    };
+  }
+
+  // ===========================================================================
+  // システム再起動時の復旧（Task 12.3）
+  // @see Requirement 9.3
+  // ===========================================================================
+
+  /**
+   * 進行中のチケットを検出
+   *
+   * システム再起動時に、'running'または'paused'状態のチケットを検出する。
+   *
+   * @returns 進行中の実行データ一覧
+   *
+   * @see Requirement 9.3: WHEN system restarts, THE System SHALL restore in-progress tickets and continue execution
+   */
+  async findInProgressExecutions(): Promise<ExecutionPersistenceData[]> {
+    const runsDir = path.join(this.baseDir, 'runs');
+    const inProgressExecutions: ExecutionPersistenceData[] = [];
+
+    try {
+      const entries = await fs.readdir(runsDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const runId = entry.name;
+          const data = await this.loadExecutionData(runId);
+
+          if (data && (data.status === 'running' || data.status === 'paused')) {
+            inProgressExecutions.push(data);
+          }
+        }
+      }
+    } catch (error) {
+      // ディレクトリが存在しない場合は空配列を返す
+      if (this.isFileNotFoundError(error)) {
+        return [];
+      }
+      throw error;
+    }
+
+    // 最終更新日時の降順でソート
+    inProgressExecutions.sort((a, b) => {
+      return new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime();
+    });
+
+    return inProgressExecutions;
+  }
+
+  /**
+   * 実行状態を復元
+   *
+   * 保存された実行データから、ワーカー状態と会話履歴を復元する。
+   *
+   * @param runId - 実行ID
+   * @returns 復元結果
+   *
+   * @see Requirement 9.3: WHEN system restarts, THE System SHALL restore in-progress tickets and continue execution
+   */
+  async restoreExecution(runId: RunId): Promise<RestoreExecutionResult> {
+    const data = await this.loadExecutionData(runId);
+    if (!data) {
+      return {
+        success: false,
+        runId,
+        error: `実行データが見つかりません: ${runId}`,
+      };
+    }
+
+    // 完了または失敗の場合は復元不要
+    if (data.status === 'completed' || data.status === 'failed') {
+      return {
+        success: false,
+        runId,
+        error: `${data.status}状態の実行は復元できません`,
+      };
+    }
+
+    return {
+      success: true,
+      runId,
+      ticketId: data.ticketId,
+      status: data.status,
+      workerStates: data.workerStates,
+      conversationHistories: data.conversationHistories,
+      gitBranches: data.gitBranches,
+      lastUpdated: data.lastUpdated,
+    };
+  }
+
+  /**
+   * 実行永続化データを初期化
+   *
+   * 新しい実行を開始する際に、空の永続化データを作成する。
+   *
+   * @param runId - 実行ID
+   * @param ticketId - チケットID
+   * @returns 作成された実行永続化データ
+   */
+  async initializeExecutionData(runId: RunId, ticketId: string): Promise<ExecutionPersistenceData> {
+    const data: ExecutionPersistenceData = {
+      runId,
+      ticketId,
+      status: 'running',
+      workerStates: {},
+      conversationHistories: {},
+      gitBranches: {},
+      lastUpdated: new Date().toISOString(),
+    };
+
+    await this.saveExecutionData(data);
+    return data;
+  }
+
+  /**
+   * 実行ステータスを更新
+   *
+   * @param runId - 実行ID
+   * @param status - 新しいステータス
+   */
+  async updateExecutionStatus(
+    runId: RunId,
+    status: 'running' | 'paused' | 'completed' | 'failed'
+  ): Promise<void> {
+    const data = await this.loadExecutionData(runId);
+    if (!data) {
+      throw new Error(`実行データが見つかりません: ${runId}`);
+    }
+
+    data.status = status;
+    data.lastUpdated = new Date().toISOString();
+    await this.saveExecutionData(data);
+  }
+
+  /**
+   * Gitブランチ情報を更新
+   *
+   * @param runId - 実行ID
+   * @param agentId - エージェントID
+   * @param branchName - ブランチ名
+   */
+  async updateGitBranch(runId: RunId, agentId: string, branchName: string): Promise<void> {
+    const data = await this.loadExecutionData(runId);
+    if (!data) {
+      throw new Error(`実行データが見つかりません: ${runId}`);
+    }
+
+    data.gitBranches[agentId] = branchName;
+    data.lastUpdated = new Date().toISOString();
+    await this.saveExecutionData(data);
   }
 }
 

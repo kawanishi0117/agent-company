@@ -8,7 +8,6 @@
  */
 
 import {
-  BaseAdapter,
   ExtendedAdapter,
   GenerateOptions,
   ChatOptions,

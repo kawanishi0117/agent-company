@@ -24,9 +24,7 @@ import {
   extractWorkerIdFromContainerName,
   isWorkerContainerName,
 } from '../../tools/cli/lib/execution/worker-container';
-import {
-  ContainerRuntime,
-} from '../../tools/cli/lib/execution/container-runtime';
+import { ContainerRuntime } from '../../tools/cli/lib/execution/container-runtime';
 import { DEFAULT_SYSTEM_CONFIG } from '../../tools/cli/lib/execution/types';
 
 // =============================================================================
@@ -61,10 +59,7 @@ describe('WorkerContainer', () => {
 
   beforeEach(() => {
     mockRuntime = createMockRuntime();
-    workerContainer = new WorkerContainer(
-      { workerId: testWorkerId },
-      mockRuntime
-    );
+    workerContainer = new WorkerContainer({ workerId: testWorkerId }, mockRuntime);
   });
 
   afterEach(() => {
@@ -211,9 +206,7 @@ describe('WorkerContainer', () => {
 
       expect(mockRuntime.createContainer).toHaveBeenCalledWith(
         expect.objectContaining({
-          volumes: expect.arrayContaining([
-            `/host/results:${CONTAINER_RESULTS_PATH}:ro`,
-          ]),
+          volumes: expect.arrayContaining([`/host/results:${CONTAINER_RESULTS_PATH}:ro`]),
         })
       );
     });
@@ -268,9 +261,7 @@ describe('WorkerContainer', () => {
 
       expect(mockRuntime.createContainer).toHaveBeenCalledWith(
         expect.objectContaining({
-          additionalOptions: expect.arrayContaining([
-            '--security-opt=no-new-privileges:true',
-          ]),
+          additionalOptions: expect.arrayContaining(['--security-opt=no-new-privileges:true']),
         })
       );
     });
@@ -351,9 +342,7 @@ describe('WorkerContainer', () => {
       await workerContainer.create();
       await workerContainer.start();
 
-      vi.mocked(mockRuntime.stopContainer).mockRejectedValueOnce(
-        new Error('Container not found')
-      );
+      vi.mocked(mockRuntime.stopContainer).mockRejectedValueOnce(new Error('Container not found'));
 
       const result = await workerContainer.stop();
 
@@ -397,9 +386,7 @@ describe('WorkerContainer', () => {
       await workerContainer.start();
 
       // 停止に失敗しても削除を試みる
-      vi.mocked(mockRuntime.stopContainer).mockRejectedValueOnce(
-        new Error('Stop failed')
-      );
+      vi.mocked(mockRuntime.stopContainer).mockRejectedValueOnce(new Error('Stop failed'));
 
       const result = await workerContainer.destroy(true);
 
@@ -424,9 +411,7 @@ describe('WorkerContainer', () => {
     it('削除に失敗した場合はエラーを返す', async () => {
       await workerContainer.create();
 
-      vi.mocked(mockRuntime.removeContainer).mockRejectedValueOnce(
-        new Error('Remove failed')
-      );
+      vi.mocked(mockRuntime.removeContainer).mockRejectedValueOnce(new Error('Remove failed'));
 
       const result = await workerContainer.destroy();
 
@@ -449,9 +434,7 @@ describe('WorkerContainer', () => {
     });
 
     it('作成に失敗した場合はエラーを返す', async () => {
-      vi.mocked(mockRuntime.createContainer).mockRejectedValueOnce(
-        new Error('Create failed')
-      );
+      vi.mocked(mockRuntime.createContainer).mockRejectedValueOnce(new Error('Create failed'));
 
       const result = await workerContainer.createAndStart();
 
@@ -480,10 +463,9 @@ describe('WorkerContainer', () => {
       await workerContainer.create();
       await workerContainer.getLogs({ tail: 100 });
 
-      expect(mockRuntime.getContainerLogs).toHaveBeenCalledWith(
-        'mock-container-id-12345',
-        { tail: 100 }
-      );
+      expect(mockRuntime.getContainerLogs).toHaveBeenCalledWith('mock-container-id-12345', {
+        tail: 100,
+      });
     });
 
     it('未作成の場合はエラーをスローする', async () => {
@@ -1027,9 +1009,7 @@ describe('error handling', () => {
   it('removeContainer エラー時に適切なエラーメッセージを返す', async () => {
     await workerContainer.create();
 
-    vi.mocked(mockRuntime.removeContainer).mockRejectedValueOnce(
-      new Error('Container in use')
-    );
+    vi.mocked(mockRuntime.removeContainer).mockRejectedValueOnce(new Error('Container in use'));
 
     const result = await workerContainer.destroy();
 
@@ -1069,10 +1049,7 @@ describe('container isolation', () => {
    */
   describe('network isolation', () => {
     it('デフォルトでnetworkMode=noneが設定される', async () => {
-      const container = new WorkerContainer(
-        { workerId: 'worker-network-test' },
-        mockRuntime
-      );
+      const container = new WorkerContainer({ workerId: 'worker-network-test' }, mockRuntime);
       await container.create();
 
       expect(mockRuntime.createContainer).toHaveBeenCalledWith(
@@ -1083,10 +1060,7 @@ describe('container isolation', () => {
     });
 
     it('networkMode=noneでコンテナ間通信が禁止される', async () => {
-      const container = new WorkerContainer(
-        { workerId: 'worker-network-isolated' },
-        mockRuntime
-      );
+      const container = new WorkerContainer({ workerId: 'worker-network-isolated' }, mockRuntime);
       await container.create();
 
       const callArgs = vi.mocked(mockRuntime.createContainer).mock.calls[0][0];
@@ -1118,14 +1092,8 @@ describe('container isolation', () => {
    */
   describe('filesystem isolation', () => {
     it('各ワーカーは独自の/workspaceを持つ（共有ボリュームなし）', async () => {
-      const containerA = new WorkerContainer(
-        { workerId: 'worker-fs-a' },
-        mockRuntime
-      );
-      const containerB = new WorkerContainer(
-        { workerId: 'worker-fs-b' },
-        mockRuntime
-      );
+      const containerA = new WorkerContainer({ workerId: 'worker-fs-a' }, mockRuntime);
+      const containerB = new WorkerContainer({ workerId: 'worker-fs-b' }, mockRuntime);
 
       await containerA.create();
       await containerB.create();
@@ -1138,11 +1106,11 @@ describe('container isolation', () => {
       const callArgsB = vi.mocked(mockRuntime.createContainer).mock.calls[1][0];
 
       // /workspaceへの共有マウントがないことを確認
-      const sharedWorkspaceVolumeA = callArgsA.volumes?.find(v =>
-        v.includes('/workspace') && !v.includes(':ro')
+      const sharedWorkspaceVolumeA = callArgsA.volumes?.find(
+        (v) => v.includes('/workspace') && !v.includes(':ro')
       );
-      const sharedWorkspaceVolumeB = callArgsB.volumes?.find(v =>
-        v.includes('/workspace') && !v.includes(':ro')
+      const sharedWorkspaceVolumeB = callArgsB.volumes?.find(
+        (v) => v.includes('/workspace') && !v.includes(':ro')
       );
 
       expect(sharedWorkspaceVolumeA).toBeUndefined();
@@ -1165,8 +1133,8 @@ describe('container isolation', () => {
       expect(callArgs.env?.GIT_REPO_URL).toBe('https://github.com/example/repo.git');
 
       // ホストの/workspaceへのbind mountがないことを確認
-      const hostWorkspaceMount = callArgs.volumes?.find(v =>
-        v.includes('workspace') && !v.includes(':ro') && !v.includes('/results')
+      const hostWorkspaceMount = callArgs.volumes?.find(
+        (v) => v.includes('workspace') && !v.includes(':ro') && !v.includes('/results')
       );
       expect(hostWorkspaceMount).toBeUndefined();
     });
@@ -1189,22 +1157,17 @@ describe('container isolation', () => {
 
       expect(mockRuntime.createContainer).toHaveBeenCalledWith(
         expect.objectContaining({
-          volumes: expect.arrayContaining([
-            '/host/runtime/runs/run-123:/results:ro',
-          ]),
+          volumes: expect.arrayContaining(['/host/runtime/runs/run-123:/results:ro']),
         })
       );
     });
 
     it('結果ディレクトリなしでもコンテナを作成できる', async () => {
-      const container = new WorkerContainer(
-        { workerId: 'worker-no-results' },
-        mockRuntime
-      );
+      const container = new WorkerContainer({ workerId: 'worker-no-results' }, mockRuntime);
       await container.create();
 
       const callArgs = vi.mocked(mockRuntime.createContainer).mock.calls[0][0];
-      const resultsVolume = callArgs.volumes?.find(v => v.includes('/results'));
+      const resultsVolume = callArgs.volumes?.find((v) => v.includes('/results'));
       expect(resultsVolume).toBeUndefined();
     });
   });
@@ -1215,58 +1178,40 @@ describe('container isolation', () => {
    */
   describe('security options', () => {
     it('no-new-privilegesが設定される', async () => {
-      const container = new WorkerContainer(
-        { workerId: 'worker-security-test' },
-        mockRuntime
-      );
+      const container = new WorkerContainer({ workerId: 'worker-security-test' }, mockRuntime);
       await container.create();
 
       expect(mockRuntime.createContainer).toHaveBeenCalledWith(
         expect.objectContaining({
-          additionalOptions: expect.arrayContaining([
-            '--security-opt=no-new-privileges:true',
-          ]),
+          additionalOptions: expect.arrayContaining(['--security-opt=no-new-privileges:true']),
         })
       );
     });
 
     it('cap-drop=ALLが設定される', async () => {
-      const container = new WorkerContainer(
-        { workerId: 'worker-cap-drop-test' },
-        mockRuntime
-      );
+      const container = new WorkerContainer({ workerId: 'worker-cap-drop-test' }, mockRuntime);
       await container.create();
 
       expect(mockRuntime.createContainer).toHaveBeenCalledWith(
         expect.objectContaining({
-          additionalOptions: expect.arrayContaining([
-            '--cap-drop=ALL',
-          ]),
+          additionalOptions: expect.arrayContaining(['--cap-drop=ALL']),
         })
       );
     });
 
     it('pids-limitが設定される', async () => {
-      const container = new WorkerContainer(
-        { workerId: 'worker-pids-limit-test' },
-        mockRuntime
-      );
+      const container = new WorkerContainer({ workerId: 'worker-pids-limit-test' }, mockRuntime);
       await container.create();
 
       expect(mockRuntime.createContainer).toHaveBeenCalledWith(
         expect.objectContaining({
-          additionalOptions: expect.arrayContaining([
-            expect.stringMatching(/--pids-limit=\d+/),
-          ]),
+          additionalOptions: expect.arrayContaining([expect.stringMatching(/--pids-limit=\d+/)]),
         })
       );
     });
 
     it('tmpfsマウントが設定される', async () => {
-      const container = new WorkerContainer(
-        { workerId: 'worker-tmpfs-test' },
-        mockRuntime
-      );
+      const container = new WorkerContainer({ workerId: 'worker-tmpfs-test' }, mockRuntime);
       await container.create();
 
       expect(mockRuntime.createContainer).toHaveBeenCalledWith(
@@ -1308,10 +1253,7 @@ describe('container isolation', () => {
    */
   describe('verifyIsolation', () => {
     it('デフォルト設定で隔離が有効と判定される', async () => {
-      const container = new WorkerContainer(
-        { workerId: 'worker-verify-default' },
-        mockRuntime
-      );
+      const container = new WorkerContainer({ workerId: 'worker-verify-default' }, mockRuntime);
 
       const result = await container.verifyIsolation();
 
@@ -1336,7 +1278,7 @@ describe('container isolation', () => {
       expect(result.valid).toBe(false);
       expect(result.networkIsolated).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
-      expect(result.errors.some(e => e.includes('Network'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('Network'))).toBe(true);
     });
 
     it('セキュリティオプションが無効な場合はエラーを返す', async () => {
@@ -1364,10 +1306,7 @@ describe('container isolation', () => {
    */
   describe('getIsolationConfig', () => {
     it('デフォルトの隔離設定を取得できる', () => {
-      const container = new WorkerContainer(
-        { workerId: 'worker-get-isolation' },
-        mockRuntime
-      );
+      const container = new WorkerContainer({ workerId: 'worker-get-isolation' }, mockRuntime);
 
       const config = container.getIsolationConfig();
 
@@ -1414,9 +1353,8 @@ describe('isolation utility functions', () => {
   describe('createIsolatedWorkerContainer', () => {
     it('最大限の隔離設定でコンテナを作成できる', async () => {
       // インポートを追加する必要がある場合はここで確認
-      const { createIsolatedWorkerContainer } = await import(
-        '../../tools/cli/lib/execution/worker-container'
-      );
+      const { createIsolatedWorkerContainer } =
+        await import('../../tools/cli/lib/execution/worker-container');
 
       const container = createIsolatedWorkerContainer('worker-isolated');
       const config = container.getIsolationConfig();
@@ -1429,18 +1367,11 @@ describe('isolation utility functions', () => {
 
   describe('verifyContainerIsolation', () => {
     it('2つのコンテナ間の隔離を検証できる', async () => {
-      const { verifyContainerIsolation } = await import(
-        '../../tools/cli/lib/execution/worker-container'
-      );
+      const { verifyContainerIsolation } =
+        await import('../../tools/cli/lib/execution/worker-container');
 
-      const containerA = new WorkerContainer(
-        { workerId: 'worker-a' },
-        mockRuntime
-      );
-      const containerB = new WorkerContainer(
-        { workerId: 'worker-b' },
-        mockRuntime
-      );
+      const containerA = new WorkerContainer({ workerId: 'worker-a' }, mockRuntime);
+      const containerB = new WorkerContainer({ workerId: 'worker-b' }, mockRuntime);
 
       const result = await verifyContainerIsolation(containerA, containerB);
 
@@ -1451,29 +1382,21 @@ describe('isolation utility functions', () => {
     });
 
     it('同じワーカーIDの場合はエラーを返す', async () => {
-      const { verifyContainerIsolation } = await import(
-        '../../tools/cli/lib/execution/worker-container'
-      );
+      const { verifyContainerIsolation } =
+        await import('../../tools/cli/lib/execution/worker-container');
 
-      const containerA = new WorkerContainer(
-        { workerId: 'same-worker' },
-        mockRuntime
-      );
-      const containerB = new WorkerContainer(
-        { workerId: 'same-worker' },
-        mockRuntime
-      );
+      const containerA = new WorkerContainer({ workerId: 'same-worker' }, mockRuntime);
+      const containerB = new WorkerContainer({ workerId: 'same-worker' }, mockRuntime);
 
       const result = await verifyContainerIsolation(containerA, containerB);
 
       expect(result.isolated).toBe(false);
-      expect(result.errors.some(e => e.includes('same worker ID'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('same worker ID'))).toBe(true);
     });
 
     it('ネットワーク隔離が無効な場合はエラーを返す', async () => {
-      const { verifyContainerIsolation } = await import(
-        '../../tools/cli/lib/execution/worker-container'
-      );
+      const { verifyContainerIsolation } =
+        await import('../../tools/cli/lib/execution/worker-container');
 
       const containerA = new WorkerContainer(
         {
@@ -1482,10 +1405,7 @@ describe('isolation utility functions', () => {
         },
         mockRuntime
       );
-      const containerB = new WorkerContainer(
-        { workerId: 'worker-net-b' },
-        mockRuntime
-      );
+      const containerB = new WorkerContainer({ workerId: 'worker-net-b' }, mockRuntime);
 
       const result = await verifyContainerIsolation(containerA, containerB);
 
@@ -1496,9 +1416,8 @@ describe('isolation utility functions', () => {
 
   describe('describeIsolationConfig', () => {
     it('隔離設定の説明を生成できる', async () => {
-      const { describeIsolationConfig, DEFAULT_ISOLATION_CONFIG } = await import(
-        '../../tools/cli/lib/execution/worker-container'
-      );
+      const { describeIsolationConfig, DEFAULT_ISOLATION_CONFIG } =
+        await import('../../tools/cli/lib/execution/worker-container');
 
       const description = describeIsolationConfig(DEFAULT_ISOLATION_CONFIG);
 

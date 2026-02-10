@@ -18,9 +18,7 @@ import {
   createErrorHandler,
   DEFAULT_RETRY_CONFIG,
   RetryConfig,
-  RetryResult,
   EscalationInfo,
-  ErrorCategory,
 } from '../../tools/cli/lib/execution/error-handler';
 import { ErrorInfo } from '../../tools/cli/lib/execution/types';
 
@@ -491,6 +489,287 @@ describe('ErrorHandler', () => {
 
       expect(errorInfo.stack).toBeDefined();
       expect(errorInfo.stack).toContain('Error: Test error');
+    });
+  });
+
+  // ===========================================================================
+  // 失敗時の処理テスト（要件11.2）
+  // ===========================================================================
+
+  describe('失敗時の処理（handleWorkerFailure）', () => {
+    /**
+     * @see Requirement 11.2: IF all retries fail, THE System SHALL mark Grandchild_Ticket as failed and notify Manager_Agent
+     */
+    it('成功時はチケットステータス更新とManager通知を行わない', async () => {
+      const operation = vi.fn().mockResolvedValue('success');
+      const onTicketStatusUpdate = vi.fn();
+      const onManagerNotification = vi.fn();
+
+      const result = await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-001',
+        workerId: 'worker-001',
+        ticketId: 'proj-001-0001-01-001',
+        managerAgentId: 'manager-001',
+        onTicketStatusUpdate,
+        onManagerNotification,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.result).toBe('success');
+      expect(result.ticketStatusUpdated).toBe(false);
+      expect(result.managerNotified).toBe(false);
+      expect(onTicketStatusUpdate).not.toHaveBeenCalled();
+      expect(onManagerNotification).not.toHaveBeenCalled();
+    });
+
+    it('全リトライ失敗時にチケットステータスを"failed"に更新する', async () => {
+      const operation = vi.fn().mockRejectedValue(new Error('Always fails'));
+      const onTicketStatusUpdate = vi.fn().mockResolvedValue(undefined);
+      const onManagerNotification = vi.fn().mockResolvedValue(undefined);
+
+      const result = await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-002',
+        workerId: 'worker-002',
+        ticketId: 'proj-001-0001-01-002',
+        managerAgentId: 'manager-001',
+        onTicketStatusUpdate,
+        onManagerNotification,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.ticketStatusUpdated).toBe(true);
+      expect(onTicketStatusUpdate).toHaveBeenCalledTimes(1);
+      expect(onTicketStatusUpdate).toHaveBeenCalledWith('proj-001-0001-01-002', 'failed');
+    });
+
+    it('全リトライ失敗時にManager Agentに通知する', async () => {
+      const operation = vi.fn().mockRejectedValue(new Error('Always fails'));
+      const onTicketStatusUpdate = vi.fn().mockResolvedValue(undefined);
+      const onManagerNotification = vi.fn().mockResolvedValue(undefined);
+
+      const result = await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-003',
+        workerId: 'worker-003',
+        ticketId: 'proj-001-0001-01-003',
+        managerAgentId: 'manager-001',
+        onTicketStatusUpdate,
+        onManagerNotification,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.managerNotified).toBe(true);
+      expect(onManagerNotification).toHaveBeenCalledTimes(1);
+      expect(onManagerNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ticketId: 'proj-001-0001-01-003',
+          workerId: 'worker-003',
+          runId: 'run-003',
+          attempts: 3,
+        })
+      );
+    });
+
+    it('失敗通知に必要なフィールドが含まれる', async () => {
+      const operation = vi.fn().mockRejectedValue(new Error('Test failure'));
+      let capturedNotification: unknown;
+      const onManagerNotification = vi.fn().mockImplementation((notification) => {
+        capturedNotification = notification;
+        return Promise.resolve();
+      });
+
+      await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-004',
+        workerId: 'worker-004',
+        ticketId: 'proj-001-0001-01-004',
+        managerAgentId: 'manager-001',
+        onTicketStatusUpdate: vi.fn().mockResolvedValue(undefined),
+        onManagerNotification,
+      });
+
+      expect(capturedNotification).toBeDefined();
+      const notification = capturedNotification as {
+        ticketId: string;
+        workerId: string;
+        runId: string;
+        error: ErrorInfo;
+        attempts: number;
+        failedAt: string;
+        recommendedAction: string;
+      };
+      expect(notification.ticketId).toBe('proj-001-0001-01-004');
+      expect(notification.workerId).toBe('worker-004');
+      expect(notification.runId).toBe('run-004');
+      expect(notification.error).toBeDefined();
+      expect(notification.error.message).toBe('Test failure');
+      expect(notification.attempts).toBe(3);
+      expect(notification.failedAt).toBeDefined();
+      expect(notification.recommendedAction).toBeDefined();
+    });
+
+    it('チケットステータス更新が失敗してもManager通知は実行される', async () => {
+      const operation = vi.fn().mockRejectedValue(new Error('Always fails'));
+      const onTicketStatusUpdate = vi.fn().mockRejectedValue(new Error('Update failed'));
+      const onManagerNotification = vi.fn().mockResolvedValue(undefined);
+
+      const result = await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-005',
+        workerId: 'worker-005',
+        ticketId: 'proj-001-0001-01-005',
+        managerAgentId: 'manager-001',
+        onTicketStatusUpdate,
+        onManagerNotification,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.ticketStatusUpdated).toBe(false);
+      expect(result.managerNotified).toBe(true);
+      expect(onTicketStatusUpdate).toHaveBeenCalledTimes(1);
+      expect(onManagerNotification).toHaveBeenCalledTimes(1);
+    });
+
+    it('Manager通知が失敗してもチケットステータス更新は実行される', async () => {
+      const operation = vi.fn().mockRejectedValue(new Error('Always fails'));
+      const onTicketStatusUpdate = vi.fn().mockResolvedValue(undefined);
+      const onManagerNotification = vi.fn().mockRejectedValue(new Error('Notification failed'));
+
+      const result = await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-006',
+        workerId: 'worker-006',
+        ticketId: 'proj-001-0001-01-006',
+        managerAgentId: 'manager-001',
+        onTicketStatusUpdate,
+        onManagerNotification,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.ticketStatusUpdated).toBe(true);
+      expect(result.managerNotified).toBe(false);
+      expect(onTicketStatusUpdate).toHaveBeenCalledTimes(1);
+      expect(onManagerNotification).toHaveBeenCalledTimes(1);
+    });
+
+    it('コールバックが未設定でも正常に動作する', async () => {
+      const operation = vi.fn().mockRejectedValue(new Error('Always fails'));
+
+      const result = await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-007',
+        workerId: 'worker-007',
+        ticketId: 'proj-001-0001-01-007',
+        managerAgentId: 'manager-001',
+        // コールバック未設定
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.ticketStatusUpdated).toBe(false);
+      expect(result.managerNotified).toBe(false);
+      expect(result.failureNotification).toBeDefined();
+    });
+
+    it('リトライ中に成功した場合は失敗処理を行わない', async () => {
+      let attempts = 0;
+      const operation = vi.fn().mockImplementation(async () => {
+        attempts++;
+        if (attempts < 2) {
+          throw new Error(`Attempt ${attempts} failed`);
+        }
+        return 'success';
+      });
+      const onTicketStatusUpdate = vi.fn();
+      const onManagerNotification = vi.fn();
+
+      const result = await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-008',
+        workerId: 'worker-008',
+        ticketId: 'proj-001-0001-01-008',
+        managerAgentId: 'manager-001',
+        onTicketStatusUpdate,
+        onManagerNotification,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.result).toBe('success');
+      expect(result.attempts).toBe(2);
+      expect(result.ticketStatusUpdated).toBe(false);
+      expect(result.managerNotified).toBe(false);
+      expect(onTicketStatusUpdate).not.toHaveBeenCalled();
+      expect(onManagerNotification).not.toHaveBeenCalled();
+    });
+
+    it('推奨アクションが接続エラーの場合は"reassign"になる', async () => {
+      const operation = vi.fn().mockRejectedValue(new Error('Connection refused'));
+      let capturedNotification: unknown;
+      const onManagerNotification = vi.fn().mockImplementation((notification) => {
+        capturedNotification = notification;
+        return Promise.resolve();
+      });
+
+      await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-009',
+        workerId: 'worker-009',
+        ticketId: 'proj-001-0001-01-009',
+        managerAgentId: 'manager-001',
+        onTicketStatusUpdate: vi.fn().mockResolvedValue(undefined),
+        onManagerNotification,
+      });
+
+      const notification = capturedNotification as { recommendedAction: string };
+      expect(notification.recommendedAction).toBe('reassign');
+    });
+
+    it('推奨アクションがGitエラーの場合は"manual_review"になる', async () => {
+      const operation = vi.fn().mockRejectedValue(new Error('git merge conflict'));
+      let capturedNotification: unknown;
+      const onManagerNotification = vi.fn().mockImplementation((notification) => {
+        capturedNotification = notification;
+        return Promise.resolve();
+      });
+
+      await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-010',
+        workerId: 'worker-010',
+        ticketId: 'proj-001-0001-01-010',
+        managerAgentId: 'manager-001',
+        onTicketStatusUpdate: vi.fn().mockResolvedValue(undefined),
+        onManagerNotification,
+      });
+
+      const notification = capturedNotification as { recommendedAction: string };
+      expect(notification.recommendedAction).toBe('manual_review');
+    });
+
+    it('推奨アクションがバリデーションエラーの場合は"escalate"になる', async () => {
+      const operation = vi.fn().mockRejectedValue(new Error('validation error: invalid input'));
+      let capturedNotification: unknown;
+      const onManagerNotification = vi.fn().mockImplementation((notification) => {
+        capturedNotification = notification;
+        return Promise.resolve();
+      });
+
+      await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-011',
+        workerId: 'worker-011',
+        ticketId: 'proj-001-0001-01-011',
+        managerAgentId: 'manager-001',
+        onTicketStatusUpdate: vi.fn().mockResolvedValue(undefined),
+        onManagerNotification,
+      });
+
+      const notification = capturedNotification as { recommendedAction: string };
+      expect(notification.recommendedAction).toBe('escalate');
+    });
+
+    it('エラーログに失敗が記録される', async () => {
+      const operation = vi.fn().mockRejectedValue(new Error('Test error for logging'));
+
+      await errorHandler.handleWorkerFailure(operation, {
+        runId: 'run-log-failure',
+        workerId: 'worker-log',
+        ticketId: 'proj-001-0001-01-log',
+        managerAgentId: 'manager-001',
+      });
+
+      const logContent = await errorHandler.readErrorLog('run-log-failure');
+      expect(logContent).toContain('Test error for logging');
     });
   });
 });

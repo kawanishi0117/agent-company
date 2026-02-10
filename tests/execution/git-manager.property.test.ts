@@ -44,7 +44,6 @@ const TEST_RUNS_DIR = 'runtime/runs/test-git-manager-property';
  */
 const TEST_RUN_ID = 'property-test-run';
 
-
 // =============================================================================
 // テスト用ヘルパー
 // =============================================================================
@@ -84,7 +83,10 @@ function failureResult(stderr: string = 'error'): CommandResult {
  */
 const ticketIdArb: fc.Arbitrary<string> = fc
   .tuple(
-    fc.stringOf(fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')), { minLength: 1, maxLength: 10 }),
+    fc.stringOf(fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')), {
+      minLength: 1,
+      maxLength: 10,
+    }),
     fc.integer({ min: 1, max: 99999 })
   )
   .map(([prefix, num]) => `${prefix}-${num}`);
@@ -130,7 +132,6 @@ const specialCharDescriptionArb: fc.Arbitrary<string> = fc.constantFrom(
   'Add & operator'
 );
 
-
 /**
  * 禁止されたパス（~/.ssh/）を生成するArbitrary
  */
@@ -161,9 +162,11 @@ const allowedPathArb: fc.Arbitrary<string> = fc.constantFrom(
 );
 
 /**
- * Git操作種別を生成するArbitrary
+ * Git操作種別を生成するArbitrary（将来の拡張用）
+ * @description 現在は未使用だが、将来のGit操作テスト拡張時に使用予定
  */
-const gitOperationArb: fc.Arbitrary<string> = fc.constantFrom(
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _gitOperationArb: fc.Arbitrary<string> = fc.constantFrom(
   'clone',
   'createBranch',
   'checkout',
@@ -205,7 +208,6 @@ describe('Property 6: Git Naming Conventions', () => {
       { numRuns: 100 }
     );
   });
-
 
   /**
    * Property 6.2: ブランチ名の説明部分は小文字とハイフンのみ
@@ -272,7 +274,6 @@ describe('Property 6: Git Naming Conventions', () => {
       { numRuns: 100 }
     );
   });
-
 
   /**
    * Property 6.5: 日本語を含む説明の処理
@@ -371,7 +372,6 @@ describe('Property 6: Git Naming Conventions', () => {
   });
 });
 
-
 // =============================================================================
 // Property 7: Git Operation Logging テスト
 // =============================================================================
@@ -429,7 +429,6 @@ describe('Property 7: Git Operation Logging', () => {
     expect(logContent).toContain('[SUCCESS]');
   });
 
-
   /**
    * Property 7.2: 失敗した操作のログ記録
    * 任意のGit操作が失敗した場合も、ログファイルに記録される
@@ -437,9 +436,7 @@ describe('Property 7: Git Operation Logging', () => {
    * **Validates: Requirement 3.8**
    */
   it('Property 7.2: 失敗した操作もログに記録される', async () => {
-    vi.mocked(mockProcessMonitor.execute).mockResolvedValue(
-      failureResult('error message')
-    );
+    vi.mocked(mockProcessMonitor.execute).mockResolvedValue(failureResult('error message'));
 
     // ブランチ作成操作を実行（失敗する）
     await expect(gitManager.createBranch('test-branch')).rejects.toThrow();
@@ -492,7 +489,6 @@ describe('Property 7: Git Operation Logging', () => {
     // 実行時間（ミリ秒）が含まれること
     expect(logContent).toMatch(/\[\d+ms\]/);
   });
-
 
   /**
    * Property 7.5: 複数操作の順序保持
@@ -572,7 +568,6 @@ describe('Property 7: Git Operation Logging', () => {
     expect(logContent).toContain('branchName=feature-branch');
   });
 
-
   /**
    * Property 7.8: runIdが設定されていない場合はログを記録しない
    * runIdが設定されていない場合、ログファイルは作成されない
@@ -634,7 +629,6 @@ describe('Property 27: Git Credential Isolation', () => {
     );
   });
 
-
   /**
    * Property 27.3: isForbiddenPath() の一貫性
    * 任意のパスに対して、isForbiddenPath() は一貫した結果を返す
@@ -643,19 +637,16 @@ describe('Property 27: Git Credential Isolation', () => {
    */
   it('Property 27.3: isForbiddenPath() は一貫した結果を返す', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.oneof(forbiddenPathArb, allowedPathArb),
-        async (testPath) => {
-          // 複数回検出を実行
-          const result1 = isForbiddenPath(testPath);
-          const result2 = isForbiddenPath(testPath);
-          const result3 = isForbiddenPath(testPath);
+      fc.asyncProperty(fc.oneof(forbiddenPathArb, allowedPathArb), async (testPath) => {
+        // 複数回検出を実行
+        const result1 = isForbiddenPath(testPath);
+        const result2 = isForbiddenPath(testPath);
+        const result3 = isForbiddenPath(testPath);
 
-          // すべて同じ結果であること
-          expect(result1).toBe(result2);
-          expect(result2).toBe(result3);
-        }
-      ),
+        // すべて同じ結果であること
+        expect(result1).toBe(result2);
+        expect(result2).toBe(result3);
+      }),
       { numRuns: 100 }
     );
   });
@@ -700,7 +691,6 @@ describe('Property 27: Git Credential Isolation', () => {
     }
   });
 
-
   /**
    * Property 27.6: 推奨ディレクトリ内のDeploy keyは許可
    * 推奨ディレクトリ内のDeploy keyは許可される
@@ -727,11 +717,7 @@ describe('Property 27: Git Credential Isolation', () => {
    * **Validates: Requirement 3.2**
    */
   it('Property 27.7: チルダ展開前のパスも禁止される', async () => {
-    const tildeNotations = [
-      '~/.ssh',
-      '~/.ssh/id_rsa',
-      '~/.ssh/config',
-    ];
+    const tildeNotations = ['~/.ssh', '~/.ssh/id_rsa', '~/.ssh/config'];
 
     for (const notation of tildeNotations) {
       const isForbidden = isForbiddenPath(notation);
@@ -746,10 +732,7 @@ describe('Property 27: Git Credential Isolation', () => {
    * **Validates: Requirement 3.2**
    */
   it('Property 27.8: 環境変数展開前のパスも禁止される', async () => {
-    const envNotations = [
-      '$HOME/.ssh',
-      '${HOME}/.ssh',
-    ];
+    const envNotations = ['$HOME/.ssh', '${HOME}/.ssh'];
 
     for (const notation of envNotations) {
       const isForbidden = isForbiddenPath(notation);
@@ -757,6 +740,344 @@ describe('Property 27: Git Credential Isolation', () => {
     }
   });
 });
+
+// =============================================================================
+// Property 28: Merge Flow Integrity テスト
+// =============================================================================
+
+describe('Property 28: Merge Flow Integrity', () => {
+  let gitManager: GitManager;
+  let mockProcessMonitor: ProcessMonitor;
+  let tempDir: string;
+
+  beforeEach(async () => {
+    // 一時ディレクトリを作成
+    tempDir = path.join(TEST_RUNS_DIR, `test-merge-${Date.now()}`);
+    await fs.mkdir(tempDir, { recursive: true });
+
+    // ProcessMonitorのモックを作成
+    mockProcessMonitor = new ProcessMonitor(tempDir);
+    vi.spyOn(mockProcessMonitor, 'execute');
+
+    // GitManagerを作成
+    gitManager = new GitManager(mockProcessMonitor, tempDir);
+    gitManager.setRunId(TEST_RUN_ID);
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch {
+      // 削除失敗は無視
+    }
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Property 28.1: マージ成功時の結果
+   * マージが成功した場合、success: true が返される
+   *
+   * **Validates: Requirement 4.4**
+   */
+  it('Property 28.1: マージ成功時は success: true が返される', async () => {
+    vi.mocked(mockProcessMonitor.execute)
+      .mockResolvedValueOnce(successResult()) // checkout
+      .mockResolvedValueOnce(successResult()); // merge
+
+    const result = await gitManager.mergeToAgentBranch('task-branch', 'agent-branch');
+
+    expect(result.success).toBe(true);
+    expect(result.conflictReport).toBeUndefined();
+  });
+
+  /**
+   * Property 28.2: コンフリクト発生時の自動解決試行
+   * コンフリクトが発生した場合、自動解決が試行される
+   *
+   * **Validates: Requirement 4.5**
+   */
+  it('Property 28.2: コンフリクト発生時は自動解決が試行される', async () => {
+    vi.mocked(mockProcessMonitor.execute)
+      .mockResolvedValueOnce(successResult()) // checkout
+      .mockResolvedValueOnce(failureResult('CONFLICT')) // merge fails
+      .mockResolvedValueOnce(successResult('main')) // branch --show-current
+      .mockResolvedValueOnce(successResult('UU file.ts')) // status --porcelain (conflict)
+      .mockResolvedValueOnce(successResult('main')) // branch --show-current (for getConflicts)
+      .mockResolvedValueOnce(successResult('UU file.ts')) // status --porcelain (for getConflicts)
+      .mockResolvedValueOnce(successResult('base content')) // git show :1:file
+      .mockResolvedValueOnce(successResult('ours content')) // git show :2:file
+      .mockResolvedValueOnce(successResult('ours content')) // git show :3:file (same as ours = auto-resolvable)
+      .mockResolvedValueOnce(successResult()) // stage
+      .mockResolvedValueOnce(successResult()) // commit
+      .mockResolvedValueOnce(successResult('abc123')); // rev-parse HEAD
+
+    const result = await gitManager.mergeToAgentBranch('task-branch', 'agent-branch');
+
+    expect(result.success).toBe(true);
+    expect(result.autoResolved).toBe(true);
+  });
+
+  /**
+   * Property 28.3: 自動解決失敗時のコンフリクトレポート
+   * 自動解決が失敗した場合、コンフリクトレポートが返される
+   *
+   * **Validates: Requirement 4.5, 4.6**
+   */
+  it('Property 28.3: 自動解決失敗時はコンフリクトレポートが返される', async () => {
+    vi.mocked(mockProcessMonitor.execute)
+      .mockResolvedValueOnce(successResult()) // checkout
+      .mockResolvedValueOnce(failureResult('CONFLICT')) // merge fails
+      .mockResolvedValueOnce(successResult('main')) // branch --show-current
+      .mockResolvedValueOnce(successResult('UU file.ts')) // status --porcelain (conflict)
+      .mockResolvedValueOnce(successResult('main')) // branch --show-current (for getConflicts)
+      .mockResolvedValueOnce(successResult('UU file.ts')) // status --porcelain (for getConflicts)
+      .mockResolvedValueOnce(successResult('base content')) // git show :1:file
+      .mockResolvedValueOnce(successResult('ours content')) // git show :2:file
+      .mockResolvedValueOnce(successResult('theirs content')) // git show :3:file (different = not auto-resolvable)
+      .mockResolvedValueOnce(successResult('main')) // branch --show-current (for generateConflictReport)
+      .mockResolvedValueOnce(successResult('UU file.ts')) // status --porcelain (for generateConflictReport)
+      .mockResolvedValueOnce(successResult('base content')) // git show :1:file
+      .mockResolvedValueOnce(successResult('ours content')) // git show :2:file
+      .mockResolvedValueOnce(successResult('theirs content')); // git show :3:file
+
+    const result = await gitManager.mergeToAgentBranch('task-branch', 'agent-branch');
+
+    expect(result.success).toBe(false);
+    expect(result.conflictReport).toBeDefined();
+    expect(result.conflictReport!.totalConflicts).toBeGreaterThan(0);
+  });
+});
+
+// =============================================================================
+// Property 29: Conflict Escalation テスト
+// =============================================================================
+
+describe('Property 29: Conflict Escalation', () => {
+  /**
+   * Property 29.1: エスカレーションメッセージの形式
+   * エスカレーションメッセージには必要な情報が含まれる
+   *
+   * **Validates: Requirement 4.6**
+   */
+  it('Property 29.1: エスカレーションメッセージには必要な情報が含まれる', async () => {
+    await fc.assert(
+      fc.asyncProperty(ticketIdArb, async (ticketId) => {
+        const gitManager = new GitManager();
+        const conflictReport: ConflictReport = {
+          timestamp: new Date().toISOString(),
+          branch: 'agent/test-branch',
+          totalConflicts: 2,
+          files: [
+            {
+              path: 'file1.ts',
+              hasBase: true,
+              hasOurs: true,
+              hasTheirs: true,
+              autoResolvable: false,
+            },
+            {
+              path: 'file2.ts',
+              hasBase: true,
+              hasOurs: true,
+              hasTheirs: true,
+              autoResolvable: false,
+            },
+          ],
+          summary: 'テストサマリー',
+        };
+
+        const escalation = gitManager.escalateConflict(conflictReport, ticketId);
+
+        // 必要なフィールドが含まれること
+        expect(escalation.type).toBe('conflict_escalation');
+        expect(escalation.ticketId).toBe(ticketId);
+        expect(escalation.branch).toBe('agent/test-branch');
+        expect(escalation.totalConflicts).toBe(2);
+        expect(escalation.files).toHaveLength(2);
+        expect(escalation.summary).toBe('テストサマリー');
+        expect(escalation.timestamp).toBeDefined();
+      }),
+      { numRuns: 50 }
+    );
+  });
+
+  /**
+   * Property 29.2: エスカレーションメッセージのタイムスタンプ
+   * エスカレーションメッセージには現在時刻のタイムスタンプが含まれる
+   *
+   * **Validates: Requirement 4.6**
+   */
+  it('Property 29.2: エスカレーションメッセージには現在時刻のタイムスタンプが含まれる', () => {
+    const gitManager = new GitManager();
+    const conflictReport: ConflictReport = {
+      timestamp: '2024-01-01T00:00:00.000Z', // 古いタイムスタンプ
+      branch: 'agent/test-branch',
+      totalConflicts: 1,
+      files: [],
+      summary: 'テスト',
+    };
+
+    const before = new Date();
+    const escalation = gitManager.escalateConflict(conflictReport, 'T-1');
+    const after = new Date();
+
+    // エスカレーションのタイムスタンプは現在時刻
+    const escalationTime = new Date(escalation.timestamp);
+    expect(escalationTime.getTime()).toBeGreaterThanOrEqual(before.getTime());
+    expect(escalationTime.getTime()).toBeLessThanOrEqual(after.getTime());
+  });
+
+  /**
+   * Property 29.3: エスカレーションメッセージのファイル情報
+   * エスカレーションメッセージにはコンフリクトファイルの情報が含まれる
+   *
+   * **Validates: Requirement 4.6**
+   */
+  it('Property 29.3: エスカレーションメッセージにはファイル情報が含まれる', async () => {
+    const fileCountArb = fc.integer({ min: 0, max: 10 });
+
+    await fc.assert(
+      fc.asyncProperty(fileCountArb, async (fileCount) => {
+        const gitManager = new GitManager();
+        const files: ConflictFileInfo[] = Array.from({ length: fileCount }, (_, i) => ({
+          path: `file${i}.ts`,
+          hasBase: true,
+          hasOurs: true,
+          hasTheirs: true,
+          autoResolvable: false,
+        }));
+
+        const conflictReport: ConflictReport = {
+          timestamp: new Date().toISOString(),
+          branch: 'agent/test-branch',
+          totalConflicts: fileCount,
+          files,
+          summary: `${fileCount}件のコンフリクト`,
+        };
+
+        const escalation = gitManager.escalateConflict(conflictReport, 'T-1');
+
+        // ファイル数が一致すること
+        expect(escalation.files).toHaveLength(fileCount);
+        expect(escalation.totalConflicts).toBe(fileCount);
+      }),
+      { numRuns: 50 }
+    );
+  });
+});
+
+// =============================================================================
+// Property 30: Task Branch Creation テスト
+// =============================================================================
+
+describe('Property 30: Task Branch Creation', () => {
+  let gitManager: GitManager;
+  let mockProcessMonitor: ProcessMonitor;
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = path.join(TEST_RUNS_DIR, `test-task-branch-${Date.now()}`);
+    await fs.mkdir(tempDir, { recursive: true });
+
+    mockProcessMonitor = new ProcessMonitor(tempDir);
+    vi.spyOn(mockProcessMonitor, 'execute');
+
+    gitManager = new GitManager(mockProcessMonitor, tempDir);
+    gitManager.setRunId(TEST_RUN_ID);
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch {
+      // 削除失敗は無視
+    }
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Property 30.1: タスクブランチ名の形式
+   * タスクブランチ名は agent/<ticket-id>-<description> 形式
+   *
+   * **Validates: Requirement 4.1**
+   */
+  it('Property 30.1: タスクブランチ名は正しい形式で生成される', async () => {
+    await fc.assert(
+      fc.asyncProperty(ticketIdArb, descriptionArb, async (ticketId, description) => {
+        vi.mocked(mockProcessMonitor.execute)
+          .mockResolvedValueOnce(successResult()) // checkout
+          .mockResolvedValueOnce(successResult()) // pull
+          .mockResolvedValueOnce(successResult()); // checkout -b
+
+        const branchName = await gitManager.createTaskBranch(ticketId, description, 'agent/main');
+
+        // agent/ プレフィックスで始まること
+        expect(branchName).toMatch(/^agent\//);
+
+        // チケットIDが含まれること
+        expect(branchName).toContain(ticketId);
+      }),
+      { numRuns: 20 }
+    );
+  });
+
+  /**
+   * Property 30.2: タスクブランチ作成のログ記録
+   * タスクブランチ作成はログに記録される
+   *
+   * **Validates: Requirement 4.1**
+   */
+  it('Property 30.2: タスクブランチ作成はログに記録される', async () => {
+    vi.mocked(mockProcessMonitor.execute)
+      .mockResolvedValueOnce(successResult()) // checkout
+      .mockResolvedValueOnce(successResult()) // pull
+      .mockResolvedValueOnce(successResult()); // checkout -b
+
+    await gitManager.createTaskBranch('T-1', 'test-feature', 'agent/main');
+
+    const logPath = path.join(tempDir, TEST_RUN_ID, 'git.log');
+    const logContent = await fs.readFile(logPath, 'utf-8');
+
+    expect(logContent).toContain('[createTaskBranch]');
+    expect(logContent).toContain('ticketId=T-1');
+    expect(logContent).toContain('[SUCCESS]');
+  });
+
+  /**
+   * Property 30.3: commitWithTicketIdの形式
+   * commitWithTicketIdは正しい形式のコミットメッセージを生成する
+   *
+   * **Validates: Requirement 4.2**
+   */
+  it('Property 30.3: commitWithTicketIdは正しい形式のコミットメッセージを生成する', async () => {
+    await fc.assert(
+      fc.asyncProperty(ticketIdArb, descriptionArb, async (ticketId, description) => {
+        // 各イテレーションでモックをリセット
+        vi.mocked(mockProcessMonitor.execute).mockReset();
+        vi.mocked(mockProcessMonitor.execute)
+          .mockResolvedValueOnce(successResult()) // commit
+          .mockResolvedValueOnce(successResult('abc123')); // rev-parse HEAD
+
+        const hash = await gitManager.commitWithTicketId(ticketId, description);
+
+        // コミットハッシュが返されること
+        expect(hash).toBe('abc123');
+
+        // コミットコマンドが正しい形式で呼ばれたこと
+        const commitCall = vi.mocked(mockProcessMonitor.execute).mock.calls[0];
+        expect(commitCall[0]).toContain(`[${ticketId}]`);
+        expect(commitCall[0]).toContain(description);
+      }),
+      { numRuns: 20 }
+    );
+  });
+});
+
+// =============================================================================
+// ConflictReport型のインポート用
+// =============================================================================
+
+import type { ConflictReport, ConflictFileInfo } from '../../tools/cli/lib/execution/git-manager';
 
 // =============================================================================
 // エッジケーステスト
@@ -788,7 +1109,6 @@ describe('Git Manager Edge Cases', () => {
     // 実装では末尾のハイフンが除去されるため 'agent/-' となる
     expect(branchName).toBe('agent/-');
   });
-
 
   /**
    * 非常に長い説明の処理
@@ -830,12 +1150,7 @@ describe('Git Manager Edge Cases', () => {
    * 相対パスの処理
    */
   it('相対パスは禁止されない', () => {
-    const relativePaths = [
-      '.ssh',
-      './ssh',
-      '../.ssh',
-      'keys/deploy_key',
-    ];
+    const relativePaths = ['.ssh', './ssh', '../.ssh', 'keys/deploy_key'];
 
     for (const relativePath of relativePaths) {
       const isForbidden = isForbiddenPath(relativePath);

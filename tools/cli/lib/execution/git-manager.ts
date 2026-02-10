@@ -18,7 +18,7 @@ import {
   createAuthenticatedUrl,
   TokenCredential,
 } from './git-credentials';
-import type { GitStatus, ConflictInfo, RunId, PullRequestId } from './types';
+import type { GitStatus, ConflictInfo, RunId } from './types';
 
 // =============================================================================
 // 定数定義
@@ -50,7 +50,6 @@ const KNOWN_GIT_HOSTS: Record<string, string[]> = {
     'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIazEu89wgQZ4bqs3d63QSMzYVa0MuJ2e2gKTKqu+UUO',
   ],
 };
-
 
 // =============================================================================
 // 型定義
@@ -406,7 +405,7 @@ export class GitManager {
 
     try {
       // ファイルリストをスペース区切りで結合
-      const fileList = files.map(f => `"${f}"`).join(' ');
+      const fileList = files.map((f) => `"${f}"`).join(' ');
       const command = `git add ${fileList}`;
       const result = await this.processMonitor.execute(command, {
         timeout: options.timeout ?? 60,
@@ -499,6 +498,225 @@ export class GitManager {
   }
 
   /**
+   * タスクブランチを作成
+   *
+   * エージェントブランチから新しいタスクブランチを作成する。
+   * ブランチ名形式: `agent/<ticket-id>-<description>`
+   *
+   * @param ticketId - チケットID
+   * @param description - タスクの説明
+   * @param agentBranch - ベースとなるエージェントブランチ名
+   * @param options - 操作オプション
+   * @returns 作成されたブランチ名
+   * @throws ブランチ作成に失敗した場合
+   *
+   * @see Requirement 4.1: THE Git_Manager SHALL create task branch from agent branch
+   */
+  async createTaskBranch(
+    ticketId: string,
+    description: string,
+    agentBranch: string,
+    options: GitOperationOptions = {}
+  ): Promise<string> {
+    const startTime = Date.now();
+    const branchName = GitManager.generateBranchName(ticketId, description);
+
+    try {
+      // まずエージェントブランチにチェックアウト
+      await this.checkout(agentBranch, options);
+
+      // 最新の状態を取得
+      const pullResult = await this.processMonitor.execute(`git pull origin "${agentBranch}"`, {
+        timeout: options.timeout ?? 120,
+        cwd: options.cwd,
+        env: this.buildGitEnv(options.env),
+      });
+
+      // pullが失敗してもブランチが存在しない場合は続行
+      if (pullResult.exitCode !== 0 && !pullResult.stderr.includes("Couldn't find remote ref")) {
+        // リモートにブランチがない場合は無視
+        console.warn(`Warning: Could not pull from ${agentBranch}: ${pullResult.stderr}`);
+      }
+
+      // タスクブランチを作成
+      await this.createBranch(branchName, options);
+
+      // ログを記録
+      await this.logOperation({
+        timestamp: new Date().toISOString(),
+        operation: 'createTaskBranch',
+        details: `ticketId=${ticketId}, branchName=${branchName}, baseBranch=${agentBranch}`,
+        success: true,
+        durationMs: Date.now() - startTime,
+      });
+
+      return branchName;
+    } catch (error) {
+      await this.logOperation({
+        timestamp: new Date().toISOString(),
+        operation: 'createTaskBranch',
+        details: `ticketId=${ticketId}, branchName=${branchName}`,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        durationMs: Date.now() - startTime,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * チケットIDを含むコミットを作成
+   *
+   * コミットメッセージ形式: `[<ticket-id>] <description>`
+   *
+   * @param ticketId - チケットID
+   * @param description - コミットの説明
+   * @param options - 操作オプション
+   * @returns コミットハッシュ
+   * @throws コミットに失敗した場合
+   *
+   * @see Requirement 4.2: THE commit message SHALL follow format: `[<ticket-id>] <description>`
+   */
+  async commitWithTicketId(
+    ticketId: string,
+    description: string,
+    options: GitOperationOptions = {}
+  ): Promise<string> {
+    const message = GitManager.generateCommitMessage(ticketId, description);
+    return this.commit(message, options);
+  }
+
+  /**
+   * タスクブランチをエージェントブランチにマージ
+   *
+   * コンフリクトが発生した場合は自動解決を試み、
+   * 失敗した場合はエスカレーションが必要であることを示す。
+   *
+   * @param taskBranch - マージするタスクブランチ名
+   * @param agentBranch - マージ先のエージェントブランチ名
+   * @param options - 操作オプション
+   * @returns マージ結果（成功/コンフリクト情報）
+   *
+   * @see Requirement 4.4: WHEN task completes, THE Git_Manager SHALL merge task branch to agent branch
+   * @see Requirement 4.5: IF merge conflict occurs, THE Git_Manager SHALL attempt auto-resolution
+   */
+  async mergeToAgentBranch(
+    taskBranch: string,
+    agentBranch: string,
+    options: GitOperationOptions = {}
+  ): Promise<{ success: boolean; conflictReport?: ConflictReport; autoResolved?: boolean }> {
+    const startTime = Date.now();
+
+    try {
+      // エージェントブランチにチェックアウト
+      await this.checkout(agentBranch, options);
+
+      // マージを実行
+      const mergeResult = await this.processMonitor.execute(`git merge "${taskBranch}"`, {
+        timeout: options.timeout ?? 120,
+        cwd: options.cwd,
+        env: options.env,
+      });
+
+      if (mergeResult.exitCode === 0) {
+        // マージ成功
+        await this.logOperation({
+          timestamp: new Date().toISOString(),
+          operation: 'mergeToAgentBranch',
+          details: `taskBranch=${taskBranch}, agentBranch=${agentBranch}`,
+          success: true,
+          durationMs: Date.now() - startTime,
+        });
+
+        return { success: true };
+      }
+
+      // コンフリクトが発生した場合
+      const hasConflicts = await this.hasConflicts(options);
+      if (hasConflicts) {
+        // 自動解決を試行
+        const autoResolveResult = await this.attemptAutoResolve(options);
+
+        if (autoResolveResult.success) {
+          // 自動解決成功、コミットを作成
+          await this.commit(`Merge ${taskBranch} into ${agentBranch} (auto-resolved)`, options);
+
+          await this.logOperation({
+            timestamp: new Date().toISOString(),
+            operation: 'mergeToAgentBranch',
+            details: `taskBranch=${taskBranch}, agentBranch=${agentBranch}, autoResolved=true`,
+            success: true,
+            durationMs: Date.now() - startTime,
+          });
+
+          return { success: true, autoResolved: true };
+        }
+
+        // 自動解決失敗、コンフリクトレポートを生成
+        const conflictReport = await this.generateConflictReport(options);
+
+        await this.logOperation({
+          timestamp: new Date().toISOString(),
+          operation: 'mergeToAgentBranch',
+          details: `taskBranch=${taskBranch}, agentBranch=${agentBranch}, conflicts=${conflictReport.totalConflicts}`,
+          success: false,
+          error: 'Merge conflicts require manual resolution',
+          durationMs: Date.now() - startTime,
+        });
+
+        return { success: false, conflictReport };
+      }
+
+      // その他のマージエラー
+      throw new Error(`git merge failed: ${mergeResult.stderr}`);
+    } catch (error) {
+      await this.logOperation({
+        timestamp: new Date().toISOString(),
+        operation: 'mergeToAgentBranch',
+        details: `taskBranch=${taskBranch}, agentBranch=${agentBranch}`,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        durationMs: Date.now() - startTime,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * コンフリクトをReviewer Agentにエスカレーション
+   *
+   * コンフリクトの詳細情報を含むエスカレーションメッセージを生成する。
+   *
+   * @param conflictReport - コンフリクトレポート
+   * @param ticketId - 関連するチケットID
+   * @returns エスカレーションメッセージ
+   *
+   * @see Requirement 4.6: IF auto-resolution fails, THE Git_Manager SHALL escalate to Reviewer_Agent with conflict details
+   */
+  escalateConflict(
+    conflictReport: ConflictReport,
+    ticketId: string
+  ): {
+    type: 'conflict_escalation';
+    ticketId: string;
+    branch: string;
+    totalConflicts: number;
+    files: ConflictFileInfo[];
+    summary: string;
+    timestamp: string;
+  } {
+    return {
+      type: 'conflict_escalation',
+      ticketId,
+      branch: conflictReport.branch,
+      totalConflicts: conflictReport.totalConflicts,
+      files: conflictReport.files,
+      summary: conflictReport.summary,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
    * リモートにプッシュ
    *
    * @param branchName - プッシュするブランチ名
@@ -545,7 +763,6 @@ export class GitManager {
       throw error;
     }
   }
-
 
   // ===========================================================================
   // ステータス取得
@@ -858,7 +1075,7 @@ export class GitManager {
       timestamp: new Date().toISOString(),
       branch: status.branch,
       totalConflicts: conflicts.length,
-      files: conflicts.map(c => ({
+      files: conflicts.map((c) => ({
         path: c.file,
         hasBase: c.base !== '',
         hasOurs: c.ours !== '',
@@ -911,12 +1128,10 @@ export class GitManager {
       return 'コンフリクトはありません。';
     }
 
-    const autoResolvable = conflicts.filter(c => this.isAutoResolvable(c)).length;
+    const autoResolvable = conflicts.filter((c) => this.isAutoResolvable(c)).length;
     const needsManual = conflicts.length - autoResolvable;
 
-    const parts: string[] = [
-      `合計 ${conflicts.length} 件のコンフリクトが検出されました。`,
-    ];
+    const parts: string[] = [`合計 ${conflicts.length} 件のコンフリクトが検出されました。`];
 
     if (autoResolvable > 0) {
       parts.push(`${autoResolvable} 件は自動解決可能です。`);
@@ -1060,7 +1275,10 @@ export class GitManager {
     const env: Record<string, string> = { ...additionalEnv };
 
     // SSH接続時のknown_hostsファイルを指定
-    if (this.credentialProvider?.type === 'deploy_key' || this.credentialProvider?.type === 'ssh_agent') {
+    if (
+      this.credentialProvider?.type === 'deploy_key' ||
+      this.credentialProvider?.type === 'ssh_agent'
+    ) {
       env.GIT_SSH_COMMAND = `ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=${this.knownHostsPath}`;
     }
 
@@ -1088,7 +1306,7 @@ export class GitManager {
     const untracked: string[] = [];
     const conflicts: string[] = [];
 
-    const lines = output.split('\n').filter(line => line.trim());
+    const lines = output.split('\n').filter((line) => line.trim());
 
     for (const line of lines) {
       const indexStatus = line[0];
@@ -1096,9 +1314,12 @@ export class GitManager {
       const filePath = line.substring(3).trim();
 
       // コンフリクト（UU, AA, DD など）
-      if (indexStatus === 'U' || workTreeStatus === 'U' ||
-          (indexStatus === 'A' && workTreeStatus === 'A') ||
-          (indexStatus === 'D' && workTreeStatus === 'D')) {
+      if (
+        indexStatus === 'U' ||
+        workTreeStatus === 'U' ||
+        (indexStatus === 'A' && workTreeStatus === 'A') ||
+        (indexStatus === 'D' && workTreeStatus === 'D')
+      ) {
         conflicts.push(filePath);
         continue;
       }
@@ -1182,7 +1403,7 @@ export class GitManager {
       }
 
       // 新しいキーを追加
-      const newKeys = keys.filter(key => !existingContent.includes(key));
+      const newKeys = keys.filter((key) => !existingContent.includes(key));
       if (newKeys.length > 0) {
         const content = existingContent + '\n' + newKeys.join('\n') + '\n';
         await fs.writeFile(this.knownHostsPath, content.trim() + '\n', 'utf-8');
@@ -1228,10 +1449,7 @@ export class GitManager {
    * @returns フォーマットされたログ行
    */
   private formatLogEntry(entry: GitLogEntry): string {
-    const parts: string[] = [
-      `[${entry.timestamp}]`,
-      `[${entry.operation}]`,
-    ];
+    const parts: string[] = [`[${entry.timestamp}]`, `[${entry.operation}]`];
 
     if (entry.details) {
       parts.push(entry.details);

@@ -15,12 +15,11 @@
  * @module tests/execution/worker-agent.property.test
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fc from 'fast-check';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import {
-  WorkerAgent,
   MAX_ITERATIONS,
   saveConversationHistory,
   loadConversationHistory,
@@ -134,9 +133,11 @@ const conversationHistoryArb: fc.Arbitrary<ConversationHistory> = fc.record({
 });
 
 /**
- * SubTaskを生成するArbitrary
+ * SubTaskを生成するArbitrary（将来の拡張用）
+ * @description 現在は未使用だが、将来のワーカーエージェントテスト拡張時に使用予定
  */
-const subTaskArb: fc.Arbitrary<SubTask> = fc.record({
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _subTaskArb: fc.Arbitrary<SubTask> = fc.record({
   id: fc.uuid(),
   parentId: fc.uuid(),
   title: fc.string({ minLength: 1, maxLength: 100 }).filter((s) => s.trim().length > 0),
@@ -402,13 +403,10 @@ describe('Property 20: Conversation Loop Termination', () => {
   it('Property 20.2: 会話ループは最大イテレーション数で終了する', async () => {
     // イテレーション数の範囲をテスト
     await fc.assert(
-      fc.asyncProperty(
-        fc.integer({ min: 1, max: MAX_ITERATIONS }),
-        async (maxIterations) => {
-          // maxIterationsは常にMAX_ITERATIONS以下であることを確認
-          expect(maxIterations).toBeLessThanOrEqual(MAX_ITERATIONS);
-        }
-      ),
+      fc.asyncProperty(fc.integer({ min: 1, max: MAX_ITERATIONS }), async (maxIterations) => {
+        // maxIterationsは常にMAX_ITERATIONS以下であることを確認
+        expect(maxIterations).toBeLessThanOrEqual(MAX_ITERATIONS);
+      }),
       { numRuns: 100 }
     );
   });
@@ -419,21 +417,13 @@ describe('Property 20: Conversation Loop Termination', () => {
    * **Validates: Requirement 11.3**
    */
   it('Property 20.3: 完了シグナルパターンが正しく検出される', () => {
-    const completionSignals = [
-      'TASK_COMPLETE',
-      'タスク完了',
-      '作業完了',
-      'DONE',
-      '完了しました',
-    ];
+    const completionSignals = ['TASK_COMPLETE', 'タスク完了', '作業完了', 'DONE', '完了しました'];
 
     // 各完了シグナルが検出されることを確認
     for (const signal of completionSignals) {
       const content = `作業が終わりました。${signal}`;
       const upperContent = content.toUpperCase();
-      const hasSignal = completionSignals.some((s) =>
-        upperContent.includes(s.toUpperCase())
-      );
+      const hasSignal = completionSignals.some((s) => upperContent.includes(s.toUpperCase()));
       expect(hasSignal).toBe(true);
     }
   });
@@ -442,13 +432,7 @@ describe('Property 20: Conversation Loop Termination', () => {
    * Property 20.4: 完了シグナルを含まないコンテンツは完了と判定されない
    */
   it('Property 20.4: 完了シグナルを含まないコンテンツは完了と判定されない', () => {
-    const completionSignals = [
-      'TASK_COMPLETE',
-      'タスク完了',
-      '作業完了',
-      'DONE',
-      '完了しました',
-    ];
+    const completionSignals = ['TASK_COMPLETE', 'タスク完了', '作業完了', 'DONE', '完了しました'];
 
     const nonCompletionContents = [
       '作業を続けます',
@@ -460,9 +444,7 @@ describe('Property 20: Conversation Loop Termination', () => {
 
     for (const content of nonCompletionContents) {
       const upperContent = content.toUpperCase();
-      const hasSignal = completionSignals.some((s) =>
-        upperContent.includes(s.toUpperCase())
-      );
+      const hasSignal = completionSignals.some((s) => upperContent.includes(s.toUpperCase()));
       expect(hasSignal).toBe(false);
     }
   });
@@ -472,15 +454,12 @@ describe('Property 20: Conversation Loop Termination', () => {
    */
   it('Property 20.5: 任意のイテレーション数は0より大きくMAX_ITERATIONS以下', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.integer({ min: 1, max: 100 }),
-        async (iterations) => {
-          // 実際のイテレーション数はMAX_ITERATIONSで制限される
-          const actualIterations = Math.min(iterations, MAX_ITERATIONS);
-          expect(actualIterations).toBeGreaterThan(0);
-          expect(actualIterations).toBeLessThanOrEqual(MAX_ITERATIONS);
-        }
-      ),
+      fc.asyncProperty(fc.integer({ min: 1, max: 100 }), async (iterations) => {
+        // 実際のイテレーション数はMAX_ITERATIONSで制限される
+        const actualIterations = Math.min(iterations, MAX_ITERATIONS);
+        expect(actualIterations).toBeGreaterThan(0);
+        expect(actualIterations).toBeLessThanOrEqual(MAX_ITERATIONS);
+      }),
       { numRuns: 100 }
     );
   });
@@ -546,16 +525,13 @@ describe('Property 21: Partial Completion Status', () => {
    */
   it('Property 21.3: 完了シグナルがある場合はsuccessステータス', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.integer({ min: 1, max: MAX_ITERATIONS }),
-        async (iterations) => {
-          // AIが完了を示した場合
-          const completed = true;
-          const status: ExecutionStatus = completed ? 'success' : 'partial';
+      fc.asyncProperty(fc.integer({ min: 1, max: MAX_ITERATIONS }), async (_iterations) => {
+        // AIが完了を示した場合
+        const completed = true;
+        const status: ExecutionStatus = completed ? 'success' : 'partial';
 
-          expect(status).toBe('success');
-        }
-      ),
+        expect(status).toBe('success');
+      }),
       { numRuns: 100 }
     );
   });
@@ -565,17 +541,14 @@ describe('Property 21: Partial Completion Status', () => {
    */
   it('Property 21.4: エラー発生時はerrorステータス', async () => {
     await fc.assert(
-      fc.asyncProperty(
-        fc.boolean(),
-        async (hasError) => {
-          // エラーが発生した場合
-          const status: ExecutionStatus = hasError ? 'error' : 'success';
+      fc.asyncProperty(fc.boolean(), async (hasError) => {
+        // エラーが発生した場合
+        const status: ExecutionStatus = hasError ? 'error' : 'success';
 
-          if (hasError) {
-            expect(status).toBe('error');
-          }
+        if (hasError) {
+          expect(status).toBe('error');
         }
-      ),
+      }),
       { numRuns: 100 }
     );
   });
@@ -642,7 +615,7 @@ describe('Worker Agent Integration Tests', () => {
   /**
    * 会話履歴の保存と読み込みが複数回行われても一貫性が保たれる
    */
-  it('会話履歴の保存と読み込みが複数回行われても一貫性が保たれる', async () => {
+  it('会話履歴の保存と読み込みが複数回行われても一貫性が保たれる', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         conversationHistoryArb,

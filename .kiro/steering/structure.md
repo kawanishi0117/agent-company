@@ -104,6 +104,10 @@ agent-company/
 │   │       │   ├── process-monitor.ts
 │   │       │   ├── message-queue.ts
 │   │       │   ├── project-manager.ts
+│   │       │   ├── ticket-manager.ts      # チケット階層管理
+│   │       │   ├── worker-type-registry.ts # ワーカータイプ定義
+│   │       │   ├── pr-creator.ts          # PR作成
+│   │       │   ├── review-workflow.ts     # レビューワークフロー
 │   │       │   ├── tools.ts
 │   │       │   └── agents/      # エージェント実装
 │   │       │       ├── manager-agent.ts
@@ -216,13 +220,21 @@ agent-company/
 │   ├── cli-workflow.spec.ts
 │   ├── execution-engine.spec.ts
 │   ├── governance.spec.ts
-│   └── gui.spec.ts
+│   ├── gui.spec.ts
+│   ├── ticket-workflow.spec.ts      # チケットワークフローE2E
+│   └── project-management.spec.ts   # プロジェクト管理E2E
 │
 ├── workspaces/                  # 対象案件管理
 │   └── projects.json
 │
+├── scripts/                     # 起動・停止スクリプト
+│   ├── start.ps1                # ワンコマンド起動（Windows）
+│   ├── start.sh                 # ワンコマンド起動（Linux/macOS）
+│   ├── stop.ps1                 # 一括停止（Windows）
+│   └── stop.sh                  # 一括停止（Linux/macOS）
+│
 ├── coverage/                    # カバレッジレポート
-├── Makefile                     # 統一コマンド
+├── Makefile                     # 統一コマンド（make up/down/status含む）
 ├── package.json
 ├── tsconfig.json
 ├── vitest.config.ts
@@ -233,56 +245,62 @@ agent-company/
 
 ## 境界の意図
 
-| ディレクトリ   | 役割                           | 変更頻度 | 所有者           |
-| -------------- | ------------------------------ | -------- | ---------------- |
-| `docs/company/`| 会社規程（プロンプトより上位） | 低       | Quality Authority |
-| `docs/specs/`  | 正式仕様書                     | 低       | COO/PM           |
-| `agents/`      | 採用・人格定義                 | 中       | Hiring Manager   |
-| `tools/`       | 実行手段（CLI/インストーラ）   | 高       | Developer        |
-| `infra/`       | Docker/隔離/権限               | 低       | システム管理者   |
-| `runtime/`     | ログ・成果物                   | 自動生成 | -                |
-| `gui/`         | 可視化UI                       | 中       | Developer        |
-| `workflows/`   | 作業管理                       | 高       | COO/PM           |
+| ディレクトリ    | 役割                           | 変更頻度 | 所有者            |
+| --------------- | ------------------------------ | -------- | ----------------- |
+| `docs/company/` | 会社規程（プロンプトより上位） | 低       | Quality Authority |
+| `docs/specs/`   | 正式仕様書                     | 低       | COO/PM            |
+| `agents/`       | 採用・人格定義                 | 中       | Hiring Manager    |
+| `tools/`        | 実行手段（CLI/インストーラ）   | 高       | Developer         |
+| `infra/`        | Docker/隔離/権限               | 低       | システム管理者    |
+| `runtime/`      | ログ・成果物                   | 自動生成 | -                 |
+| `gui/`          | 可視化UI                       | 中       | Developer         |
+| `workflows/`    | 作業管理                       | 高       | COO/PM            |
 
 ## 重要な設計原則
 
 ### 1. 採用と実行を分離
+
 - `agents/registry/`: エージェント定義（YAML）
 - `tools/adapters/`: AI実行アダプタ（TypeScript）
 - 混ぜない
 
 ### 2. 成果物集約
+
 - 全ての実行結果は `runtime/runs/<run-id>/` に保存
 - 構造: `logs.txt`, `report.md`, `result.json`, `judgment.json`
 
 ### 3. 例外のファイル化
+
 - `workflows/waivers/` に期限付きで記録
 - 必須項目: 期限、理由、代替策、フォロータスク
 
 ### 4. 許可リスト集約
+
 - `tools/installers/allowlist/` で一元管理
 - 新規追加はWaiver申請 → セキュリティレビュー → 承認後追加
 
 ### 5. 状態の永続化
+
 - `runtime/state/config.json`: システム設定
 - `runtime/state/bus/`: Agent Bus状態
 - `runtime/state/runs/`: 実行状態
 
 ## ファイル命名規則
 
-| 種別               | パターン                    | 例                           |
-| ------------------ | --------------------------- | ---------------------------- |
-| TypeScriptソース   | `kebab-case.ts`             | `agent-bus.ts`               |
-| テストファイル     | `*.test.ts`                 | `orchestrator.test.ts`       |
-| Property-based     | `*.property.test.ts`        | `agent-bus.property.test.ts` |
-| E2Eテスト          | `*.spec.ts`                 | `cli-workflow.spec.ts`       |
-| エージェント定義   | `snake_case.yaml`           | `coo_pm.yaml`                |
-| チケット           | `NNNN-title.md`             | `0001-sample.md`             |
-| 実行ディレクトリ   | `YYYY-MM-DD-HHMMSS-<id>`    | `2026-01-27-151426-q3me`     |
+| 種別             | パターン                 | 例                           |
+| ---------------- | ------------------------ | ---------------------------- |
+| TypeScriptソース | `kebab-case.ts`          | `agent-bus.ts`               |
+| テストファイル   | `*.test.ts`              | `orchestrator.test.ts`       |
+| Property-based   | `*.property.test.ts`     | `agent-bus.property.test.ts` |
+| E2Eテスト        | `*.spec.ts`              | `cli-workflow.spec.ts`       |
+| エージェント定義 | `snake_case.yaml`        | `coo_pm.yaml`                |
+| チケット         | `NNNN-title.md`          | `0001-sample.md`             |
+| 実行ディレクトリ | `YYYY-MM-DD-HHMMSS-<id>` | `2026-01-27-151426-q3me`     |
 
 ## インポートパス
 
 ### CLI（ESM）
+
 ```typescript
 // 相対パス + .js 拡張子
 import { parseTicket } from './ticket.js';
@@ -290,6 +308,7 @@ import { StateManager } from './lib/execution/state-manager.js';
 ```
 
 ### GUI（Next.js）
+
 ```typescript
 // パスエイリアス
 import { Button } from '@/components/ui/Button';

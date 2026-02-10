@@ -6,10 +6,7 @@
  * @see Requirements: 22.5, 22.6
  */
 
-import {
-  createProjectManager,
-  ProjectManagerError,
-} from '../lib/execution/project-manager.js';
+import { createProjectManager, ProjectManagerError } from '../lib/execution/project-manager.js';
 
 // =============================================================================
 // ヘルプ表示
@@ -32,6 +29,8 @@ export function showProjectHelp(): void {
 オプション:
   --branch <name>       デフォルトブランチ（デフォルト: main）
   --integration <name>  統合ブランチ（デフォルト: develop）
+  --base-branch <name>  PRの作成先ブランチ（デフォルト: main）
+  --agent-branch <name> エージェント作業用ブランチ（デフォルト: agent/<project-id>）
   --workdir <path>      作業ディレクトリ
   --json                JSON形式で出力
   --help, -h            このヘルプを表示
@@ -41,6 +40,7 @@ export function showProjectHelp(): void {
   project list --json
   project add my-app https://github.com/user/my-app.git
   project add my-app https://github.com/user/my-app.git --branch main --integration develop
+  project add my-app https://github.com/user/my-app.git --base-branch main --agent-branch agent/my-app
   project remove my-app-abc12345
   project show my-app-abc12345
 `);
@@ -60,6 +60,10 @@ interface AddOptions {
   integrationBranch?: string;
   /** 作業ディレクトリ */
   workDir?: string;
+  /** PRの作成先ブランチ（デフォルト: 'main'） */
+  baseBranch?: string;
+  /** エージェント作業用ブランチ（デフォルト: 'agent/<project-id>'） */
+  agentBranch?: string;
 }
 
 /**
@@ -100,6 +104,18 @@ function parseAddOptions(args: string[]): AddOptions {
         throw new Error('--workdir オプションにはパスが必要です');
       }
       options.workDir = value;
+    } else if (arg === '--base-branch') {
+      const value = args[++i];
+      if (!value || value.startsWith('--')) {
+        throw new Error('--base-branch オプションにはブランチ名が必要です');
+      }
+      options.baseBranch = value;
+    } else if (arg === '--agent-branch') {
+      const value = args[++i];
+      if (!value || value.startsWith('--')) {
+        throw new Error('--agent-branch オプションにはブランチ名が必要です');
+      }
+      options.agentBranch = value;
     }
   }
 
@@ -189,11 +205,7 @@ async function listProjects(options: ListOptions): Promise<void> {
  *
  * @see Requirement 22.6: `npx tsx tools/cli/agentcompany.ts project add <name> <git-url>` SHALL register project
  */
-async function addProject(
-  name: string,
-  gitUrl: string,
-  options: AddOptions
-): Promise<void> {
+async function addProject(name: string, gitUrl: string, options: AddOptions): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`\n➕ プロジェクトを追加: ${name}`);
   // eslint-disable-next-line no-console
@@ -346,7 +358,11 @@ export async function handleProjectCommand(args: string[]): Promise<void> {
           positionalArgs.push(args[i]);
         } else {
           // オプションの値をスキップ
-          if (['--branch', '--integration', '--workdir'].includes(args[i])) {
+          if (
+            ['--branch', '--integration', '--workdir', '--base-branch', '--agent-branch'].includes(
+              args[i]
+            )
+          ) {
             i++;
           }
         }

@@ -3,9 +3,12 @@
  *
  * M6: Agent Execution Engineで使用される全ての型定義を集約
  * - タスク管理、実行結果、エージェント設定、システム設定に関する型
+ * - チケット階層構造（Parent/Child/Grandchild）
+ * - ワーカータイプ定義
+ * - レビュー結果
  *
  * @module execution/types
- * @see Requirements: 20.1, 20.2, 20.4
+ * @see Requirements: 20.1, 20.2, 20.4, 2.5, 2.6, 2.7, 3.1, 5.2
  */
 
 // =============================================================================
@@ -57,25 +60,25 @@ export type PullRequestId = string;
  * @description 親タスクの状態を表す列挙型
  */
 export type TaskStatus =
-  | 'pending'      // 待機中
-  | 'decomposing'  // 分解中
-  | 'executing'    // 実行中
-  | 'reviewing'    // レビュー中
-  | 'completed'    // 完了
-  | 'failed';      // 失敗
+  | 'pending' // 待機中
+  | 'decomposing' // 分解中
+  | 'executing' // 実行中
+  | 'reviewing' // レビュー中
+  | 'completed' // 完了
+  | 'failed'; // 失敗
 
 /**
  * サブタスクステータス
  * @description サブタスクの状態を表す列挙型
  */
 export type SubTaskStatus =
-  | 'pending'       // 待機中
-  | 'assigned'      // 割り当て済み
-  | 'running'       // 実行中
+  | 'pending' // 待機中
+  | 'assigned' // 割り当て済み
+  | 'running' // 実行中
   | 'quality_check' // 品質チェック中
-  | 'completed'     // 完了
-  | 'failed'        // 失敗
-  | 'blocked';      // ブロック中
+  | 'completed' // 完了
+  | 'failed' // 失敗
+  | 'blocked'; // ブロック中
 
 /**
  * 実行結果ステータス
@@ -83,10 +86,10 @@ export type SubTaskStatus =
  * @see Requirement 20.4: THE status field SHALL be one of: success, partial, quality_failed, error
  */
 export type ExecutionStatus =
-  | 'success'        // 成功
-  | 'partial'        // 部分完了（最大イテレーション到達）
+  | 'success' // 成功
+  | 'partial' // 部分完了（最大イテレーション到達）
   | 'quality_failed' // 品質ゲート失敗
-  | 'error';         // エラー
+  | 'error'; // エラー
 
 // =============================================================================
 // タスク関連の型定義
@@ -430,7 +433,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
 
   // AI設定
   defaultAiAdapter: 'ollama',
-  defaultModel: 'llama3',
+  defaultModel: 'llama3.2:1b',
 
   // コンテナランタイム設定
   containerRuntime: 'dod',
@@ -542,14 +545,18 @@ export interface ConversationHistory {
 /**
  * エージェントメッセージ種別
  * @description エージェント間で送受信されるメッセージの種類
+ * @see Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 4.6
  */
 export type AgentMessageType =
-  | 'task_assign'      // タスク割り当て
-  | 'task_complete'    // タスク完了
-  | 'task_failed'      // タスク失敗
-  | 'escalate'         // エスカレーション
-  | 'status_request'   // ステータス要求
-  | 'status_response'; // ステータス応答
+  | 'task_assign' // タスク割り当て
+  | 'task_complete' // タスク完了
+  | 'task_failed' // タスク失敗
+  | 'escalate' // エスカレーション
+  | 'status_request' // ステータス要求
+  | 'status_response' // ステータス応答
+  | 'review_request' // レビュー要求
+  | 'review_response' // レビュー応答
+  | 'conflict_escalate'; // コンフリクトエスカレーション
 
 /**
  * エージェントメッセージ
@@ -795,7 +802,6 @@ export const VALID_EXECUTION_STATUSES: ExecutionStatus[] = [
   'error',
 ];
 
-
 // =============================================================================
 // システム設定バリデーション
 // =============================================================================
@@ -985,4 +991,775 @@ export function mergeWithDefaultConfig(partialConfig: Partial<SystemConfig>): Sy
     ...DEFAULT_SYSTEM_CONFIG,
     ...partialConfig,
   };
+}
+
+// =============================================================================
+// チケット階層構造の型定義
+// @see Requirements: 2.5, 2.6, 2.7, 2.8
+// =============================================================================
+
+/**
+ * チケットステータス
+ * @description チケットの状態を表す列挙型
+ * @see Requirement 2.8: WHEN a ticket status changes, THE Ticket_Manager SHALL propagate status updates
+ */
+export type TicketStatus =
+  | 'pending' // 待機中
+  | 'decomposing' // 分解中
+  | 'in_progress' // 実行中
+  | 'review_requested' // レビュー待ち
+  | 'revision_required' // 修正要求
+  | 'completed' // 完了
+  | 'failed' // 失敗
+  | 'pr_created'; // PR作成済み
+
+/**
+ * 有効なチケットステータス一覧
+ */
+export const VALID_TICKET_STATUSES: TicketStatus[] = [
+  'pending',
+  'decomposing',
+  'in_progress',
+  'review_requested',
+  'revision_required',
+  'completed',
+  'failed',
+  'pr_created',
+];
+
+/**
+ * 親チケットメタデータ
+ * @description 親チケットに付随するメタ情報
+ */
+export interface ParentTicketMetadata {
+  /** 優先度 */
+  priority: 'low' | 'medium' | 'high';
+  /** 期限（ISO8601形式、オプション） */
+  deadline?: string;
+  /** タグ一覧 */
+  tags: string[];
+}
+
+/**
+ * 親チケット（社長の指示）
+ * @description 社長（ユーザー）からの指示を表す親チケット
+ * @see Requirement 2.5: THE Parent_Ticket SHALL contain: id, projectId, instruction, status, createdAt, childTickets[]
+ */
+export interface ParentTicket {
+  /** チケットID（形式: <project-id>-<sequence>） */
+  id: string;
+  /** プロジェクトID */
+  projectId: string;
+  /** 社長からの指示 */
+  instruction: string;
+  /** チケットステータス */
+  status: TicketStatus;
+  /** 作成日時（ISO8601形式） */
+  createdAt: string;
+  /** 更新日時（ISO8601形式） */
+  updatedAt: string;
+  /** 子チケット一覧 */
+  childTickets: ChildTicket[];
+  /** メタデータ */
+  metadata: ParentTicketMetadata;
+}
+
+/**
+ * 親チケットの必須フィールド一覧
+ * @see Requirement 2.5
+ */
+export const PARENT_TICKET_REQUIRED_FIELDS: (keyof ParentTicket)[] = [
+  'id',
+  'projectId',
+  'instruction',
+  'status',
+  'createdAt',
+  'childTickets',
+];
+
+/**
+ * 子チケット（部長が分解）
+ * @description Manager Agentが分解した子チケット
+ * @see Requirement 2.6: THE Child_Ticket SHALL contain: id, parentId, title, description, status, workerType, grandchildTickets[]
+ */
+export interface ChildTicket {
+  /** チケットID（形式: <parent-id>-<sequence>） */
+  id: string;
+  /** 親チケットID */
+  parentId: string;
+  /** タイトル */
+  title: string;
+  /** 説明 */
+  description: string;
+  /** チケットステータス */
+  status: TicketStatus;
+  /** 担当ワーカータイプ */
+  workerType: WorkerType;
+  /** 作成日時（ISO8601形式） */
+  createdAt: string;
+  /** 更新日時（ISO8601形式） */
+  updatedAt: string;
+  /** 孫チケット一覧 */
+  grandchildTickets: GrandchildTicket[];
+}
+
+/**
+ * 子チケットの必須フィールド一覧
+ * @see Requirement 2.6
+ */
+export const CHILD_TICKET_REQUIRED_FIELDS: (keyof ChildTicket)[] = [
+  'id',
+  'parentId',
+  'title',
+  'description',
+  'status',
+  'workerType',
+  'grandchildTickets',
+];
+
+/**
+ * 孫チケット（実作業）
+ * @description 実際の作業単位となる孫チケット
+ * @see Requirement 2.7: THE Grandchild_Ticket SHALL contain: id, parentId, title, description, acceptanceCriteria[], status, assignee, gitBranch, artifacts[]
+ */
+export interface GrandchildTicket {
+  /** チケットID（形式: <child-id>-<sequence>） */
+  id: string;
+  /** 親チケットID（子チケットのID） */
+  parentId: string;
+  /** タイトル */
+  title: string;
+  /** 説明 */
+  description: string;
+  /** 受け入れ基準一覧 */
+  acceptanceCriteria: string[];
+  /** チケットステータス */
+  status: TicketStatus;
+  /** 割り当てられたワーカーID（オプション） */
+  assignee?: string;
+  /** 作業ブランチ名（オプション） */
+  gitBranch?: string;
+  /** 成果物パス一覧 */
+  artifacts: string[];
+  /** レビュー結果（オプション） */
+  reviewResult?: ReviewResult;
+  /** 作成日時（ISO8601形式） */
+  createdAt: string;
+  /** 更新日時（ISO8601形式） */
+  updatedAt: string;
+}
+
+/**
+ * 孫チケットの必須フィールド一覧
+ * @see Requirement 2.7
+ */
+export const GRANDCHILD_TICKET_REQUIRED_FIELDS: (keyof GrandchildTicket)[] = [
+  'id',
+  'parentId',
+  'title',
+  'description',
+  'acceptanceCriteria',
+  'status',
+  'artifacts',
+];
+
+// =============================================================================
+// ワーカータイプの型定義
+// @see Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
+// =============================================================================
+
+/**
+ * ワーカータイプ
+ * @description エージェントの専門分野を表す列挙型
+ * @see Requirement 3.1: THE System SHALL support the following worker types: research, design, designer, developer, test, reviewer
+ */
+export type WorkerType =
+  | 'research' // 市場調査・技術調査
+  | 'design' // アーキテクチャ設計
+  | 'designer' // UI/UXデザイン
+  | 'developer' // コード実装
+  | 'test' // テスト作成・実行
+  | 'reviewer'; // コードレビュー
+
+/**
+ * 有効なワーカータイプ一覧
+ * @see Requirement 3.1
+ */
+export const VALID_WORKER_TYPES: WorkerType[] = [
+  'research',
+  'design',
+  'designer',
+  'developer',
+  'test',
+  'reviewer',
+];
+
+/**
+ * ワーカータイプ設定
+ * @description 各ワーカータイプの能力・ツール・ペルソナ設定
+ * @see Requirements: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
+ */
+export interface WorkerTypeConfig {
+  /** ワーカータイプ */
+  type: WorkerType;
+  /** 能力一覧 */
+  capabilities: string[];
+  /** 使用可能ツール一覧 */
+  tools: string[];
+  /** ペルソナ（性格・振る舞いの説明） */
+  persona: string;
+  /** AI設定 */
+  aiConfig: {
+    /** アダプタ名 */
+    adapter: string;
+    /** モデル名 */
+    model: string;
+    /** 温度パラメータ */
+    temperature: number;
+  };
+}
+
+/**
+ * ワーカータイプ設定の必須フィールド一覧
+ */
+export const WORKER_TYPE_CONFIG_REQUIRED_FIELDS: (keyof WorkerTypeConfig)[] = [
+  'type',
+  'capabilities',
+  'tools',
+  'persona',
+  'aiConfig',
+];
+
+// =============================================================================
+// レビュー関連の型定義
+// @see Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6
+// =============================================================================
+
+/**
+ * レビューチェックリスト
+ * @description レビュー時のチェック項目
+ * @see Requirement 5.2: THE Reviewer_Agent SHALL check: code quality, test coverage, acceptance criteria fulfillment
+ */
+export interface ReviewChecklist {
+  /** コード品質チェック結果 */
+  codeQuality: boolean;
+  /** テストカバレッジチェック結果 */
+  testCoverage: boolean;
+  /** 受け入れ基準充足チェック結果 */
+  acceptanceCriteria: boolean;
+}
+
+/**
+ * レビュー決定
+ * @description レビュアーの判定結果
+ * @see Requirements: 5.3, 5.4, 5.5
+ */
+export interface ReviewDecision {
+  /** 承認フラグ */
+  approved: boolean;
+  /** フィードバック（却下時は必須） */
+  feedback?: string;
+  /** チェックリスト結果 */
+  checklist: ReviewChecklist;
+}
+
+/**
+ * レビュー結果
+ * @description レビューの完全な結果情報
+ * @see Requirement 5.6: THE Reviewer_Agent SHALL log all review decisions
+ */
+export interface ReviewResult {
+  /** レビュアーID */
+  reviewerId: string;
+  /** 承認フラグ */
+  approved: boolean;
+  /** フィードバック（オプション） */
+  feedback?: string;
+  /** チェックリスト結果 */
+  checklist: ReviewChecklist;
+  /** レビュー日時（ISO8601形式） */
+  reviewedAt: string;
+}
+
+/**
+ * レビュー結果の必須フィールド一覧
+ */
+export const REVIEW_RESULT_REQUIRED_FIELDS: (keyof ReviewResult)[] = [
+  'reviewerId',
+  'approved',
+  'checklist',
+  'reviewedAt',
+];
+
+/**
+ * レビューステータス
+ * @description レビューの状態
+ */
+export type ReviewStatus =
+  | 'pending' // レビュー待ち
+  | 'in_review' // レビュー中
+  | 'approved' // 承認済み
+  | 'rejected'; // 却下
+
+/**
+ * 有効なレビューステータス一覧
+ */
+export const VALID_REVIEW_STATUSES: ReviewStatus[] = [
+  'pending',
+  'in_review',
+  'approved',
+  'rejected',
+];
+
+// =============================================================================
+// チケット永続化の型定義
+// @see Requirement 9.1
+// =============================================================================
+
+/**
+ * チケット永続化データ
+ * @description チケット階層を永続化するためのデータ構造
+ * @see Requirement 9.1: THE System SHALL persist ticket hierarchy to `runtime/state/tickets/<project-id>.json`
+ */
+export interface TicketPersistenceData {
+  /** プロジェクトID */
+  projectId: string;
+  /** 親チケット一覧 */
+  parentTickets: ParentTicket[];
+  /** 最終更新日時（ISO8601形式） */
+  lastUpdated: string;
+}
+
+/**
+ * 実行永続化データ
+ * @description 実行状態を永続化するためのデータ構造
+ * @see Requirement 9.2: THE System SHALL persist execution state to `runtime/state/runs/<run-id>/state.json`
+ */
+export interface ExecutionPersistenceData {
+  /** 実行ID */
+  runId: string;
+  /** チケットID */
+  ticketId: string;
+  /** 実行状態 */
+  status: 'running' | 'paused' | 'completed' | 'failed';
+  /** ワーカー状態マップ */
+  workerStates: Record<string, WorkerState>;
+  /** 会話履歴マップ */
+  conversationHistories: Record<string, ConversationHistory>;
+  /** Gitブランチマップ */
+  gitBranches: Record<string, string>;
+  /** 最終更新日時（ISO8601形式） */
+  lastUpdated: string;
+}
+
+/**
+ * ワーカー状態
+ * @description ワーカーの実行状態
+ */
+export interface WorkerState {
+  /** ワーカーID */
+  workerId: string;
+  /** ワーカータイプ */
+  workerType: WorkerType;
+  /** 現在のステータス */
+  status: WorkerStatus;
+  /** 割り当てられたチケットID */
+  assignedTicketId?: string;
+  /** 最終アクティビティ日時（ISO8601形式） */
+  lastActivity: string;
+}
+
+// =============================================================================
+// 拡張プロジェクトの型定義
+// @see Requirements: 1.1, 1.2, 1.5
+// =============================================================================
+
+/**
+ * 拡張プロジェクト
+ * @description ブランチ設定を含む拡張プロジェクト情報
+ * @see Requirement 1.1: THE Project SHALL include `baseBranch` field for PR target branch (default: 'main')
+ * @see Requirement 1.2: THE Project SHALL include `agentBranch` field for agent work integration branch
+ */
+export interface ExtendedProject extends Project {
+  /** PRの作成先ブランチ（デフォルト: 'main'） */
+  baseBranch: string;
+  /** エージェント作業用ブランチ（デフォルト: 'agent/<project-id>'） */
+  agentBranch: string;
+}
+
+/**
+ * 拡張プロジェクトの必須フィールド一覧
+ * @see Requirements: 1.1, 1.2
+ */
+export const EXTENDED_PROJECT_REQUIRED_FIELDS: (keyof ExtendedProject)[] = [
+  'id',
+  'name',
+  'gitUrl',
+  'defaultBranch',
+  'integrationBranch',
+  'workDir',
+  'createdAt',
+  'lastUsed',
+  'baseBranch',
+  'agentBranch',
+];
+
+/**
+ * プロジェクト登録オプション
+ * @description プロジェクト登録時のオプション（name, gitUrlは別引数で渡す）
+ */
+export interface AddProjectOptions {
+  /** デフォルトブランチ（オプション、デフォルト: 'main'） */
+  defaultBranch?: string;
+  /** 統合ブランチ（オプション、デフォルト: 'develop'） */
+  integrationBranch?: string;
+  /** 作業ディレクトリ（オプション） */
+  workDir?: string;
+}
+
+/**
+ * 拡張プロジェクト登録オプション
+ * @description ブランチ設定を含む拡張プロジェクト登録オプション
+ * @see Requirements: 1.1, 1.2, 1.3
+ */
+export interface ExtendedAddProjectOptions extends AddProjectOptions {
+  /** PRの作成先ブランチ（オプション、デフォルト: 'main'） */
+  baseBranch?: string;
+  /** エージェント作業用ブランチ（オプション、デフォルト: 'agent/<project-id>'） */
+  agentBranch?: string;
+  /**
+   * Git URL検証をスキップするか（オプション、デフォルト: false）
+   * @description テスト時やオフライン環境で使用
+   */
+  skipGitUrlValidation?: boolean;
+  /**
+   * Git URLのアクセシビリティチェックを行うか（オプション、デフォルト: false）
+   * @description trueの場合、git ls-remoteでリモートリポジトリへのアクセスを確認
+   * @see Requirement 1.3
+   */
+  validateAccessibility?: boolean;
+  /**
+   * アクセシビリティチェックのタイムアウト秒数（オプション、デフォルト: 30）
+   */
+  validationTimeoutSeconds?: number;
+}
+
+/**
+ * Git URL検証結果
+ * @description Git URLの形式検証とアクセシビリティチェックの結果
+ * @see Requirement 1.3
+ */
+export interface GitUrlValidationResult {
+  /** 検証が成功したか（形式とアクセシビリティの両方が有効な場合にtrue） */
+  valid: boolean;
+  /** URL形式が有効か */
+  formatValid: boolean;
+  /** リモートリポジトリにアクセス可能か */
+  accessible: boolean;
+  /** エラーメッセージ（検証失敗時） */
+  error?: string;
+}
+
+/**
+ * デフォルトのブランチ設定
+ */
+export const DEFAULT_BRANCH_CONFIG = {
+  /** デフォルトのベースブランチ */
+  baseBranch: 'main',
+  /** エージェントブランチのプレフィックス */
+  agentBranchPrefix: 'agent/',
+} as const;
+
+/**
+ * エージェントブランチ名を生成
+ * @param projectId - プロジェクトID
+ * @returns エージェントブランチ名
+ */
+export function generateAgentBranchName(projectId: string): string {
+  return `${DEFAULT_BRANCH_CONFIG.agentBranchPrefix}${projectId}`;
+}
+
+/**
+ * ExtendedProjectのバリデーション
+ * @param project - バリデーション対象のプロジェクト
+ * @returns バリデーション結果
+ */
+export function validateExtendedProject(project: unknown): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // nullまたはundefinedチェック
+  if (project === null || project === undefined) {
+    return {
+      valid: false,
+      errors: ['プロジェクトがnullまたはundefinedです'],
+      warnings: [],
+    };
+  }
+
+  // オブジェクトチェック
+  if (typeof project !== 'object') {
+    return {
+      valid: false,
+      errors: ['プロジェクトはオブジェクトである必要があります'],
+      warnings: [],
+    };
+  }
+
+  const proj = project as Record<string, unknown>;
+
+  // 必須フィールドのチェック
+  for (const field of EXTENDED_PROJECT_REQUIRED_FIELDS) {
+    if (proj[field] === undefined || proj[field] === null) {
+      errors.push(`必須フィールド '${field}' が存在しません`);
+    }
+  }
+
+  // 文字列フィールドのチェック
+  const stringFields: (keyof ExtendedProject)[] = [
+    'id',
+    'name',
+    'gitUrl',
+    'defaultBranch',
+    'integrationBranch',
+    'workDir',
+    'createdAt',
+    'lastUsed',
+    'baseBranch',
+    'agentBranch',
+  ];
+
+  for (const field of stringFields) {
+    if (proj[field] !== undefined && typeof proj[field] !== 'string') {
+      errors.push(`フィールド '${field}' は文字列である必要があります`);
+    }
+  }
+
+  // agentBranchの形式チェック
+  if (typeof proj.agentBranch === 'string') {
+    if (!proj.agentBranch.startsWith(DEFAULT_BRANCH_CONFIG.agentBranchPrefix)) {
+      warnings.push(
+        `agentBranchは '${DEFAULT_BRANCH_CONFIG.agentBranchPrefix}' で始まることを推奨します`
+      );
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+// =============================================================================
+// エージェントブランチ確保結果
+// =============================================================================
+
+/**
+ * エージェントブランチ確保の結果
+ * @description ensureAgentBranchメソッドの戻り値
+ * @see Requirement 1.4: WHEN a project is registered, THE System SHALL create the agent branch if it does not exist
+ */
+export interface EnsureAgentBranchResult {
+  /** 操作が成功したか */
+  success: boolean;
+  /** ブランチが既に存在していたか */
+  exists: boolean;
+  /** 新しくブランチを作成したか */
+  created: boolean;
+  /** ブランチ名 */
+  branchName: string;
+  /** エラーメッセージ（失敗時） */
+  error?: string;
+}
+
+// =============================================================================
+// 実行ディレクトリ用タスクメタデータ
+// @see Requirements: 2.4, 2.5 (AI Execution Integration)
+// =============================================================================
+
+/**
+ * 実行ディレクトリ用タスクメタデータ
+ *
+ * タスク送信時に `runtime/runs/<run-id>/task.json` に永続化されるメタデータ。
+ * 既存の TaskMetadata（優先度・期限・タグ）とは異なり、
+ * 実行コンテキスト全体を記録する。
+ *
+ * @see Requirement 2.4: WHEN a task is submitted, THE System SHALL create a run directory
+ * @see Requirement 2.5: THE System SHALL persist task metadata to task.json
+ */
+export interface RunTaskMetadata {
+  /** タスクID */
+  taskId: string;
+  /** 実行ID */
+  runId: string;
+  /** プロジェクトID */
+  projectId: string;
+  /** 社長からの指示 */
+  instruction: string;
+  /** タスクステータス */
+  status: TaskStatus;
+  /** 作成日時（ISO8601形式） */
+  createdAt: string;
+  /** 更新日時（ISO8601形式） */
+  updatedAt: string;
+  /** 使用するAIアダプタ名 */
+  aiAdapter: string;
+  /** 使用するAIモデル名 */
+  model: string;
+}
+
+
+// =============================================================================
+// ExecutionReporter関連の型定義
+// @see Requirements: 5.1, 5.2, 5.3, 5.4 (AI Execution Integration)
+// =============================================================================
+
+/**
+ * 変更エントリ
+ * @description 実行中に発生したファイル変更の記録
+ * @see Requirement 5.3: レポートには変更点を含むこと
+ */
+export interface ChangeEntry {
+  /** ファイルパス */
+  path: string;
+  /** アクション種別 */
+  action: 'created' | 'modified' | 'deleted';
+}
+
+/**
+ * テスト結果サマリー
+ * @description lint/testの結果を要約した構造体
+ * @see Requirement 5.3: レポートにはテスト結果を含むこと
+ */
+export interface TestResultSummary {
+  /** lint合格フラグ */
+  lintPassed: boolean;
+  /** lint出力ログ */
+  lintOutput: string;
+  /** test合格フラグ */
+  testPassed: boolean;
+  /** test出力ログ */
+  testOutput: string;
+  /** 総合合格フラグ */
+  overallPassed: boolean;
+}
+
+/**
+ * レポートデータ
+ * @description 実行結果のレポートデータ構造体
+ * @see Requirement 5.1: 完了タスクの成果物を収集すること
+ * @see Requirement 5.2: レポートを生成すること
+ * @see Requirement 5.3: レポートにはtask description, changes, test results, conversation summaryを含むこと
+ * @see Requirement 5.4: 成果物をrunディレクトリに収集すること
+ */
+export interface ReportData {
+  /** 実行ID */
+  runId: string;
+  /** タスク説明 */
+  taskDescription: string;
+  /** 実行ステータス */
+  status: ExecutionStatus;
+  /** 開始日時（ISO8601形式） */
+  startTime: string;
+  /** 終了日時（ISO8601形式） */
+  endTime: string;
+  /** 所要時間（ミリ秒） */
+  duration: number;
+  /** 変更エントリ一覧 */
+  changes: ChangeEntry[];
+  /** テスト結果サマリー */
+  testResults: TestResultSummary;
+  /** 会話サマリー */
+  conversationSummary: string;
+  /** 成果物パス一覧 */
+  artifacts: string[];
+}
+
+// =============================================================================
+// エラーハンドリング強化の型定義
+// @see Requirements: 1.5, 6.1, 6.3, 6.5
+// =============================================================================
+
+/**
+ * エラーハンドリング強化用エラーカテゴリ
+ * @description エラーの分類（error-handler.ts内のErrorCategoryとは別定義）
+ * @see Requirement 6.1
+ */
+export type EnhancedErrorCategory =
+  | 'ai_unavailable'
+  | 'ai_timeout'
+  | 'tool_execution'
+  | 'quality_gate'
+  | 'persistence'
+  | 'validation'
+  | 'unknown';
+
+/**
+ * エラー統計情報
+ * @description 実行中のエラー統計
+ * @see Requirement 6.1
+ */
+export interface ErrorStatistics {
+  /** 実行ID */
+  runId: string;
+  /** カテゴリ別エラー数 */
+  byCategory: Record<string, number>;
+  /** 総エラー数 */
+  totalErrors: number;
+  /** 復旧可能エラー数 */
+  recoverableErrors: number;
+  /** 復旧不可能エラー数 */
+  unrecoverableErrors: number;
+  /** 最初のエラー日時 */
+  firstErrorAt?: string;
+  /** 最後のエラー日時 */
+  lastErrorAt?: string;
+}
+
+/**
+ * 一時停止状態
+ * @description AI利用不可時の一時停止状態
+ * @see Requirement 1.5, 6.3
+ */
+export interface PausedState {
+  /** 実行ID */
+  runId: string;
+  /** 一時停止理由 */
+  reason: string;
+  /** 一時停止日時（ISO8601形式） */
+  pausedAt: string;
+  /** 一時停止時のタスクステータス */
+  taskStatus: TaskStatus;
+  /** 保存された進捗情報 */
+  progress: {
+    /** 完了したサブタスク数 */
+    completedSubTasks: number;
+    /** 総サブタスク数 */
+    totalSubTasks: number;
+    /** 最後に処理したサブタスクID */
+    lastProcessedSubTaskId?: string;
+  };
+  /** リカバリー手順 */
+  recoveryInstructions: string;
+}
+
+/**
+ * 失敗レポートデータ
+ * @description 永続的失敗時のレポートデータ
+ * @see Requirement 6.5
+ */
+export interface FailureReportData {
+  /** 実行ID */
+  runId: string;
+  /** タスク説明 */
+  taskDescription: string;
+  /** エラー一覧 */
+  errors: ErrorInfo[];
+  /** 失敗日時（ISO8601形式） */
+  failedAt: string;
+  /** 推奨アクション */
+  recommendedActions: string[];
+  /** リカバリー手順 */
+  recoverySteps: string[];
 }

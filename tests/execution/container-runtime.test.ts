@@ -193,7 +193,9 @@ describe('ContainerRuntime', () => {
       });
 
       it('docker cp コマンドを拒否する', () => {
-        const result = containerRuntime.validateDockerCommand('docker cp file.txt container-id:/app/');
+        const result = containerRuntime.validateDockerCommand(
+          'docker cp file.txt container-id:/app/'
+        );
 
         expect(result.valid).toBe(false);
         expect(result.error).toContain('not allowed');
@@ -249,7 +251,9 @@ describe('ContainerRuntime', () => {
       });
 
       it('docker commit コマンドを拒否する', () => {
-        const result = containerRuntime.validateDockerCommand('docker commit container-id my-image');
+        const result = containerRuntime.validateDockerCommand(
+          'docker commit container-id my-image'
+        );
 
         expect(result.valid).toBe(false);
         expect(result.error).toContain('not allowed');
@@ -273,7 +277,9 @@ describe('ContainerRuntime', () => {
       });
 
       it('docker export コマンドを拒否する', () => {
-        const result = containerRuntime.validateDockerCommand('docker export container-id > container.tar');
+        const result = containerRuntime.validateDockerCommand(
+          'docker export container-id > container.tar'
+        );
 
         expect(result.valid).toBe(false);
         expect(result.error).toContain('not allowed');
@@ -281,7 +287,9 @@ describe('ContainerRuntime', () => {
       });
 
       it('docker import コマンドを拒否する', () => {
-        const result = containerRuntime.validateDockerCommand('docker import container.tar my-image');
+        const result = containerRuntime.validateDockerCommand(
+          'docker import container.tar my-image'
+        );
 
         expect(result.valid).toBe(false);
         expect(result.error).toContain('not allowed');
@@ -297,7 +305,9 @@ describe('ContainerRuntime', () => {
       });
 
       it('docker secret コマンドを拒否する', () => {
-        const result = containerRuntime.validateDockerCommand('docker secret create my-secret file.txt');
+        const result = containerRuntime.validateDockerCommand(
+          'docker secret create my-secret file.txt'
+        );
 
         expect(result.valid).toBe(false);
         expect(result.error).toContain('not allowed');
@@ -430,20 +440,38 @@ describe('ContainerRuntime', () => {
     });
 
     it('オプション付きコマンドからサブコマンドを抽出する', () => {
-      expect(containerRuntime.extractDockerSubCommand('docker run -d --name test nginx')).toBe('run');
-      expect(containerRuntime.extractDockerSubCommand('docker logs --tail 100 container-id')).toBe('logs');
+      expect(containerRuntime.extractDockerSubCommand('docker run -d --name test nginx')).toBe(
+        'run'
+      );
+      expect(containerRuntime.extractDockerSubCommand('docker logs --tail 100 container-id')).toBe(
+        'logs'
+      );
     });
 
     it('グローバルオプション付きコマンドからサブコマンドを抽出する', () => {
-      expect(containerRuntime.extractDockerSubCommand('docker -H unix:///var/run/docker.sock run nginx')).toBe('run');
-      expect(containerRuntime.extractDockerSubCommand('docker --host tcp://localhost:2375 stop container-id')).toBe('stop');
-      expect(containerRuntime.extractDockerSubCommand('docker -c my-context run nginx')).toBe('run');
-      expect(containerRuntime.extractDockerSubCommand('docker --context my-context run nginx')).toBe('run');
+      expect(
+        containerRuntime.extractDockerSubCommand('docker -H unix:///var/run/docker.sock run nginx')
+      ).toBe('run');
+      expect(
+        containerRuntime.extractDockerSubCommand(
+          'docker --host tcp://localhost:2375 stop container-id'
+        )
+      ).toBe('stop');
+      expect(containerRuntime.extractDockerSubCommand('docker -c my-context run nginx')).toBe(
+        'run'
+      );
+      expect(
+        containerRuntime.extractDockerSubCommand('docker --context my-context run nginx')
+      ).toBe('run');
     });
 
     it('クォート付きコマンドを正しく処理する', () => {
-      expect(containerRuntime.extractDockerSubCommand('docker run -e "VAR=value" nginx')).toBe('run');
-      expect(containerRuntime.extractDockerSubCommand("docker run -e 'VAR=value' nginx")).toBe('run');
+      expect(containerRuntime.extractDockerSubCommand('docker run -e "VAR=value" nginx')).toBe(
+        'run'
+      );
+      expect(containerRuntime.extractDockerSubCommand("docker run -e 'VAR=value' nginx")).toBe(
+        'run'
+      );
     });
 
     it('大文字小文字を区別しない', () => {
@@ -510,8 +538,12 @@ describe('ContainerRuntime', () => {
       });
 
       // 危険なコマンドは依然として拒否される
-      expect(containerRuntime.validateDockerCommand('docker exec -it container bash').valid).toBe(false);
-      expect(containerRuntime.validateDockerCommand('docker cp file container:/').valid).toBe(false);
+      expect(containerRuntime.validateDockerCommand('docker exec -it container bash').valid).toBe(
+        false
+      );
+      expect(containerRuntime.validateDockerCommand('docker cp file container:/').valid).toBe(
+        false
+      );
       expect(containerRuntime.validateDockerCommand('docker network create net').valid).toBe(false);
       expect(containerRuntime.validateDockerCommand('docker volume create vol').valid).toBe(false);
 

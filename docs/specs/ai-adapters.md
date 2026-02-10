@@ -57,9 +57,7 @@ const result = await adapter.generate({
 // チャット
 const chatResult = await adapter.chat({
   model: 'llama3',
-  messages: [
-    { role: 'user', content: 'What is 2+2?' },
-  ],
+  messages: [{ role: 'user', content: 'What is 2+2?' }],
 });
 ```
 
@@ -109,21 +107,24 @@ import { createAdapterFromConfig, AdapterRegistry } from './tools/adapters/index
 const registry = new AdapterRegistry();
 
 // フォールバック付きアダプタを作成
-const adapter = createAdapterFromConfig({
-  primary: 'ollama',
-  fallback: {
-    fallbackAdapter: 'gemini',
-    maxRetries: 3,
-    retryDelayMs: 1000,
+const adapter = createAdapterFromConfig(
+  {
+    primary: 'ollama',
+    fallback: {
+      fallbackAdapter: 'gemini',
+      maxRetries: 3,
+      retryDelayMs: 1000,
+    },
   },
-}, registry);
+  registry
+);
 ```
 
 ## 対応アダプタ
 
-| アダプタ名 | 説明 | ツール呼び出し |
-|-----------|------|---------------|
-| `ollama` | ローカルLLM実行環境 | ✅ (0.3.0以降) |
+| アダプタ名 | 説明                | ツール呼び出し |
+| ---------- | ------------------- | -------------- |
+| `ollama`   | ローカルLLM実行環境 | ✅ (0.3.0以降) |
 
 ### 将来対応予定
 
@@ -181,12 +182,12 @@ interface ToolCall {
 
 ## エラーハンドリング
 
-| エラークラス | 説明 |
-|-------------|------|
-| `AdapterError` | 基本エラークラス |
-| `AdapterConnectionError` | 接続エラー |
-| `AdapterTimeoutError` | タイムアウトエラー |
-| `AdapterFallbackError` | フォールバック失敗エラー |
+| エラークラス             | 説明                     |
+| ------------------------ | ------------------------ |
+| `AdapterError`           | 基本エラークラス         |
+| `AdapterConnectionError` | 接続エラー               |
+| `AdapterTimeoutError`    | タイムアウトエラー       |
+| `AdapterFallbackError`   | フォールバック失敗エラー |
 
 ## ファイル構成
 

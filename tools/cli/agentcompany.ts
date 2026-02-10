@@ -18,6 +18,8 @@ import {
   handleResumeCommand,
 } from './commands/execute.js';
 import { handleProjectCommand } from './commands/project.js';
+import { handleTicketCommand } from './commands/ticket.js';
+import { serverCommand, showServerHelp } from './commands/server.js';
 
 // コマンドライン引数
 const args = process.argv.slice(2);
@@ -47,6 +49,8 @@ AgentCompany CLI
   stop <run-id>           実行を停止
   resume <run-id>         実行を再開
   project <subcommand>    プロジェクト管理
+  ticket <subcommand>     チケット管理
+  server                  Orchestrator APIサーバーを起動（GUI連携用）
   help                    このヘルプを表示
 
 例:
@@ -65,6 +69,13 @@ AgentCompany CLI
   agentcompany resume run-abc123
   agentcompany project list
   agentcompany project add my-app https://github.com/user/my-app.git
+  agentcompany ticket create my-project "新機能を実装してください"
+  agentcompany ticket list my-project
+  agentcompany ticket status my-project-0001
+  agentcompany ticket pause my-project-0001
+  agentcompany ticket resume my-project-0001
+  agentcompany server
+  agentcompany server --port 8080
 `);
 }
 
@@ -227,6 +238,18 @@ async function main(): Promise<void> {
 
     case 'project':
       await handleProjectCommand(args.slice(1));
+      break;
+
+    case 'ticket':
+      await handleTicketCommand(args.slice(1));
+      break;
+
+    case 'server':
+      if (args[1] === '--help' || args[1] === '-h') {
+        showServerHelp();
+      } else {
+        await serverCommand(args.slice(1));
+      }
       break;
 
     case 'help':

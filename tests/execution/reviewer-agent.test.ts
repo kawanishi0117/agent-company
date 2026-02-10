@@ -6,9 +6,8 @@
  * @see Requirements: 4.1, 4.2, 4.3, 4.4
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 
 // =============================================================================
 // モック設定
@@ -68,7 +67,7 @@ import {
   ReviewComment,
 } from '../../tools/cli/lib/execution/agents/reviewer';
 import { ConflictInfo } from '../../tools/cli/lib/execution/types';
-import { getAdapter } from '../../tools/adapters/index';
+// getAdapterはモック設定で使用されるため、直接インポートは不要
 
 // =============================================================================
 // テストスイート
@@ -374,10 +373,7 @@ describe('ReviewerAgent', () => {
     it('コンフリクト分析時にログが記録される', async () => {
       await reviewer.analyzeConflicts(testRunId);
 
-      expect(fs.mkdir).toHaveBeenCalledWith(
-        expect.stringContaining(testRunId),
-        expect.any(Object)
-      );
+      expect(fs.mkdir).toHaveBeenCalledWith(expect.stringContaining(testRunId), expect.any(Object));
       expect(fs.appendFile).toHaveBeenCalled();
     });
 

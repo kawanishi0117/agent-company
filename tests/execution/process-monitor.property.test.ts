@@ -161,18 +161,16 @@ const NORMAL_COMMANDS = [
 // =============================================================================
 
 /**
- * タイムアウト値を生成するArbitrary（1-10秒）
+ * タイムアウト値を生成するArbitrary（2-10秒）
+ * 注意: Windowsでは1秒だとechoコマンドでもタイムアウトする可能性があるため、最小値を2秒に設定
  */
-const timeoutArb: fc.Arbitrary<number> = fc.integer({ min: 1, max: 10 });
+const timeoutArb: fc.Arbitrary<number> = fc.integer({ min: 2, max: 10 });
 
 /**
  * インタラクティブコマンドを生成するArbitrary
  */
 const interactiveCommandArb: fc.Arbitrary<string> = fc
-  .tuple(
-    fc.constantFrom(...INTERACTIVE_COMMANDS),
-    fc.constantFrom(...INTERACTIVE_COMMAND_ARGS)
-  )
+  .tuple(fc.constantFrom(...INTERACTIVE_COMMANDS), fc.constantFrom(...INTERACTIVE_COMMAND_ARGS))
   .map(([cmd, args]) => cmd + args);
 
 /**
@@ -241,9 +239,7 @@ describe('Property 12: Command Timeout Enforcement', () => {
 
     // タイムアウトより長く実行されるコマンド
     // 既存のユニットテストと同じコマンドを使用
-    const command = isWindows
-      ? `ping -n 10 127.0.0.1`
-      : `sleep 10`;
+    const command = isWindows ? `ping -n 10 127.0.0.1` : `sleep 10`;
 
     const result = await processMonitor.execute(command, { timeout });
 

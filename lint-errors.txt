@@ -1,0 +1,370 @@
+﻿
+> agent-company@0.1.0 lint
+> eslint . --ext .ts && cd gui/web && npm run lint && cd ../.. && prettier --check "**/*.{ts,json,md,yaml}" --ignore-path .gitignore
+
+
+D:\develop\agent-company\file.ts
+  1:0  error  Parsing error: Unexpected keyword or identifier
+
+D:\develop\agent-company\tests\adapters\adapter-fallback.property.test.ts
+   13:32  error  'vi' is defined but never used                      @typescript-eslint/no-unused-vars
+   16:3   error  'BaseAdapter' is defined but never used             @typescript-eslint/no-unused-vars
+  328:7   error  'retryDelayArb' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\cli\ticket-command.test.ts
+   11:25  error  'createTicketManager' is defined but never used  @typescript-eslint/no-unused-vars
+  331:73  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+
+D:\develop\agent-company\tests\execution\agent-bus.property.test.ts
+   20:13  error  'path' is defined but never used           @typescript-eslint/no-unused-vars
+   27:3   error  'IMessageQueue' is defined but never used  @typescript-eslint/no-unused-vars
+  783:36  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+  786:36  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+  817:36  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+
+D:\develop\agent-company\tests\execution\agent-bus.test.ts
+    10:55  error  'vi' is defined but never used             @typescript-eslint/no-unused-vars
+    16:3   error  'IAgentBus' is defined but never used      @typescript-eslint/no-unused-vars
+    20:3   error  'IMessageQueue' is defined but never used  @typescript-eslint/no-unused-vars
+   150:19  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+   156:19  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+   174:19  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+   588:47  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+   591:47  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+   683:48  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+   757:48  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+   795:46  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+   862:47  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+  1130:30  error  Unexpected any. Specify a different type   @typescript-eslint/no-explicit-any
+
+D:\develop\agent-company\tests\execution\config-schema.test.ts
+  20:3  error  'MessageQueueType' is defined but never used   @typescript-eslint/no-unused-vars
+  21:3  error  'GitCredentialType' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\decomposer.property.test.ts
+  575:7  error  'decomposer' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  793:7  error  'decomposer' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\error-handler.property.test.ts
+   23:13  error    'path' is defined but never used                       @typescript-eslint/no-unused-vars
+   27:3   error    'DEFAULT_RETRY_CONFIG' is defined but never used       @typescript-eslint/no-unused-vars
+   29:3   error    'RetryResult' is defined but never used                @typescript-eslint/no-unused-vars
+   33:3   error    'FailureHandlingResult' is defined but never used      @typescript-eslint/no-unused-vars
+   34:3   error    'WorkerFailureNotification' is defined but never used  @typescript-eslint/no-unused-vars
+   36:10  error    'TicketStatus' is defined but never used               @typescript-eslint/no-unused-vars
+  132:7   error    'failCountArb' is assigned a value but never used      @typescript-eslint/no-unused-vars
+  156:5   warning  Missing return type on function                        @typescript-eslint/explicit-function-return-type
+  178:5   warning  Missing return type on function                        @typescript-eslint/explicit-function-return-type
+
+D:\develop\agent-company\tests\execution\error-handler.test.ts
+  21:3  error  'RetryResult' is defined but never used                @typescript-eslint/no-unused-vars
+  23:3  error  'ErrorCategory' is defined but never used              @typescript-eslint/no-unused-vars
+  24:3  error  'WorkerFailureNotification' is defined but never used  @typescript-eslint/no-unused-vars
+  25:3  error  'FailureHandlingContext' is defined but never used     @typescript-eslint/no-unused-vars
+  26:3  error  'FailureHandlingResult' is defined but never used      @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\git-credentials.test.ts
+    8:55  error  'vi' is defined but never used            @typescript-eslint/no-unused-vars
+  570:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\develop\agent-company\tests\execution\git-manager.property.test.ts
+  166:7  error  'gitOperationArb' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\integration-workflow.test.ts
+  11:55  error  'vi' is defined but never used                     @typescript-eslint/no-unused-vars
+  21:3   error  'TicketStatus' is defined but never used           @typescript-eslint/no-unused-vars
+  72:11  error  'messageQueue' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\manager-agent.test.ts
+  20:3  error  'WorkerInfo' is defined but never used      @typescript-eslint/no-unused-vars
+  21:3  error  'WorkloadInfo' is defined but never used    @typescript-eslint/no-unused-vars
+  22:3  error  'ScalingConfig' is defined but never used   @typescript-eslint/no-unused-vars
+  25:3  error  'ProgressReport' is defined but never used  @typescript-eslint/no-unused-vars
+  32:3  error  'Project' is defined but never used         @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\merger-agent.test.ts
+   9:59  error  'Mock' is defined but never used  @typescript-eslint/no-unused-vars
+  11:13  error  'path' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\orchestrator.test.ts
+   12:55  error    'vi' is defined but never used                  @typescript-eslint/no-unused-vars
+   19:3   error    'OrchestratorConfig' is defined but never used  @typescript-eslint/no-unused-vars
+   21:3   error    'AgentInfo' is defined but never used           @typescript-eslint/no-unused-vars
+   22:3   error    'TaskStatusDetail' is defined but never used    @typescript-eslint/no-unused-vars
+   27:33  error    'SystemConfig' is defined but never used        @typescript-eslint/no-unused-vars
+  460:34  warning  Missing return type on function                 @typescript-eslint/explicit-function-return-type
+  497:32  warning  Missing return type on function                 @typescript-eslint/explicit-function-return-type
+  500:33  warning  Missing return type on function                 @typescript-eslint/explicit-function-return-type
+
+D:\develop\agent-company\tests\execution\pr-creator.property.test.ts
+  132:7  error  'branchNameArb' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\project-manager.property.test.ts
+  125:7  error  'extendedProjectArb' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\quality-gate.property.test.ts
+   17:13  error  'path' is defined but never used                       @typescript-eslint/no-unused-vars
+   21:3   error  'QualityGateConfig' is defined but never used          @typescript-eslint/no-unused-vars
+   23:3   error  'GateResult' is defined but never used                 @typescript-eslint/no-unused-vars
+   38:7   error  'RUNS_BASE_DIR' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  155:7   error  'customCommandArb' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\quality-gate.test.ts
+  15:3   error  'QualityGateConfig' is defined but never used  @typescript-eslint/no-unused-vars
+  17:3   error  'GateResult' is defined but never used         @typescript-eslint/no-unused-vars
+  19:10  error  'QualityGateResult' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\review-workflow.property.test.ts
+  16:55  error  'vi' is defined but never used                   @typescript-eslint/no-unused-vars
+  23:3   error  'ReviewSubmitOptions' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\reviewer-agent.test.ts
+  11:13  error  'path' is defined but never used        @typescript-eslint/no-unused-vars
+  71:10  error  'getAdapter' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\state-manager.property.test.ts
+  17:13  error  'path' is defined but never used                    @typescript-eslint/no-unused-vars
+  20:3   error  'PauseResumeResult' is defined but never used       @typescript-eslint/no-unused-vars
+  21:3   error  'RestoreExecutionResult' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\ticket-manager.property.test.ts
+  88:7  error  'ticketStatusArb' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\ticket-manager.test.ts
+  301:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\develop\agent-company\tests\execution\ticket-types.property.test.ts
+  125:7  error  'childTicketWithoutGrandchildrenArb' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  191:7  error  'parentTicketWithoutChildrenArb' is assigned a value but never used      @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\tools.property.test.ts
+   88:7  error  'validReplaceEditArb' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  111:7  error  'validInsertEditArb' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  128:7  error  'validDeleteEditArb' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\worker-agent.property.test.ts
+   18:55  error  'vi' is defined but never used                                                @typescript-eslint/no-unused-vars
+   23:3   error  'WorkerAgent' is defined but never used                                       @typescript-eslint/no-unused-vars
+  139:7   error  'subTaskArb' is assigned a value but never used                               @typescript-eslint/no-unused-vars
+  551:16  error  'iterations' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\worker-container-isolation.test.ts
+   21:3  error  'WorkerContainerConfig' is defined but never used     @typescript-eslint/no-unused-vars
+   22:3  error  'ContainerIsolationConfig' is defined but never used  @typescript-eslint/no-unused-vars
+   23:3  error  'DEFAULT_ISOLATION_CONFIG' is defined but never used  @typescript-eslint/no-unused-vars
+   25:3  error  'CONTAINER_RESULTS_PATH' is defined but never used    @typescript-eslint/no-unused-vars
+   31:3  error  'ContainerCreateOptions' is defined but never used    @typescript-eslint/no-unused-vars
+  734:7  error  'mockRuntimeB' is assigned a value but never used     @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tests\execution\worker-container.property.test.ts
+   85:7   error  'networkModeArb' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  697:21  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  698:21  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+
+D:\develop\agent-company\tests\execution\worker-pool.test.ts
+   10:55  error  'vi' is defined but never used                     @typescript-eslint/no-unused-vars
+   18:3   error  'WorkerPoolConfig' is defined but never used       @typescript-eslint/no-unused-vars
+   19:3   error  'WorkerInfo' is defined but never used             @typescript-eslint/no-unused-vars
+   21:31  error  'DEFAULT_SYSTEM_CONFIG' is defined but never used  @typescript-eslint/no-unused-vars
+  214:13  error  'worker' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  264:13  error  'worker' is assigned a value but never used        @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tools\adapters\index.ts
+  21:3   error  'AdapterConnectionError' is defined but never used  @typescript-eslint/no-unused-vars
+  27:10  error  'OllamaAdapter' is defined but never used           @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tools\adapters\ollama.ts
+  11:3  error  'BaseAdapter' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tools\cli\commands\ticket.ts
+   10:3   error  'TicketManager' is defined but never used          @typescript-eslint/no-unused-vars
+  245:11  error  'stateManager' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tools\cli\lib\execution\agent-bus.ts
+  580:7  warning  Unexpected console statement  no-console
+
+D:\develop\agent-company\tools\cli\lib\execution\agents\manager.ts
+   676:5   warning  Unexpected console statement  no-console
+   677:5   warning  Unexpected console statement  no-console
+   728:7   warning  Unexpected console statement  no-console
+   805:5   warning  Unexpected console statement  no-console
+   822:5   warning  Unexpected console statement  no-console
+   924:7   warning  Unexpected console statement  no-console
+   931:5   warning  Unexpected console statement  no-console
+   948:5   warning  Unexpected console statement  no-console
+   973:7   warning  Unexpected console statement  no-console
+  1024:11  warning  Unexpected console statement  no-console
+  1118:5   warning  Unexpected console statement  no-console
+  1150:5   warning  Unexpected console statement  no-console
+  1175:7   warning  Unexpected console statement  no-console
+  1224:5   warning  Unexpected console statement  no-console
+  1225:5   warning  Unexpected console statement  no-console
+  1295:5   warning  Unexpected console statement  no-console
+  1296:5   warning  Unexpected console statement  no-console
+  1420:5   warning  Unexpected console statement  no-console
+  1421:5   warning  Unexpected console statement  no-console
+  1465:7   warning  Unexpected console statement  no-console
+  1482:5   warning  Unexpected console statement  no-console
+  1531:11  warning  Unexpected console statement  no-console
+  1538:9   warning  Unexpected console statement  no-console
+  1562:11  warning  Unexpected console statement  no-console
+  1569:9   warning  Unexpected console statement  no-console
+  1675:11  warning  Unexpected console statement  no-console
+  1688:13  warning  Unexpected console statement  no-console
+  1690:13  warning  Unexpected console statement  no-console
+  1738:7   warning  Unexpected console statement  no-console
+  1743:7   warning  Unexpected console statement  no-console
+  1747:5   warning  Unexpected console statement  no-console
+  1757:9   warning  Unexpected console statement  no-console
+  1769:7   warning  Unexpected console statement  no-console
+  1783:5   warning  Unexpected console statement  no-console
+  2027:9   warning  Unexpected console statement  no-console
+  2060:7   warning  Unexpected console statement  no-console
+  2087:7   warning  Unexpected console statement  no-console
+  2109:9   warning  Unexpected console statement  no-console
+  2117:11  warning  Unexpected console statement  no-console
+  2148:5   warning  Unexpected console statement  no-console
+  2156:5   warning  Unexpected console statement  no-console
+  2170:5   warning  Unexpected console statement  no-console
+  2174:7   warning  Unexpected console statement  no-console
+  2184:5   warning  Unexpected console statement  no-console
+  2296:5   warning  Unexpected console statement  no-console
+  2344:5   warning  Unexpected console statement  no-console
+  2364:7   warning  Unexpected console statement  no-console
+  2366:7   warning  Unexpected console statement  no-console
+  2382:5   warning  Unexpected console statement  no-console
+  2412:5   warning  Unexpected console statement  no-console
+  2420:5   warning  Unexpected console statement  no-console
+  2433:7   warning  Unexpected console statement  no-console
+
+D:\develop\agent-company\tools\cli\lib\execution\agents\merger.ts
+   16:3  error  'ExecutionResult' is defined but never used                                     @typescript-eslint/no-unused-vars
+   17:3  error  'ExecutionStatus' is defined but never used                                     @typescript-eslint/no-unused-vars
+   18:3  error  'ErrorInfo' is defined but never used                                           @typescript-eslint/no-unused-vars
+  552:5  error  'sourceBranch' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  553:5  error  'targetBranch' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  571:5  error  'sourceBranch' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  572:5  error  'targetBranch' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tools\cli\lib\execution\agents\reviewer.ts
+   17:3  error    'GitStatus' is defined but never used          @typescript-eslint/no-unused-vars
+   18:3  error    'ExecutionResult' is defined but never used    @typescript-eslint/no-unused-vars
+   19:3  error    'ExecutionStatus' is defined but never used    @typescript-eslint/no-unused-vars
+   20:3  error    'ArtifactInfo' is defined but never used       @typescript-eslint/no-unused-vars
+   21:3  error    'ErrorInfo' is defined but never used          @typescript-eslint/no-unused-vars
+   22:3  error    'QualityGateResult' is defined but never used  @typescript-eslint/no-unused-vars
+  313:7  warning  Unexpected console statement                   no-console
+
+D:\develop\agent-company\tools\cli\lib\execution\agents\worker.ts
+  27:24  error  'toolExecutor' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tools\cli\lib\execution\container-runtime.ts
+  14:13  error  'path' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tools\cli\lib\execution\error-handler.ts
+   372:9   warning  Unexpected console statement  no-console
+   380:11  warning  Unexpected console statement  no-console
+   501:11  warning  Unexpected console statement  no-console
+   522:9   warning  Unexpected console statement  no-console
+   531:11  warning  Unexpected console statement  no-console
+   548:5   warning  Unexpected console statement  no-console
+   665:11  warning  Unexpected console statement  no-console
+   688:9   warning  Unexpected console statement  no-console
+   697:11  warning  Unexpected console statement  no-console
+   715:5   warning  Unexpected console statement  no-console
+   733:9   warning  Unexpected console statement  no-console
+   737:9   warning  Unexpected console statement  no-console
+   756:9   warning  Unexpected console statement  no-console
+   760:9   warning  Unexpected console statement  no-console
+   897:5   warning  Unexpected console statement  no-console
+   927:5   warning  Unexpected console statement  no-console
+   939:9   warning  Unexpected console statement  no-console
+   972:7   warning  Unexpected console statement  no-console
+  1076:7   warning  Unexpected console statement  no-console
+
+D:\develop\agent-company\tools\cli\lib\execution\git-manager.ts
+    21:47  error    'PullRequestId' is defined but never used  @typescript-eslint/no-unused-vars
+   214:7   warning  Unexpected console statement               no-console
+   539:9   warning  Unexpected console statement               no-console
+  1407:7   warning  Unexpected console statement               no-console
+  1437:7   warning  Unexpected console statement               no-console
+
+D:\develop\agent-company\tools\cli\lib\execution\orchestrator.ts
+    20:3   error    'SubTaskStatus' is defined but never used                                    @typescript-eslint/no-unused-vars
+    22:3   error    'ExecutionStateStatus' is defined but never used                             @typescript-eslint/no-unused-vars
+    25:3   error    'Project' is defined but never used                                          @typescript-eslint/no-unused-vars
+    28:3   error    'ChildTicket' is defined but never used                                      @typescript-eslint/no-unused-vars
+    29:3   error    'GrandchildTicket' is defined but never used                                 @typescript-eslint/no-unused-vars
+    30:3   error    'TicketStatus' is defined but never used                                     @typescript-eslint/no-unused-vars
+    35:22  error    'createWorkerPool' is defined but never used                                 @typescript-eslint/no-unused-vars
+    44:3   error    'DEFAULT_RETRY_CONFIG' is defined but never used                             @typescript-eslint/no-unused-vars
+   352:5   warning  Unexpected console statement                                                 no-console
+   374:11  warning  Unexpected console statement                                                 no-console
+   378:7   warning  Unexpected console statement                                                 no-console
+   445:5   warning  Unexpected console statement                                                 no-console
+   446:5   warning  Unexpected console statement                                                 no-console
+   452:9   warning  Unexpected console statement                                                 no-console
+   525:5   error    'projectId' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+   632:5   warning  Unexpected console statement                                                 no-console
+   667:5   warning  Unexpected console statement                                                 no-console
+   776:5   warning  Unexpected console statement                                                 no-console
+   806:5   warning  Unexpected console statement                                                 no-console
+   817:5   warning  Unexpected console statement                                                 no-console
+   847:5   warning  Unexpected console statement                                                 no-console
+   880:5   warning  Unexpected console statement                                                 no-console
+   939:5   warning  Unexpected console statement                                                 no-console
+   940:5   warning  Unexpected console statement                                                 no-console
+   959:7   warning  Unexpected console statement                                                 no-console
+  1210:11  error    'taskId' is assigned a value but never used                                  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tools\cli\lib\execution\pr-creator.ts
+   14:36  error    'ChildTicket' is defined but never used         @typescript-eslint/no-unused-vars
+   14:49  error    'GrandchildTicket' is defined but never used    @typescript-eslint/no-unused-vars
+  179:11  error    'startTime' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  397:11  error    'startTime' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  532:7   warning  Unexpected console statement                    no-console
+
+D:\develop\agent-company\tools\cli\lib\execution\process-monitor.ts
+   21:3  error    'CommandRejectionReason' is defined but never used  @typescript-eslint/no-unused-vars
+  637:7  warning  Unexpected console statement                        no-console
+
+D:\develop\agent-company\tools\cli\lib\execution\review-workflow.ts
+   15:3  error    'GrandchildTicket' is defined but never used  @typescript-eslint/no-unused-vars
+  473:7  warning  Unexpected console statement                  no-console
+
+D:\develop\agent-company\tools\cli\lib\execution\state-manager.ts
+  21:3  error  'TicketStatus' is defined but never used          @typescript-eslint/no-unused-vars
+  37:7  error  'RUNS_DIR' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  42:7  error  'CONFIG_FILE' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\develop\agent-company\tools\cli\lib\execution\worker-pool.ts
+  546:11  error    'requiredCapabilities' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  781:9   warning  Unexpected console statement                               no-console
+  838:9   warning  Unexpected console statement                               no-console
+
+D:\develop\agent-company\tools\cli\lib\hiring\hiring-logger.ts
+  148:7  warning  Unexpected console statement  no-console
+
+D:\develop\agent-company\tools\cli\lib\hiring\notification.ts
+  166:7  warning  Unexpected console statement  no-console
+
+D:\develop\agent-company\tools\cli\lib\hiring\registry-manager.ts
+  207:5  warning  Unexpected console statement  no-console
+  349:7  warning  Unexpected console statement  no-console
+  355:5  warning  Unexpected console statement  no-console
+  387:5  warning  Unexpected console statement  no-console
+
+D:\develop\agent-company\tools\installers\installer.ts
+  125:5  warning  Unexpected console statement  no-console
+  126:5  warning  Unexpected console statement  no-console
+  134:5  warning  Unexpected console statement  no-console
+  135:5  warning  Unexpected console statement  no-console
+  149:5  warning  Unexpected console statement  no-console
+  151:5  warning  Unexpected console statement  no-console
+  153:7  warning  Unexpected console statement  no-console
+
+D:\develop\agent-company\tools\installers\log-writer.ts
+  97:5  warning  Unexpected console statement  no-console
+
+笨・259 problems (142 errors, 117 warnings)
+

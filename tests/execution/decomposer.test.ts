@@ -101,12 +101,14 @@ function createTestContext(overrides?: Partial<ProjectContext>): ProjectContext 
 /**
  * 有効なAI応答を生成
  */
-function createValidAIResponse(subTasks: Array<{
-  title: string;
-  description: string;
-  acceptanceCriteria?: string[];
-  estimatedEffort?: 'small' | 'medium' | 'large';
-}>): string {
+function createValidAIResponse(
+  subTasks: Array<{
+    title: string;
+    description: string;
+    acceptanceCriteria?: string[];
+    estimatedEffort?: 'small' | 'medium' | 'large';
+  }>
+): string {
   return `\`\`\`json
 {
   "subTasks": ${JSON.stringify(subTasks)}
@@ -166,10 +168,7 @@ describe('TaskDecomposer', () => {
         mockAdapter.setResponse(aiResponse);
 
         const context = createTestContext();
-        const result = await decomposer.decompose(
-          'Create a user management feature',
-          context
-        );
+        const result = await decomposer.decompose('Create a user management feature', context);
 
         expect(result.subTasks).toHaveLength(2);
         expect(result.subTasks[0].title).toBe('Create user model');
@@ -245,12 +244,8 @@ describe('TaskDecomposer', () => {
     describe('input validation', () => {
       it('should throw error for empty instruction', async () => {
         const context = createTestContext();
-        await expect(decomposer.decompose('', context)).rejects.toThrow(
-          TaskDecomposerError
-        );
-        await expect(decomposer.decompose('', context)).rejects.toThrow(
-          'Instruction is required'
-        );
+        await expect(decomposer.decompose('', context)).rejects.toThrow(TaskDecomposerError);
+        await expect(decomposer.decompose('', context)).rejects.toThrow('Instruction is required');
       });
 
       it('should throw error for whitespace-only instruction', async () => {
@@ -262,9 +257,9 @@ describe('TaskDecomposer', () => {
 
       it('should throw error for missing project context', async () => {
         const context = { project: undefined } as unknown as ProjectContext;
-        await expect(
-          decomposer.decompose('Test instruction', context)
-        ).rejects.toThrow('Project context is required');
+        await expect(decomposer.decompose('Test instruction', context)).rejects.toThrow(
+          'Project context is required'
+        );
       });
     });
 
@@ -314,9 +309,9 @@ describe('TaskDecomposer', () => {
         const context = createTestContext();
         const options: DecomposeOptions = { minSubTasks: 3 };
 
-        await expect(
-          decomposer.decompose('Test instruction', context, options)
-        ).rejects.toThrow('Generated 1 sub-tasks, but minimum is 3');
+        await expect(decomposer.decompose('Test instruction', context, options)).rejects.toThrow(
+          'Generated 1 sub-tasks, but minimum is 3'
+        );
       });
     });
 
@@ -376,21 +371,19 @@ That's all!`;
         mockAdapter.setResponse('This is not valid JSON');
 
         const context = createTestContext();
-        await expect(
-          decomposer.decompose('Test instruction', context)
-        ).rejects.toThrow(TaskDecomposerError);
+        await expect(decomposer.decompose('Test instruction', context)).rejects.toThrow(
+          TaskDecomposerError
+        );
       });
 
       it('should throw error for missing title', async () => {
-        const aiResponse = createValidAIResponse([
-          { title: '', description: 'Description 1' },
-        ]);
+        const aiResponse = createValidAIResponse([{ title: '', description: 'Description 1' }]);
         mockAdapter.setResponse(aiResponse);
 
         const context = createTestContext();
-        await expect(
-          decomposer.decompose('Test instruction', context)
-        ).rejects.toThrow('title is required');
+        await expect(decomposer.decompose('Test instruction', context)).rejects.toThrow(
+          'title is required'
+        );
       });
 
       it('should throw error for missing description', async () => {
@@ -404,9 +397,9 @@ That's all!`;
         mockAdapter.setResponse(aiResponse);
 
         const context = createTestContext();
-        await expect(
-          decomposer.decompose('Test instruction', context)
-        ).rejects.toThrow('description is required');
+        await expect(decomposer.decompose('Test instruction', context)).rejects.toThrow(
+          'description is required'
+        );
       });
 
       it('should normalize acceptance criteria', async () => {
@@ -463,12 +456,12 @@ That's all!`;
         mockAdapter.setFailure(true, 'Connection failed');
 
         const context = createTestContext();
-        await expect(
-          decomposer.decompose('Test instruction', context)
-        ).rejects.toThrow(TaskDecomposerError);
-        await expect(
-          decomposer.decompose('Test instruction', context)
-        ).rejects.toThrow('AI adapter error');
+        await expect(decomposer.decompose('Test instruction', context)).rejects.toThrow(
+          TaskDecomposerError
+        );
+        await expect(decomposer.decompose('Test instruction', context)).rejects.toThrow(
+          'AI adapter error'
+        );
       });
 
       it('should include error code in TaskDecomposerError', async () => {
@@ -512,9 +505,7 @@ That's all!`;
         await decomposer.decompose('Test instruction', context);
 
         // プロンプトにプロジェクト情報が含まれていることを確認
-        const userMessage = mockAdapter.lastChatOptions?.messages.find(
-          (m) => m.role === 'user'
-        );
+        const userMessage = mockAdapter.lastChatOptions?.messages.find((m) => m.role === 'user');
         expect(userMessage?.content).toContain('My Project');
         expect(userMessage?.content).toContain('https://github.com/test/my-project.git');
       });
@@ -531,9 +522,7 @@ That's all!`;
 
         await decomposer.decompose('Test instruction', context);
 
-        const userMessage = mockAdapter.lastChatOptions?.messages.find(
-          (m) => m.role === 'user'
-        );
+        const userMessage = mockAdapter.lastChatOptions?.messages.find((m) => m.role === 'user');
         expect(userMessage?.content).toContain('React');
         expect(userMessage?.content).toContain('TypeScript');
       });
@@ -550,9 +539,7 @@ That's all!`;
 
         await decomposer.decompose('Test instruction', context);
 
-        const userMessage = mockAdapter.lastChatOptions?.messages.find(
-          (m) => m.role === 'user'
-        );
+        const userMessage = mockAdapter.lastChatOptions?.messages.find((m) => m.role === 'user');
         expect(userMessage?.content).toContain('src/index.ts');
       });
 
@@ -568,9 +555,7 @@ That's all!`;
 
         await decomposer.decompose('Test instruction', context);
 
-        const userMessage = mockAdapter.lastChatOptions?.messages.find(
-          (m) => m.role === 'user'
-        );
+        const userMessage = mockAdapter.lastChatOptions?.messages.find((m) => m.role === 'user');
         expect(userMessage?.content).toContain('monorepo structure');
       });
     });
@@ -633,9 +618,7 @@ That's all!`;
       const graph = await decomposer.analyzeDependencies(tasks);
 
       // task-2がtask-1に依存
-      const hasDependency = graph.edges.some(
-        ([from, to]) => from === 'task-2' && to === 'task-1'
-      );
+      const hasDependency = graph.edges.some(([from, to]) => from === 'task-2' && to === 'task-1');
       expect(hasDependency).toBe(true);
     });
 
@@ -655,9 +638,7 @@ That's all!`;
 
       const graph = await decomposer.analyzeDependencies(tasks);
 
-      const hasDependency = graph.edges.some(
-        ([from, to]) => from === 'task-2' && to === 'task-1'
-      );
+      const hasDependency = graph.edges.some(([from, to]) => from === 'task-2' && to === 'task-1');
       expect(hasDependency).toBe(true);
     });
 
@@ -666,18 +647,8 @@ That's all!`;
      */
     it('should detect cycle in circular dependencies', async () => {
       const tasks: SubTask[] = [
-        createSubTask(
-          'task-1',
-          'parent-1',
-          'Task A',
-          'depends on Task B'
-        ),
-        createSubTask(
-          'task-2',
-          'parent-1',
-          'Task B',
-          'depends on Task A'
-        ),
+        createSubTask('task-1', 'parent-1', 'Task A', 'depends on Task B'),
+        createSubTask('task-2', 'parent-1', 'Task B', 'depends on Task A'),
       ];
 
       const graph = await decomposer.analyzeDependencies(tasks);
@@ -711,9 +682,7 @@ That's all!`;
      * @see Requirement 2.2: 単一タスクの処理
      */
     it('should handle single task correctly', async () => {
-      const tasks: SubTask[] = [
-        createSubTask('task-1', 'parent-1', 'Single task'),
-      ];
+      const tasks: SubTask[] = [createSubTask('task-1', 'parent-1', 'Single task')];
 
       const graph = await decomposer.analyzeDependencies(tasks);
 
@@ -728,12 +697,7 @@ That's all!`;
     it('should only create edges between valid node IDs', async () => {
       const tasks: SubTask[] = [
         createSubTask('task-1', 'parent-1', 'First task'),
-        createSubTask(
-          'task-2',
-          'parent-1',
-          'Second task',
-          'after First task is done'
-        ),
+        createSubTask('task-2', 'parent-1', 'Second task', 'after First task is done'),
         createSubTask('task-3', 'parent-1', 'Third task'),
       ];
 
@@ -778,12 +742,7 @@ That's all!`;
     it('should separate tasks with dependencies into different groups', async () => {
       const tasks: SubTask[] = [
         createSubTask('task-1', 'parent-1', 'Create database'),
-        createSubTask(
-          'task-2',
-          'parent-1',
-          'Create API',
-          'Implement after Create database'
-        ),
+        createSubTask('task-2', 'parent-1', 'Create API', 'Implement after Create database'),
       ];
 
       const groups = await decomposer.identifyParallelizable(tasks);
@@ -798,18 +757,8 @@ That's all!`;
     it('should preserve all tasks across groups', async () => {
       const tasks: SubTask[] = [
         createSubTask('task-1', 'parent-1', 'Setup database'),
-        createSubTask(
-          'task-2',
-          'parent-1',
-          'Create models',
-          'after Setup database is done'
-        ),
-        createSubTask(
-          'task-3',
-          'parent-1',
-          'Create API',
-          'after Create models is done'
-        ),
+        createSubTask('task-2', 'parent-1', 'Create models', 'after Setup database is done'),
+        createSubTask('task-3', 'parent-1', 'Create API', 'after Create models is done'),
       ];
 
       const groups = await decomposer.identifyParallelizable(tasks);
@@ -845,24 +794,9 @@ That's all!`;
     it('should handle complex dependency chains', async () => {
       const tasks: SubTask[] = [
         createSubTask('task-1', 'parent-1', 'Initialize project'),
-        createSubTask(
-          'task-2',
-          'parent-1',
-          'Setup database',
-          'after Initialize project is done'
-        ),
-        createSubTask(
-          'task-3',
-          'parent-1',
-          'Create models',
-          'after Setup database is done'
-        ),
-        createSubTask(
-          'task-4',
-          'parent-1',
-          'Create API',
-          'after Create models is done'
-        ),
+        createSubTask('task-2', 'parent-1', 'Setup database', 'after Initialize project is done'),
+        createSubTask('task-3', 'parent-1', 'Create models', 'after Setup database is done'),
+        createSubTask('task-4', 'parent-1', 'Create API', 'after Create models is done'),
       ];
 
       const groups = await decomposer.identifyParallelizable(tasks);
@@ -876,9 +810,7 @@ That's all!`;
      * @see Requirement 2.2: 単一タスクの処理
      */
     it('should handle single task correctly', async () => {
-      const tasks: SubTask[] = [
-        createSubTask('task-1', 'parent-1', 'Single task'),
-      ];
+      const tasks: SubTask[] = [createSubTask('task-1', 'parent-1', 'Single task')];
 
       const groups = await decomposer.identifyParallelizable(tasks);
 
@@ -895,12 +827,7 @@ That's all!`;
       const tasks: SubTask[] = [
         createSubTask('task-1', 'parent-1', 'Create user model'),
         createSubTask('task-2', 'parent-1', 'Create product model'),
-        createSubTask(
-          'task-3',
-          'parent-1',
-          'Create user API',
-          'after Create user model is done'
-        ),
+        createSubTask('task-3', 'parent-1', 'Create user API', 'after Create user model is done'),
       ];
 
       const groups = await decomposer.identifyParallelizable(tasks);
@@ -969,7 +896,12 @@ That's all!`;
 
     it('should include all required fields in saved file', async () => {
       const fs = await import('fs/promises');
-      const subTask = createSubTask('task-123-001', 'task-123', 'Create User Model', 'Define the User model with required fields');
+      const subTask = createSubTask(
+        'task-123-001',
+        'task-123',
+        'Create User Model',
+        'Define the User model with required fields'
+      );
       subTask.acceptanceCriteria = ['User model has id field', 'User model has name field'];
 
       const filePath = await decomposer.saveSubTask(subTask, { backlogDir: testBacklogDir });
@@ -1010,17 +942,17 @@ That's all!`;
     it('should throw error for sub-task without id', async () => {
       const subTask = createSubTask('', 'parent-001', 'Test Task');
 
-      await expect(
-        decomposer.saveSubTask(subTask, { backlogDir: testBacklogDir })
-      ).rejects.toThrow('SubTask id is required');
+      await expect(decomposer.saveSubTask(subTask, { backlogDir: testBacklogDir })).rejects.toThrow(
+        'SubTask id is required'
+      );
     });
 
     it('should throw error for sub-task without parentId', async () => {
       const subTask = createSubTask('task-001', '', 'Test Task');
 
-      await expect(
-        decomposer.saveSubTask(subTask, { backlogDir: testBacklogDir })
-      ).rejects.toThrow('SubTask parentId is required');
+      await expect(decomposer.saveSubTask(subTask, { backlogDir: testBacklogDir })).rejects.toThrow(
+        'SubTask parentId is required'
+      );
     });
 
     it('should use default backlog directory when not specified', async () => {
@@ -1111,12 +1043,9 @@ That's all!`;
       mockAdapter.setResponse(aiResponse);
 
       const context = createTestContext();
-      const result = await decomposer.decomposeAndSave(
-        'Test instruction',
-        context,
-        undefined,
-        { backlogDir: testBacklogDir }
-      );
+      const result = await decomposer.decomposeAndSave('Test instruction', context, undefined, {
+        backlogDir: testBacklogDir,
+      });
 
       // 分解結果を確認
       expect(result.subTasks).toHaveLength(2);
@@ -1139,12 +1068,9 @@ That's all!`;
       mockAdapter.setResponse(aiResponse);
 
       const context = createTestContext();
-      const result = await decomposer.decomposeAndSave(
-        'Test instruction',
-        context,
-        undefined,
-        { backlogDir: testBacklogDir }
-      );
+      const result = await decomposer.decomposeAndSave('Test instruction', context, undefined, {
+        backlogDir: testBacklogDir,
+      });
 
       // savedFilesが結果に含まれていることを確認
       expect(result).toHaveProperty('savedFiles');

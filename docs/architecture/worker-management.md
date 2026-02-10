@@ -14,20 +14,22 @@ Manager Agentは、ワークロードに基づいてWorker Agentを動的に管�
 ```typescript
 // スケーリング設定
 interface ScalingConfig {
-  minWorkers: number;        // 最小ワーカー数（デフォルト: 1）
-  maxWorkers: number;        // 最大ワーカー数（デフォルト: 10）
-  scaleUpThreshold: number;  // スケールアップしきい値（デフォルト: 2.0）
+  minWorkers: number; // 最小ワーカー数（デフォルト: 1）
+  maxWorkers: number; // 最大ワーカー数（デフォルト: 10）
+  scaleUpThreshold: number; // スケールアップしきい値（デフォルト: 2.0）
   scaleDownThreshold: number; // スケールダウンしきい値（デフォルト: 0.5）
-  scalingCooldown: number;   // クールダウン時間（デフォルト: 30秒）
+  scalingCooldown: number; // クールダウン時間（デフォルト: 30秒）
   autoScalingEnabled: boolean; // 自動スケーリング有効フラグ
 }
 ```
 
 **スケールアップ条件:**
+
 - 保留タスク数 / アクティブワーカー数 >= scaleUpThreshold
 - 現在のワーカー数 < maxWorkers
 
 **スケールダウン条件:**
+
 - アイドルワーカー比率 >= scaleDownThreshold
 - 保留タスク数 = 0
 - 現在のワーカー数 > minWorkers
@@ -39,15 +41,16 @@ interface ScalingConfig {
 ```typescript
 // ワーカー仕様
 interface WorkerSpec {
-  name: string;              // ワーカー名
-  capabilities: string[];    // 能力一覧（例: ['frontend', 'react', 'testing']）
-  priority?: number;         // 優先度（高いほど優先的に割り当て）
-  adapterName?: string;      // AIアダプタ名
-  modelName?: string;        // モデル名
+  name: string; // ワーカー名
+  capabilities: string[]; // 能力一覧（例: ['frontend', 'react', 'testing']）
+  priority?: number; // 優先度（高いほど優先的に割り当て）
+  adapterName?: string; // AIアダプタ名
+  modelName?: string; // モデル名
 }
 ```
 
 **マッチングスコア計算:**
+
 1. 能力マッチング: タスクの要件とワーカーの能力の一致度
 2. ヘルススコア: ワーカーの健全性（0-100）
 3. 優先度: ワーカーに設定された優先度
@@ -70,12 +73,13 @@ interface WorkerInfo {
   completedTasks: number;
   failedTasks: number;
   consecutiveFailures: number;
-  healthScore: number;       // 0-100
+  healthScore: number; // 0-100
   priority: number;
 }
 ```
 
 **ヘルススコア計算:**
+
 - 基本スコア: 100
 - 連続失敗ペナルティ: -15 × 連続失敗回数
 - 総失敗率ペナルティ: -30 × (失敗タスク数 / 総タスク数)
@@ -87,10 +91,12 @@ interface WorkerInfo {
 問題のあるワーカーを自動的に置換する。
 
 **置換条件:**
+
 - 連続失敗回数 >= 5回
 - ヘルススコア < 10
 
 **置換プロセス:**
+
 1. 古いワーカーを解雇（割り当て中のタスクはpendingに戻す）
 2. 同じ能力を持つ新しいワーカーを雇用
 3. ログに記録
@@ -164,10 +170,10 @@ console.log(`置換されたワーカー: ${healthResult.replacedWorkers.length}
 
 ## 要件トレーサビリティ
 
-| 機能 | 要件 |
-|------|------|
-| 動的スケーリング | Requirement 1.6 |
-| ワーカー雇用/解雇 | Requirement 1.6 |
-| 能力マッチング | Requirement 1.6 |
+| 機能               | 要件            |
+| ------------------ | --------------- |
+| 動的スケーリング   | Requirement 1.6 |
+| ワーカー雇用/解雇  | Requirement 1.6 |
+| 能力マッチング     | Requirement 1.6 |
 | ヘルスモニタリング | Requirement 1.6 |
-| 自動ワーカー置換 | Requirement 1.6 |
+| 自動ワーカー置換   | Requirement 1.6 |

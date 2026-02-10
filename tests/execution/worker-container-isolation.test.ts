@@ -18,17 +18,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
   WorkerContainer,
-  WorkerContainerConfig,
-  ContainerIsolationConfig,
-  DEFAULT_ISOLATION_CONFIG,
   CONTAINER_WORKSPACE_PATH,
-  CONTAINER_RESULTS_PATH,
   createIsolatedWorkerContainer,
   verifyContainerIsolation,
 } from '../../tools/cli/lib/execution/worker-container';
 import {
   ContainerRuntime,
-  ContainerCreateOptions,
   DEFAULT_ALLOWED_DOCKER_COMMANDS,
 } from '../../tools/cli/lib/execution/container-runtime';
 
@@ -56,7 +51,6 @@ function createMockRuntime(): ContainerRuntime {
     getRuntimeType: vi.fn().mockReturnValue('dod'),
   } as unknown as ContainerRuntime;
 }
-
 
 // =============================================================================
 // 受け入れテスト 1: ファイルシステム隔離
@@ -86,14 +80,8 @@ describe('Isolation Acceptance Test: Filesystem Isolation', () => {
    * - Worker A SHALL NOT be able to read/write files in Worker B's `/workspace`
    */
   it('各ワーカーは独自の /workspace を持ち、共有ボリュームがない', async () => {
-    const containerA = new WorkerContainer(
-      { workerId: 'worker-a-fs' },
-      mockRuntimeA
-    );
-    const containerB = new WorkerContainer(
-      { workerId: 'worker-b-fs' },
-      mockRuntimeB
-    );
+    const containerA = new WorkerContainer({ workerId: 'worker-a-fs' }, mockRuntimeA);
+    const containerB = new WorkerContainer({ workerId: 'worker-b-fs' }, mockRuntimeB);
 
     await containerA.create();
     await containerB.create();
@@ -211,10 +199,9 @@ describe('Isolation Acceptance Test: Filesystem Isolation', () => {
     const result = await verifyContainerIsolation(containerA, containerB);
 
     expect(result.filesystemIsolated).toBe(true);
-    expect(result.errors.filter(e => e.includes('Filesystem'))).toHaveLength(0);
+    expect(result.errors.filter((e) => e.includes('Filesystem'))).toHaveLength(0);
   });
 });
-
 
 // =============================================================================
 // 受け入れテスト 2: ネットワーク隔離
@@ -245,14 +232,8 @@ describe('Isolation Acceptance Test: Network Isolation', () => {
    * - Network: No inter-container communication except via Agent_Bus
    */
   it('デフォルトで networkMode=none が設定される', async () => {
-    const containerA = new WorkerContainer(
-      { workerId: 'worker-a-net' },
-      mockRuntimeA
-    );
-    const containerB = new WorkerContainer(
-      { workerId: 'worker-b-net' },
-      mockRuntimeB
-    );
+    const containerA = new WorkerContainer({ workerId: 'worker-a-net' }, mockRuntimeA);
+    const containerB = new WorkerContainer({ workerId: 'worker-b-net' }, mockRuntimeB);
 
     await containerA.create();
     await containerB.create();
@@ -296,7 +277,7 @@ describe('Isolation Acceptance Test: Network Isolation', () => {
     const result = await container.verifyIsolation();
 
     expect(result.networkIsolated).toBe(true);
-    expect(result.errors.filter(e => e.includes('Network'))).toHaveLength(0);
+    expect(result.errors.filter((e) => e.includes('Network'))).toHaveLength(0);
   });
 
   /**
@@ -337,7 +318,7 @@ describe('Isolation Acceptance Test: Network Isolation', () => {
 
     expect(result.networkIsolated).toBe(false);
     expect(result.isolated).toBe(false);
-    expect(result.errors.some(e => e.includes('Network'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('Network'))).toBe(true);
   });
 
   /**
@@ -365,7 +346,6 @@ describe('Isolation Acceptance Test: Network Isolation', () => {
   });
 });
 
-
 // =============================================================================
 // 受け入れテスト 3: ホストファイルシステム隔離
 // Worker A がホストファイルシステムにアクセス不可
@@ -392,10 +372,7 @@ describe('Isolation Acceptance Test: Host Filesystem Isolation', () => {
    * - Worker A SHALL NOT be able to access host filesystem outside of designated paths
    */
   it('ホストファイルシステムへの直接マウントがない', async () => {
-    const container = new WorkerContainer(
-      { workerId: 'worker-host-fs' },
-      mockRuntime
-    );
+    const container = new WorkerContainer({ workerId: 'worker-host-fs' }, mockRuntime);
 
     await container.create();
 
@@ -420,7 +397,7 @@ describe('Isolation Acceptance Test: Host Filesystem Isolation', () => {
         '/sys',
         '/dev',
       ];
-      return dangerousPaths.some(p => hostPath === p || hostPath.startsWith(p + '/'));
+      return dangerousPaths.some((p) => hostPath === p || hostPath.startsWith(p + '/'));
     });
 
     // 危険なマウントがないことを確認（結果ディレクトリは除く）
@@ -529,10 +506,7 @@ describe('Isolation Acceptance Test: Host Filesystem Isolation', () => {
    * **Validates: Requirement 5.4**
    */
   it('プロセス数制限が設定される', async () => {
-    const container = new WorkerContainer(
-      { workerId: 'worker-pids-limit' },
-      mockRuntime
-    );
+    const container = new WorkerContainer({ workerId: 'worker-pids-limit' }, mockRuntime);
 
     await container.create();
 
@@ -545,7 +519,6 @@ describe('Isolation Acceptance Test: Host Filesystem Isolation', () => {
     expect(pidsLimitOption).toBeDefined();
   });
 });
-
 
 // =============================================================================
 // 受け入れテスト 4: DoD使用時のコンテナ生成制限
@@ -705,7 +678,9 @@ describe('Isolation Acceptance Test: DoD Container Spawn Restriction', () => {
     expect(runtime.validateDockerCommand('docker network create worker-net').valid).toBe(false);
 
     // ネットワーク接続が拒否される
-    expect(runtime.validateDockerCommand('docker network connect worker-net container-id').valid).toBe(false);
+    expect(
+      runtime.validateDockerCommand('docker network connect worker-net container-id').valid
+    ).toBe(false);
   });
 
   /**
@@ -724,18 +699,19 @@ describe('Isolation Acceptance Test: DoD Container Spawn Restriction', () => {
   });
 });
 
-
 // =============================================================================
 // 統合受け入れテスト: 全隔離条件の検証
 // =============================================================================
 
 describe('Isolation Acceptance Test: Comprehensive Verification', () => {
   let mockRuntimeA: ContainerRuntime;
-  let mockRuntimeB: ContainerRuntime;
+  // mockRuntimeBは将来の拡張用に保持
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  let _mockRuntimeB: ContainerRuntime;
 
   beforeEach(() => {
     mockRuntimeA = createMockRuntime();
-    mockRuntimeB = createMockRuntime();
+    _mockRuntimeB = createMockRuntime();
   });
 
   afterEach(() => {
@@ -838,9 +814,15 @@ describe('Isolation Acceptance Test: Comprehensive Verification', () => {
     // セキュリティオプション
     expect(callArgs.additionalOptions).toContain('--security-opt=no-new-privileges:true');
     expect(callArgs.additionalOptions).toContain('--cap-drop=ALL');
-    expect(callArgs.additionalOptions?.some((opt: string) => opt.includes('--pids-limit'))).toBe(true);
-    expect(callArgs.additionalOptions?.some((opt: string) => opt.includes('--tmpfs=/tmp'))).toBe(true);
-    expect(callArgs.additionalOptions?.some((opt: string) => opt.includes('--tmpfs=/var/tmp'))).toBe(true);
+    expect(callArgs.additionalOptions?.some((opt: string) => opt.includes('--pids-limit'))).toBe(
+      true
+    );
+    expect(callArgs.additionalOptions?.some((opt: string) => opt.includes('--tmpfs=/tmp'))).toBe(
+      true
+    );
+    expect(
+      callArgs.additionalOptions?.some((opt: string) => opt.includes('--tmpfs=/var/tmp'))
+    ).toBe(true);
   });
 
   /**
@@ -911,7 +893,7 @@ describe('Isolation Acceptance Test Criteria Summary', () => {
   it('全ての受け入れテスト基準が定義されている', () => {
     // このテストは、受け入れテスト基準のドキュメントとして機能
     const criteria = [
-      'Worker A SHALL NOT be able to read/write files in Worker B\'s `/workspace`',
+      "Worker A SHALL NOT be able to read/write files in Worker B's `/workspace`",
       'Worker A SHALL NOT be able to send network packets directly to Worker B',
       'Worker A SHALL NOT be able to access host filesystem outside of designated paths',
       'Worker A SHALL NOT be able to spawn containers affecting other workers (when using DoD)',

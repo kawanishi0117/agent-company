@@ -6,38 +6,41 @@ inclusion: always
 
 ## 言語・ランタイム
 
-| 項目       | バージョン | 用途                     |
-| ---------- | ---------- | ------------------------ |
-| Node.js    | 20.x       | CLI、テスト、ビルド      |
-| TypeScript | 5.3+       | 全TypeScriptコード       |
-| Python     | 3.x        | Docker内スクリプト       |
+| 項目       | バージョン | 用途                |
+| ---------- | ---------- | ------------------- |
+| Node.js    | 20.x       | CLI、テスト、ビルド |
+| TypeScript | 5.3+       | 全TypeScriptコード  |
+| Python     | 3.x        | Docker内スクリプト  |
 
 ## 実行基盤
 
 ### Docker
+
 - **ベースイメージ**: `node:20-slim`
 - **Compose**: `infra/docker/compose.yaml`
 - **隔離**: seccomp, no-new-privileges, cap_drop ALL
 - **リソース制限**: CPU 2コア、メモリ 4GB
 
 ### コンテナ構成
-| サービス   | 役割                     | ポート  |
-| ---------- | ------------------------ | ------- |
-| ollama     | ローカルLLM実行基盤      | 11434   |
-| workspace  | 開発・実行環境           | -       |
-| worker     | ワーカーエージェント実行 | -       |
+
+| サービス  | 役割                     | ポート |
+| --------- | ------------------------ | ------ |
+| ollama    | ローカルLLM実行基盤      | 11434  |
+| workspace | 開発・実行環境           | -      |
+| worker    | ワーカーエージェント実行 | -      |
 
 ## GUI
 
-| 項目           | 技術                          |
-| -------------- | ----------------------------- |
-| フレームワーク | Next.js 14.x (App Router)     |
-| 言語           | TypeScript                    |
-| スタイル       | Tailwind CSS 3.x              |
-| テスト         | Vitest + Testing Library      |
-| 場所           | `gui/web/`                    |
+| 項目           | 技術                      |
+| -------------- | ------------------------- |
+| フレームワーク | Next.js 14.x (App Router) |
+| 言語           | TypeScript                |
+| スタイル       | Tailwind CSS 3.x          |
+| テスト         | Vitest + Testing Library  |
+| 場所           | `gui/web/`                |
 
 ### GUI カラーパレット（Tailwind設定）
+
 ```typescript
 // gui/web/tailwind.config.ts
 colors: {
@@ -53,14 +56,15 @@ colors: {
 
 ## CLI
 
-| 項目       | 技術                          |
-| ---------- | ----------------------------- |
-| 言語       | TypeScript (ESM)              |
-| 実行       | tsx                           |
-| 場所       | `tools/cli/`                  |
-| エントリ   | `tools/cli/agentcompany.ts`   |
+| 項目     | 技術                        |
+| -------- | --------------------------- |
+| 言語     | TypeScript (ESM)            |
+| 実行     | tsx                         |
+| 場所     | `tools/cli/`                |
+| エントリ | `tools/cli/agentcompany.ts` |
 
 ### CLIコマンド一覧
+
 ```bash
 agentcompany run <ticket-path>       # ワークフロー実行
 agentcompany list                    # チケット一覧
@@ -74,17 +78,39 @@ agentcompany status                  # 実行状況表示
 agentcompany stop <run-id>           # 実行停止
 agentcompany resume <run-id>         # 実行再開
 agentcompany project <subcommand>    # プロジェクト管理
+agentcompany ticket <subcommand>     # チケット管理
+agentcompany server                  # Orchestrator APIサーバー起動（GUI連携用）
 ```
+
+### Orchestrator Server（GUI連携）
+
+GUIからOrchestratorを制御するためのHTTP APIサーバー。
+
+```bash
+# デフォルトポート（3001）で起動
+agentcompany server
+
+# カスタムポートで起動
+agentcompany server --port 8080
+```
+
+**主要エンドポイント**:
+- `POST /api/tasks` - タスク送信
+- `GET /api/dashboard/status` - ダッシュボード統合情報
+- `POST /api/agents/pause` - 全エージェント一時停止
+- `POST /api/agents/emergency-stop` - 緊急停止
 
 ## 品質ゲート
 
 ### 静的解析
-| ツール    | 設定ファイル       | 用途           |
-| --------- | ------------------ | -------------- |
-| ESLint    | `.eslintrc.json`   | コード品質     |
-| Prettier  | `.prettierrc`      | フォーマット   |
+
+| ツール   | 設定ファイル     | 用途         |
+| -------- | ---------------- | ------------ |
+| ESLint   | `.eslintrc.json` | コード品質   |
+| Prettier | `.prettierrc`    | フォーマット |
 
 ### ESLintルール（主要）
+
 ```json
 {
   "@typescript-eslint/explicit-function-return-type": "warn",
@@ -94,13 +120,15 @@ agentcompany project <subcommand>    # プロジェクト管理
 ```
 
 ### テスト
-| ツール     | 設定ファイル              | 用途                |
-| ---------- | ------------------------- | ------------------- |
-| Vitest     | `vitest.config.ts`        | ユニットテスト      |
-| fast-check | -                         | Property-based test |
-| Playwright | `playwright.config.ts`    | E2Eテスト           |
+
+| ツール     | 設定ファイル           | 用途                |
+| ---------- | ---------------------- | ------------------- |
+| Vitest     | `vitest.config.ts`     | ユニットテスト      |
+| fast-check | -                      | Property-based test |
+| Playwright | `playwright.config.ts` | E2Eテスト           |
 
 ### テストファイル命名規則
+
 - ユニットテスト: `*.test.ts`
 - Property-based: `*.property.test.ts`
 - E2Eテスト: `e2e/*.spec.ts`
@@ -108,6 +136,7 @@ agentcompany project <subcommand>    # プロジェクト管理
 ## 依存管理
 
 ### allowlist方式
+
 | ファイル                             | 用途               |
 | ------------------------------------ | ------------------ |
 | `tools/installers/allowlist/apt.txt` | システムパッケージ |
@@ -115,6 +144,7 @@ agentcompany project <subcommand>    # プロジェクト管理
 | `tools/installers/allowlist/npm.txt` | Node.jsパッケージ  |
 
 ### インストーラ
+
 ```bash
 # allowlist内のパッケージをインストール
 /usr/local/bin/install.sh npm typescript
@@ -128,7 +158,14 @@ agentcompany project <subcommand>    # プロジェクト管理
 ## ビルド・実行コマンド
 
 ### Makefile
+
 ```bash
+# ワンコマンド起動・停止
+make up         # 全環境一括起動（Docker + Ollama + Server + GUI）
+make down       # 全環境一括停止
+make status     # 起動状態確認
+
+# 開発
 make install    # 依存インストール
 make lint       # 静的解析
 make test       # ユニットテスト
@@ -137,9 +174,15 @@ make ci         # 全ゲート実行
 make build      # TypeScriptビルド
 make clean      # ビルド成果物削除
 make run        # CLI実行
+
+# Docker
+make docker-up    # Docker環境のみ起動
+make docker-down  # Docker環境のみ停止
+make docker-logs  # Dockerログ表示
 ```
 
 ### npm scripts
+
 ```bash
 npm run lint        # ESLint + Prettier
 npm run lint:fix    # 自動修正
@@ -151,6 +194,7 @@ npm run cli         # CLI実行
 ```
 
 ### Docker
+
 ```bash
 # Workspace起動
 docker compose -f infra/docker/compose.yaml up -d
@@ -165,6 +209,7 @@ docker compose -f infra/docker/compose.yaml exec workspace bash
 ## TypeScript設定
 
 ### コンパイラオプション（主要）
+
 ```json
 {
   "target": "ES2022",
@@ -178,6 +223,7 @@ docker compose -f infra/docker/compose.yaml exec workspace bash
 ```
 
 ### パスエイリアス（GUI）
+
 ```json
 {
   "paths": {
@@ -207,6 +253,7 @@ docker compose -f infra/docker/compose.yaml exec workspace bash
 ## AI Adapter
 
 ### 基底クラス
+
 ```typescript
 // tools/adapters/base.ts
 export interface AIAdapter {
@@ -217,6 +264,7 @@ export interface AIAdapter {
 ```
 
 ### Ollama Adapter
+
 ```typescript
 // tools/adapters/ollama.ts
 // デフォルト: http://localhost:11434
@@ -225,9 +273,10 @@ export interface AIAdapter {
 
 ## 環境変数
 
-| 変数名           | 用途                     | デフォルト                    |
-| ---------------- | ------------------------ | ----------------------------- |
-| `NODE_ENV`       | 実行環境                 | `development`                 |
-| `OLLAMA_HOST`    | Ollama接続先             | `http://localhost:11434`      |
-| `INSTALL_LOG_DIR`| インストールログ出力先   | `/workspace/runtime/logs/install` |
-| `ALLOWLIST_DIR`  | allowlistディレクトリ    | `/usr/local/agentcompany/installers/allowlist` |
+| 変数名                 | 用途                     | デフォルト                                     |
+| ---------------------- | ------------------------ | ---------------------------------------------- |
+| `NODE_ENV`             | 実行環境                 | `development`                                  |
+| `OLLAMA_HOST`          | Ollama接続先             | `http://localhost:11434`                       |
+| `ORCHESTRATOR_API_URL` | Orchestrator API接続先   | `http://localhost:3001`                        |
+| `INSTALL_LOG_DIR`      | インストールログ出力先   | `/workspace/runtime/logs/install`              |
+| `ALLOWLIST_DIR`        | allowlistディレクトリ    | `/usr/local/agentcompany/installers/allowlist` |

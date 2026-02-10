@@ -94,7 +94,7 @@ export class MinimalWorkflow {
     if (this.useAI && (await this.adapter.isAvailable())) {
       try {
         const response = await this.adapter.generate({
-          model: 'llama3',
+          model: 'llama3.2:1b',
           prompt: `以下のチケットの実行計画を立ててください。
 
 タイトル: ${ticket.title}
