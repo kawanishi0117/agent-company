@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui';
+import { SystemHealthBanner } from '@/components/ui/SystemHealthBanner';
 
 // =============================================================================
 // 型定義
@@ -166,6 +167,12 @@ export default function DashboardPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
+      {/* システムヘルス警告バナー */}
+      <SystemHealthBanner
+        orchestratorConnected={Boolean(data && (data as DashboardData & { orchestratorConnected: boolean }).orchestratorConnected)}
+        codingAgents={(data?.aiStatus as AIStatus & { codingAgents?: string[] })?.codingAgents ?? []}
+        ollamaRunning={data?.aiStatus?.ollamaRunning ?? false}
+      />
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold text-text-primary">ダッシュボード</h1><p className="text-text-secondary mt-1">エージェント実行エンジンの状態を監視します</p></div>
         <div className="flex items-center gap-2 text-sm text-text-muted"><span>最終更新: {formatTime(data.lastUpdated)}</span><span className="w-2 h-2 bg-status-pass rounded-full animate-pulse" /></div>

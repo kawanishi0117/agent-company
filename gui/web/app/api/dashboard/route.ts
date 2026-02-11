@@ -66,6 +66,8 @@ interface AIStatus {
   recommendedModels: string[];
   /** セットアップ手順（利用不可時のみ） */
   setupInstructions?: string;
+  /** 利用可能なコーディングエージェント名一覧 */
+  codingAgents: string[];
   /** 最終チェック日時（ISO 8601形式） */
   lastChecked: string;
 }
@@ -136,6 +138,7 @@ async function getAIHealthStatus(): Promise<AIStatus> {
     modelsInstalled: [],
     recommendedModels: ['llama3.2:1b', 'codellama', 'deepseek-coder'],
     setupInstructions: 'Ollamaをインストールして起動してください: https://ollama.ai',
+    codingAgents: [],
     lastChecked: new Date().toISOString(),
   };
 
@@ -158,6 +161,7 @@ async function getAIHealthStatus(): Promise<AIStatus> {
         modelsInstalled?: string[];
         recommendedModels?: string[];
         setupInstructions?: string;
+        codingAgents?: { available?: boolean; agents?: string[] };
       };
 
       return {
@@ -168,6 +172,7 @@ async function getAIHealthStatus(): Promise<AIStatus> {
           ? data.recommendedModels
           : fallback.recommendedModels,
         setupInstructions: data.available ? undefined : (data.setupInstructions ?? fallback.setupInstructions),
+        codingAgents: Array.isArray(data.codingAgents?.agents) ? data.codingAgents.agents : [],
         lastChecked: new Date().toISOString(),
       };
     }

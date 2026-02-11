@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui';
+import { SystemHealthBanner } from '@/components/ui/SystemHealthBanner';
 
 // =============================================================================
 // 型定義
@@ -87,6 +88,8 @@ export default function CommandCenterPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [orchestratorConnected, setOrchestratorConnected] = useState<boolean | null>(null);
+  const [codingAgents, setCodingAgents] = useState<string[]>([]);
+  const [ollamaRunning, setOllamaRunning] = useState(false);
 
   // データ読み込み
   const loadData = useCallback(async () => {
@@ -115,6 +118,17 @@ export default function CommandCenterPage(): JSX.Element {
 
   useEffect(() => {
     loadData();
+    // ヘルスチェック: CodingAgent/Ollama 可用性を取得
+    fetch('/api/dashboard')
+      .then((r) => r.json())
+      .then((result) => {
+        if (result.data) {
+          setOrchestratorConnected(result.data.orchestratorConnected ?? false);
+          setCodingAgents(result.data.aiStatus?.codingAgents ?? []);
+          setOllamaRunning(result.data.aiStatus?.ollamaRunning ?? false);
+        }
+      })
+      .catch(() => { /* ヘルスチェック失敗は無視 */ });
   }, [loadData]);
 
   // プレビュー取得
@@ -241,6 +255,13 @@ export default function CommandCenterPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
+      {/* システムヘルス警告バナー */}
+      <SystemHealthBanner
+        orchestratorConnected={orchestratorConnected ?? false}
+        codingAgents={codingAgents}
+        ollamaRunning={ollamaRunning}
+      />
+
       {/* ヘッダー */}
       <div>
         <h1 className="text-2xl font-bold text-text-primary">コマンドセンター</h1>
