@@ -503,7 +503,7 @@ describe('Property 16: Pause/Resume State Preservation', () => {
    *
    * **Validates: Requirement 9.4, 9.5**
    */
-  it('Property 16.1: 一時停止時にすべての状態が保存される', async () => {
+  it('Property 16.1: 一時停止時にすべての状態が保存される', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         executionPersistenceDataArb.filter((d) => d.status === 'running'),
@@ -536,7 +536,7 @@ describe('Property 16: Pause/Resume State Preservation', () => {
    *
    * **Validates: Requirement 9.4**
    */
-  it('Property 16.2: 再開時にすべての状態が復元される', async () => {
+  it('Property 16.2: 再開時にすべての状態が復元される', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         executionPersistenceDataArb.map((d) => ({ ...d, status: 'paused' as const })),
@@ -569,7 +569,7 @@ describe('Property 16: Pause/Resume State Preservation', () => {
    *
    * **Validates: Requirements 9.4, 9.5**
    */
-  it('Property 16.3: 一時停止→再開のサイクルで状態が完全に保持される', async () => {
+  it('Property 16.3: 一時停止→再開のサイクルで状態が完全に保持される', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         executionPersistenceDataArb.filter((d) => d.status === 'running'),

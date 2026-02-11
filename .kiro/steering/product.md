@@ -56,13 +56,17 @@ AIエージェントを「会社組織」として運用するフレームワー
 - 必須フィールド: id, title, responsibilities, capabilities, deliverables, quality_gates, budget, persona, escalation
 - 採用フロー: JD生成 → 面接課題 → 試用実行 → スコア化 → 登録
 
-### 5. GUI（Backlog/Runs/Reports）での可視化
+### 5. GUI（Dashboard/Backlog/Tickets/Runs/Reports）での可視化
 
+- Dashboard: リアルタイム実行状況、承認待ち通知
 - Backlog: カンバンボード（Todo/Doing/Review/Done）
+- Tickets: チケット一覧・作成・詳細管理
 - Runs: 実行ログ、成果物リンク
 - Reports: 日次/週次レポート
-- Dashboard: リアルタイム実行状況
 - Command Center: タスク投入・制御
+- Workflows: ワークフロー一覧・詳細
+- Projects: プロジェクト管理
+- Settings: コーディングエージェント設定
 
 ## Agent Execution Engine
 
@@ -88,16 +92,22 @@ Merger Agent（ブランチマージ）
 
 ### 主要コンポーネント
 
-| コンポーネント   | 役割                   | 場所                                          |
-| ---------------- | ---------------------- | --------------------------------------------- |
-| Orchestrator     | 全体制御、タスク管理   | `tools/cli/lib/execution/orchestrator.ts`     |
-| State Manager    | 状態永続化             | `tools/cli/lib/execution/state-manager.ts`    |
-| Agent Bus        | エージェント間通信     | `tools/cli/lib/execution/agent-bus.ts`        |
-| Worker Pool      | ワーカー管理           | `tools/cli/lib/execution/worker-pool.ts`      |
-| Worker Container | 隔離実行環境           | `tools/cli/lib/execution/worker-container.ts` |
-| Git Manager      | ブランチ・コミット管理 | `tools/cli/lib/execution/git-manager.ts`      |
-| Quality Gate     | 品質チェック統合       | `tools/cli/lib/execution/quality-gate.ts`     |
-| Error Handler    | エラー処理・リトライ   | `tools/cli/lib/execution/error-handler.ts`    |
+| コンポーネント        | 役割                   | 場所                                               |
+| --------------------- | ---------------------- | -------------------------------------------------- |
+| Orchestrator          | 全体制御、タスク管理   | `tools/cli/lib/execution/orchestrator.ts`          |
+| OrchestratorServer    | GUI連携HTTPサーバー    | `tools/cli/lib/execution/orchestrator-server.ts`   |
+| State Manager         | 状態永続化             | `tools/cli/lib/execution/state-manager.ts`         |
+| Agent Bus             | エージェント間通信     | `tools/cli/lib/execution/agent-bus.ts`             |
+| Worker Pool           | ワーカー管理           | `tools/cli/lib/execution/worker-pool.ts`           |
+| Worker Container      | 隔離実行環境           | `tools/cli/lib/execution/worker-container.ts`      |
+| Git Manager           | ブランチ・コミット管理 | `tools/cli/lib/execution/git-manager.ts`           |
+| Quality Gate          | 品質チェック統合       | `tools/cli/lib/execution/quality-gate.ts`          |
+| Quality Gate Integration | 品質ゲート統合実行  | `tools/cli/lib/execution/quality-gate-integration.ts` |
+| Error Handler         | エラー処理・リトライ   | `tools/cli/lib/execution/error-handler.ts`         |
+| AI Health Checker     | AI可用性チェック       | `tools/cli/lib/execution/ai-health-checker.ts`     |
+| Execution Reporter    | 実行レポート生成       | `tools/cli/lib/execution/execution-reporter.ts`    |
+| Settings Manager      | 設定管理               | `tools/cli/lib/execution/settings-manager.ts`      |
+| Workspace Manager     | ワークスペース管理     | `tools/cli/lib/execution/workspace-manager.ts`     |
 
 ## 品質判定基準
 
@@ -197,11 +207,18 @@ Merger Agent（ブランチマージ）
 - 両方利用不可の場合は 503 エラー
 - 提案フェーズは Ollama、開発フェーズは CodingAgent と役割分担
 
-### GUI
+### GUI画面一覧
 
-- Command Center: `/command`（CEO指示入力、ワークフロー開始）
-- Workflows一覧: `/workflows`（フィルタ・ソート対応）
-- ワークフロー詳細: `/workflows/[id]`（6タブ: 概要/提案書/会議録/進捗/品質/承認履歴）
-- Dashboard: 承認待ち通知カード、ワークフローサマリー
-- Settings: `/settings`（コーディングエージェント設定）
-- Navigation: 承認待ち数の通知バッジ
+| パス | 画面 | 機能 |
+|------|------|------|
+| `/dashboard` | Dashboard | リアルタイム実行状況、承認待ち通知 |
+| `/command` | Command Center | CEO指示入力、ワークフロー開始 |
+| `/backlog` | Backlog | カンバンボード |
+| `/tickets` | Tickets | チケット一覧・作成・詳細 |
+| `/workflows` | Workflows | ワークフロー一覧（フィルタ・ソート） |
+| `/workflows/[id]` | ワークフロー詳細 | 6タブ: 概要/提案書/会議録/進捗/品質/承認履歴 |
+| `/projects` | Projects | プロジェクト管理 |
+| `/runs` | Runs | 実行ログ・成果物 |
+| `/reports` | Reports | 日次/週次レポート |
+| `/review` | Review | レビュー管理 |
+| `/settings` | Settings | コーディングエージェント設定 |

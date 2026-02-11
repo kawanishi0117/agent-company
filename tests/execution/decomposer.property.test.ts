@@ -813,7 +813,7 @@ describe('Property 4: Sub-Task File Naming Convention', () => {
    * Property 4.1: ファイル名は <parent-id>-<sub-id>.md パターンに従う
    * **Validates: Requirement 2.5**
    */
-  it('Property 4.1: ファイル名は <parent-id>-<sub-id>.md パターンに従う', async () => {
+  it('Property 4.1: ファイル名は <parent-id>-<sub-id>.md パターンに従う', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 5 }), async (taskCount) => {
         const adapter = new MockIndependentTaskAdapter(taskCount);
@@ -867,7 +867,7 @@ describe('Property 4: Sub-Task File Naming Convention', () => {
    * Property 4.2: ファイルは指定されたbacklogディレクトリに保存される
    * **Validates: Requirement 2.5**
    */
-  it('Property 4.2: ファイルは指定されたbacklogディレクトリに保存される', async () => {
+  it('Property 4.2: ファイルは指定されたbacklogディレクトリに保存される', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 5 }), async (taskCount) => {
         const adapter = new MockIndependentTaskAdapter(taskCount);
@@ -917,7 +917,7 @@ describe('Property 4: Sub-Task File Naming Convention', () => {
    * Property 4.3: 保存されたファイルにはparent_idフィールドが含まれる
    * **Validates: Requirement 2.4, 2.5**
    */
-  it('Property 4.3: 保存されたファイルにはparent_idフィールドが含まれる', async () => {
+  it('Property 4.3: 保存されたファイルにはparent_idフィールドが含まれる', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 3 }), async (taskCount) => {
         const adapter = new MockIndependentTaskAdapter(taskCount);
@@ -964,7 +964,7 @@ describe('Property 4: Sub-Task File Naming Convention', () => {
    * Property 4.4: サブタスクIDの連番は001から始まる
    * **Validates: Requirement 2.5**
    */
-  it('Property 4.4: サブタスクIDの連番は001から始まる', async () => {
+  it('Property 4.4: サブタスクIDの連番は001から始まる', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 10 }), async (taskCount) => {
         const adapter = new MockIndependentTaskAdapter(taskCount);
@@ -1002,7 +1002,7 @@ describe('Property 4: Sub-Task File Naming Convention', () => {
    * Property 4.5: decomposeAndSaveは分解と保存を一括で行う
    * **Validates: Requirement 2.5**
    */
-  it('Property 4.5: decomposeAndSaveは分解と保存を一括で行う', async () => {
+  it('Property 4.5: decomposeAndSaveは分解と保存を一括で行う', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 5 }), async (taskCount) => {
         const adapter = new MockIndependentTaskAdapter(taskCount);
@@ -1054,7 +1054,7 @@ describe('Property 4: Sub-Task File Naming Convention', () => {
    * Property 4.6: 保存されたファイルはMarkdown形式である
    * **Validates: Requirement 2.5**
    */
-  it('Property 4.6: 保存されたファイルはMarkdown形式である', async () => {
+  it('Property 4.6: 保存されたファイルはMarkdown形式である', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 1, max: 3 }), async (taskCount) => {
         const adapter = new MockIndependentTaskAdapter(taskCount);

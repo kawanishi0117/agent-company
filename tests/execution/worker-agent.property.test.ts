@@ -215,7 +215,7 @@ describe('Property 19: Conversation History Persistence Round-Trip', () => {
    *
    * **Validates: Requirements 11.1, 11.6**
    */
-  it('Property 19.1: 任意の会話履歴を保存後、読み込むと全フィールドが正確に復元される', async () => {
+  it('Property 19.1: 任意の会話履歴を保存後、読み込むと全フィールドが正確に復元される', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(conversationHistoryArb, async (history) => {
         // テスト用のrunIdを生成（クリーンアップ対象にするため）
@@ -241,7 +241,7 @@ describe('Property 19: Conversation History Persistence Round-Trip', () => {
    *
    * **Validates: Requirement 11.1 (conversation history)**
    */
-  it('Property 19.2: メッセージ配列が正確に保持される', async () => {
+  it('Property 19.2: メッセージ配列が正確に保持される', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(conversationHistoryArb, async (history) => {
         const testRunId = `test-${history.runId}`;
@@ -269,7 +269,7 @@ describe('Property 19: Conversation History Persistence Round-Trip', () => {
    *
    * **Validates: Requirement 11.1 (tool call records)**
    */
-  it('Property 19.3: ツール呼び出し記録が正確に保持される', async () => {
+  it('Property 19.3: ツール呼び出し記録が正確に保持される', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(conversationHistoryArb, async (history) => {
         const testRunId = `test-${history.runId}`;

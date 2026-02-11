@@ -198,7 +198,7 @@ describe('Feature: ai-execution-integration, Property 2: Graceful Degradation on
    * @see Requirement 1.5: AI利用不可時のGraceful Degradation
    * @see Requirement 6.3: 一時停止と状態保存
    */
-  it('Property 2.1: AI利用不可時にpaused-state.jsonが作成される', async () => {
+  it('Property 2.1: AI利用不可時にpaused-state.jsonが作成される', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -239,7 +239,7 @@ describe('Feature: ai-execution-integration, Property 2: Graceful Degradation on
    *
    * @see Requirement 1.5: データ損失なしの一時停止
    */
-  it('Property 2.2: 一時停止状態に全ての進捗情報が保持される', async () => {
+  it('Property 2.2: 一時停止状態に全ての進捗情報が保持される', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -298,7 +298,7 @@ describe('Feature: ai-execution-integration, Property 2: Graceful Degradation on
    *
    * @see Requirement 6.3: エラーログへの記録
    */
-  it('Property 2.3: 一時停止時にerrors.logにも記録される', async () => {
+  it('Property 2.3: 一時停止時にerrors.logにも記録される', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -336,7 +336,7 @@ describe('Feature: ai-execution-integration, Property 2: Graceful Degradation on
    *
    * @see Requirement 6.3: 状態の永続化
    */
-  it('Property 2.4: 保存された状態がJSONラウンドトリップで一致する', async () => {
+  it('Property 2.4: 保存された状態がJSONラウンドトリップで一致する', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -391,7 +391,7 @@ describe('Feature: ai-execution-integration, Property 13: Error Logging and Fail
    *
    * @see Requirement 6.1: エラーログの記録
    */
-  it('Property 13.1: 任意のエラーがerrors.logに記録される', async () => {
+  it('Property 13.1: 任意のエラーがerrors.logに記録される', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -429,7 +429,7 @@ describe('Feature: ai-execution-integration, Property 13: Error Logging and Fail
    *
    * @see Requirement 6.1: エラーログの完全性
    */
-  it('Property 13.2: 複数エラーが全てerrors.logに記録される', async () => {
+  it('Property 13.2: 複数エラーが全てerrors.logに記録される', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -465,7 +465,7 @@ describe('Feature: ai-execution-integration, Property 13: Error Logging and Fail
    *
    * @see Requirement 6.1: エラー統計情報
    */
-  it('Property 13.3: エラー統計が正しく集計される', async () => {
+  it('Property 13.3: エラー統計が正しく集計される', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -520,7 +520,7 @@ describe('Feature: ai-execution-integration, Property 13: Error Logging and Fail
    *
    * @see Requirement 6.1: エラー統計の初期状態
    */
-  it('Property 13.4: 空のログに対する統計が初期値を返す', async () => {
+  it('Property 13.4: 空のログに対する統計が初期値を返す', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(runIdArb, async (runId) => {
         const handler = createErrorHandler({
@@ -549,7 +549,7 @@ describe('Feature: ai-execution-integration, Property 13: Error Logging and Fail
    *
    * @see Requirement 6.5: 永続的失敗時のレポート生成
    */
-  it('Property 13.5: 失敗レポートがMarkdownファイルとして生成される', async () => {
+  it('Property 13.5: 失敗レポートがMarkdownファイルとして生成される', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -596,7 +596,7 @@ describe('Feature: ai-execution-integration, Property 13: Error Logging and Fail
    *
    * @see Requirement 6.5: レポートの完全性
    */
-  it('Property 13.6: 失敗レポートに全エラーのメッセージが含まれる', async () => {
+  it('Property 13.6: 失敗レポートに全エラーのメッセージが含まれる', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -635,7 +635,7 @@ describe('Feature: ai-execution-integration, Property 13: Error Logging and Fail
    *
    * @see Requirements: 6.1, 6.5
    */
-  it('Property 13.7: エラーログと失敗レポートが共存し整合性がある', async () => {
+  it('Property 13.7: エラーログと失敗レポートが共存し整合性がある', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,

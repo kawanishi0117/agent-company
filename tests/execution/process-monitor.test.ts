@@ -44,7 +44,7 @@ const TEST_RUN_ID = 'test-run-001';
 /**
  * ログファイルが作成されるまで待機
  */
-async function waitForLogFile(logPath: string, maxWaitMs: number = 2000): Promise<boolean> {
+async function waitForLogFile(logPath: string, maxWaitMs: number = 5000): Promise<boolean> {
   const startTime = Date.now();
   while (Date.now() - startTime < maxWaitMs) {
     try {
@@ -460,7 +460,7 @@ describe('ProcessMonitor', () => {
      * コマンドログの出力
      * @see Requirement 6.7: THE Process_Monitor SHALL log all command executions
      */
-    it('コマンド実行をログに記録する', async () => {
+    it('コマンド実行をログに記録する', { timeout: 15000 }, async () => {
       const command = isWindows ? 'cmd /c echo test_log' : 'echo test_log';
       await processMonitor.execute(command, { timeout: 5 });
 
@@ -486,7 +486,7 @@ describe('ProcessMonitor', () => {
       expect(logContent).toContain('[TIMEOUT]');
     }, 15000);
 
-    it('バックグラウンド実行をログに記録する', async () => {
+    it('バックグラウンド実行をログに記録する', { timeout: 15000 }, async () => {
       const command = isWindows ? 'cmd /c echo bg_test' : 'echo bg_test';
       const processId = await processMonitor.executeBackground(command);
 

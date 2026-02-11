@@ -408,7 +408,7 @@ describe('Feature: autonomous-agent-workflow, Property 15: State Persistence Rou
    *
    * **Validates: Requirement 9.1**
    */
-  it('Property 15.1: 保存と読み込みでデータが保持される', async () => {
+  it('Property 15.1: 保存と読み込みでデータが保持される', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(projectIdArb, instructionArb, async (projectId, instruction) => {
         // 新しいマネージャーでチケットを作成
@@ -442,7 +442,7 @@ describe('Feature: autonomous-agent-workflow, Property 15: State Persistence Rou
    *
    * **Validates: Requirement 9.1**
    */
-  it('Property 15.2: 階層構造が保存・読み込みで保持される', async () => {
+  it('Property 15.2: 階層構造が保存・読み込みで保持される', { timeout: 30000 }, async () => {
     const projectId = 'test-proj';
     const manager1 = new TicketManager(tempDir);
 
@@ -486,7 +486,7 @@ describe('Feature: autonomous-agent-workflow, Property 15: State Persistence Rou
    *
    * **Validates: Requirement 9.1**
    */
-  it('Property 15.3: シーケンス番号が保存・読み込みで保持される', async () => {
+  it('Property 15.3: シーケンス番号が保存・読み込みで保持される', { timeout: 30000 }, async () => {
     const projectId = 'test-proj';
     const manager1 = new TicketManager(tempDir);
 

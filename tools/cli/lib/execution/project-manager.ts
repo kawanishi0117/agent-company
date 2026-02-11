@@ -126,8 +126,10 @@ export class ProjectManager {
     // データを更新
     data.lastUpdated = new Date().toISOString();
 
-    // ファイルに保存
-    await fs.writeFile(this.projectsFile, JSON.stringify(data, null, 2), 'utf-8');
+    // アトミック書き込み: 一時ファイルに書き込んでからリネーム
+    const tmpFile = `${this.projectsFile}.tmp.${Date.now()}`;
+    await fs.writeFile(tmpFile, JSON.stringify(data, null, 2), 'utf-8');
+    await fs.rename(tmpFile, this.projectsFile);
 
     // キャッシュを更新
     this.cachedData = data;

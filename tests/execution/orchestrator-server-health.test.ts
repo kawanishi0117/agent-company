@@ -27,6 +27,7 @@ import { StateManager } from '../../tools/cli/lib/execution/state-manager';
 import { createAgentBus } from '../../tools/cli/lib/execution/agent-bus';
 import { createWorkerPool } from '../../tools/cli/lib/execution/worker-pool';
 import { AIHealthChecker } from '../../tools/cli/lib/execution/ai-health-checker';
+import { CodingAgentRegistry } from '../../tools/coding-agents/index';
 
 // =============================================================================
 // テスト用定数
@@ -114,6 +115,16 @@ function createUnavailableHealthChecker(): AIHealthChecker {
 }
 
 /**
+ * 空のCodingAgentRegistryを作成（全エージェント利用不可）
+ * @returns アダプタが登録されていないCodingAgentRegistry
+ */
+function createEmptyCodingAgentRegistry(): CodingAgentRegistry {
+  const registry = new CodingAgentRegistry();
+  registry.clearAdapters();
+  return registry;
+}
+
+/**
  * テスト用のOrchestratorServerを作成・起動
  *
  * @param tempDir - 一時ディレクトリ
@@ -150,6 +161,7 @@ async function createAndStartServer(
     port,
     orchestrator,
     aiHealthChecker,
+    codingAgentRegistry: createEmptyCodingAgentRegistry(),
   });
 
   await server.start();

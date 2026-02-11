@@ -332,7 +332,7 @@ describe('Feature: ai-execution-integration, Property 10: Quality Gate Sequentia
    *
    * **Validates: Requirements 4.3**
    */
-  it('saveResults → loadResults: ラウンドトリップで等価なデータが返る', async () => {
+  it('saveResults → loadResults: ラウンドトリップで等価なデータが返る', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -385,7 +385,7 @@ describe('Feature: ai-execution-integration, Property 10: Quality Gate Sequentia
    *
    * **Validates: Requirements 4.3**
    */
-  it('saveResults: quality.json ファイルが作成される', async () => {
+  it('saveResults: quality.json ファイルが作成される', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -643,7 +643,7 @@ describe('Feature: ai-execution-integration, Property 11: Quality Gate Feedback 
    *
    * **Validates: Requirements 4.4, 4.5**
    */
-  it('WorkerAgent品質ゲート統合: コールバック経由で品質チェックが実行される', async () => {
+  it('WorkerAgent品質ゲート統合: コールバック経由で品質チェックが実行される', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,

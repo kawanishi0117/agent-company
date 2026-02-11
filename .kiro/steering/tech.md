@@ -36,6 +36,7 @@ inclusion: always
 | フレームワーク | Next.js 14.x (App Router) |
 | 言語           | TypeScript                |
 | スタイル       | Tailwind CSS 3.x          |
+| Markdown       | marked 11.x               |
 | テスト         | Vitest + Testing Library  |
 | 場所           | `gui/web/`                |
 
@@ -44,13 +45,22 @@ inclusion: always
 ```typescript
 // gui/web/tailwind.config.ts
 colors: {
+  // Background
   'bg-primary': '#0f172a',      // slate-900
   'bg-secondary': '#1e293b',    // slate-800
+  'bg-tertiary': '#334155',     // slate-700
+  // Text
   'text-primary': '#f8fafc',    // slate-50
+  'text-secondary': '#94a3b8',  // slate-400
+  'text-muted': '#64748b',      // slate-500
+  // Accent
   'accent-primary': '#3b82f6',  // blue-500
+  'accent-hover': '#2563eb',    // blue-600
+  // Status
   'status-pass': '#22c55e',     // green-500
   'status-fail': '#ef4444',     // red-500
   'status-waiver': '#eab308',   // yellow-500
+  'status-running': '#3b82f6',  // blue-500
 }
 ```
 
@@ -190,7 +200,10 @@ npm run test        # Vitest（カバレッジ付き）
 npm run test:watch  # Vitest（ウォッチモード）
 npm run e2e         # Playwright
 npm run ci          # 全ゲート
-npm run cli         # CLI実行
+npm run cli         # CLI実行（tsx tools/cli/agentcompany.ts）
+npm run up          # ワンコマンド起動（scripts/start.ps1）
+npm run down        # ワンコマンド停止（scripts/stop.ps1）
+npm run status      # 起動状態確認（scripts/status.ps1）
 ```
 
 ### Docker
@@ -218,7 +231,8 @@ docker compose -f infra/docker/compose.yaml exec workspace bash
   "strict": true,
   "noUnusedLocals": true,
   "noUnusedParameters": true,
-  "noImplicitReturns": true
+  "noImplicitReturns": true,
+  "noFallthroughCasesInSwitch": true
 }
 ```
 
@@ -231,6 +245,30 @@ docker compose -f infra/docker/compose.yaml exec workspace bash
   }
 }
 ```
+
+## 主要依存パッケージ
+
+### ルート（package.json）
+
+| パッケージ | 用途 |
+|-----------|------|
+| yaml | YAML解析 |
+| gray-matter | Markdownフロントマター解析 |
+| tsx | TypeScript実行 |
+| vitest + @vitest/coverage-v8 | テスト + カバレッジ |
+| fast-check | Property-based testing |
+| @playwright/test | E2Eテスト |
+
+### GUI（gui/web/package.json）
+
+| パッケージ | 用途 |
+|-----------|------|
+| next ^14.2.0 | フレームワーク |
+| react ^18.3.0 | UI |
+| marked ^11.0.0 | Markdownレンダリング |
+| gray-matter | フロントマター解析 |
+| tailwindcss ^3.4.4 | スタイル |
+| @testing-library/react | コンポーネントテスト |
 
 ## 設定ファイル一覧
 
@@ -247,6 +285,7 @@ docker compose -f infra/docker/compose.yaml exec workspace bash
 | `gui/web/package.json`             | GUI依存設定            |
 | `gui/web/tailwind.config.ts`       | Tailwind設定           |
 | `gui/web/vitest.config.ts`         | GUI Vitest設定         |
+| `gui/web/vitest.setup.ts`          | GUI Vitestセットアップ |
 | `runtime/state/config.json`        | システム設定           |
 | `tools/installers/allowlist/*.txt` | 許可パッケージリスト   |
 

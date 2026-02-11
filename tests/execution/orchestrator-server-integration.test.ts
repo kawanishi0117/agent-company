@@ -30,6 +30,7 @@ import { createWorkerPool } from '../../tools/cli/lib/execution/worker-pool';
 import { AIHealthChecker } from '../../tools/cli/lib/execution/ai-health-checker';
 import { RunDirectoryManager } from '../../tools/cli/lib/execution/run-directory-manager';
 import { createQualityGateIntegration } from '../../tools/cli/lib/execution/quality-gate-integration';
+import { CodingAgentRegistry } from '../../tools/coding-agents/index';
 
 // =============================================================================
 // テスト用定数
@@ -160,10 +161,16 @@ async function createAndStartServer(
     qualityGateIntegration,
   });
 
+  // AI利用不可テスト用: 空のCodingAgentRegistryを注入
+  // グローバルレジストリはローカルCLIツールを検出してしまうため
+  const emptyCodingAgentRegistry = new CodingAgentRegistry();
+  emptyCodingAgentRegistry.clearAdapters();
+
   const server = createOrchestratorServer({
     port,
     orchestrator,
     aiHealthChecker,
+    codingAgentRegistry: emptyCodingAgentRegistry,
   });
 
   await server.start();

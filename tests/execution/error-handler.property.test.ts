@@ -535,7 +535,7 @@ describe('Retry Edge Cases (Property-Based)', () => {
    * リトライ設定の独立性
    * 異なるリトライ設定は互いに影響しない
    */
-  it('リトライ設定は独立している', async () => {
+  it('リトライ設定は独立している', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,

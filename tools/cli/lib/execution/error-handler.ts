@@ -975,22 +975,31 @@ export class ErrorHandler {
    * @see Requirement 13.5: THE error details SHALL be logged to `runtime/runs/<run-id>/errors.log`
    */
   async logError(runId: RunId, error: ErrorInfo): Promise<void> {
-    try {
-      // ログディレクトリを作成
-      const logDir = path.join(this.runtimeBasePath, runId);
-      await fs.mkdir(logDir, { recursive: true });
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // ログディレクトリを作成
+        const logDir = path.join(this.runtimeBasePath, runId);
+        await fs.mkdir(logDir, { recursive: true });
 
-      // ログファイルパス
-      const logPath = path.join(logDir, ERROR_LOG_FILENAME);
+        // ログファイルパス
+        const logPath = path.join(logDir, ERROR_LOG_FILENAME);
 
-      // ログエントリを作成
-      const logEntry = this.formatLogEntry(error);
+        // ログエントリを作成
+        const logEntry = this.formatLogEntry(error);
 
-      // ログファイルに追記
-      await fs.appendFile(logPath, logEntry + '\n', 'utf-8');
-    } catch (logError) {
-      // ログ出力自体のエラーはコンソールに出力
-      console.error('[ErrorHandler] エラーログ出力失敗:', logError);
+        // ログファイルに追記
+        await fs.appendFile(logPath, logEntry + '\n', 'utf-8');
+        return; // 成功したら終了
+      } catch (logError) {
+        // ENOENT等の一時的エラーはリトライ
+        if (attempt < maxRetries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+          continue;
+        }
+        // 最終リトライでも失敗した場合はコンソールに出力
+        console.error('[ErrorHandler] エラーログ出力失敗:', logError);
+      }
     }
   }
 
@@ -1317,22 +1326,29 @@ export class ErrorHandler {
       recoveryInstructions,
     };
 
-    // 状態をファイルに保存
-    try {
-      const stateDir = path.join(this.runtimeBasePath, runId);
-      await fs.mkdir(stateDir, { recursive: true });
+    // 状態をファイルに保存（リトライ付き）
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const stateDir = path.join(this.runtimeBasePath, runId);
+        await fs.mkdir(stateDir, { recursive: true });
 
-      const statePath = path.join(stateDir, PAUSED_STATE_FILENAME);
-      await fs.writeFile(statePath, JSON.stringify(pausedState, null, 2), 'utf-8');
+        const statePath = path.join(stateDir, PAUSED_STATE_FILENAME);
+        await fs.writeFile(statePath, JSON.stringify(pausedState, null, 2), 'utf-8');
 
-      console.warn(
-        `[ErrorHandler] AI利用不可 - 実行を一時停止しました (runId: ${runId})`
-      );
-    } catch (writeError) {
-      console.error(
-        '[ErrorHandler] 一時停止状態の保存に失敗:',
-        writeError instanceof Error ? writeError.message : String(writeError)
-      );
+        console.warn(
+          `[ErrorHandler] AI利用不可 - 実行を一時停止しました (runId: ${runId})`
+        );
+        break;
+      } catch (writeError) {
+        if (attempt < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+          continue;
+        }
+        console.error(
+          '[ErrorHandler] 一時停止状態の保存に失敗:',
+          writeError instanceof Error ? writeError.message : String(writeError)
+        );
+      }
     }
 
     // エラーログにも記録

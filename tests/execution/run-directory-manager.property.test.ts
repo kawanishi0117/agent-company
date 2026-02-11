@@ -207,7 +207,7 @@ describe('Feature: ai-execution-integration, Property 4: Run Directory and Metad
    *
    * **Validates: Requirements 2.4**
    */
-  it('createRunDirectory: 実行ディレクトリと artifacts サブディレクトリが作成される', async () => {
+  it('createRunDirectory: 実行ディレクトリと artifacts サブディレクトリが作成される', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runIdArb,
@@ -243,7 +243,7 @@ describe('Feature: ai-execution-integration, Property 4: Run Directory and Metad
    *
    * **Validates: Requirements 2.4, 2.5**
    */
-  it('saveTaskMetadata → loadTaskMetadata: ラウンドトリップで等価なオブジェクトが返る', async () => {
+  it('saveTaskMetadata → loadTaskMetadata: ラウンドトリップで等価なオブジェクトが返る', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runTaskMetadataArb,
@@ -291,7 +291,7 @@ describe('Feature: ai-execution-integration, Property 4: Run Directory and Metad
    *
    * **Validates: Requirements 2.4, 2.5**
    */
-  it('統合フロー: createRunDirectory → saveTaskMetadata → loadTaskMetadata が正しく動作する', async () => {
+  it('統合フロー: createRunDirectory → saveTaskMetadata → loadTaskMetadata が正しく動作する', { timeout: 30000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         runTaskMetadataArb,

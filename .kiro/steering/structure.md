@@ -11,12 +11,18 @@ agent-company/
 ├── .kiro/                       # Kiro設定
 │   ├── specs/                   # 機能仕様（開発中）
 │   │   ├── agent-execution-engine/
+│   │   ├── ai-execution-integration/
+│   │   ├── autonomous-agent-workflow/
+│   │   ├── coding-agent-integration/
+│   │   ├── company-workflow-engine/
+│   │   ├── end-to-end-workflow-wiring/
 │   │   ├── m0-skeleton/
 │   │   ├── m1-docker-workspace/
 │   │   ├── m2-quality-gates/
 │   │   ├── m3-governance/
 │   │   ├── m4-gui/
-│   │   └── m5-hiring-system/
+│   │   ├── m5-hiring-system/
+│   │   └── workflow-production-ready/
 │   └── steering/                # LLM向けガイドライン
 │       ├── always.md            # 常時適用ルール
 │       ├── product.md           # プロダクト概要
@@ -25,7 +31,7 @@ agent-company/
 │
 ├── docs/                        # 会社の規程（人が読める）
 │   ├── specs/                   # 機能仕様書（正式版）
-│   │   ├── README.md            # 仕様書インデックス
+│   │   ├── README.md
 │   │   ├── agent-execution-engine.md
 │   │   ├── ai-adapters.md
 │   │   ├── ai-execution-integration.md
@@ -34,7 +40,7 @@ agent-company/
 │   │   ├── company-workflow-engine.md
 │   │   ├── end-to-end-workflow-wiring.md
 │   │   ├── workflow-production-ready.md
-│   │   └── milestones/          # マイルストーン仕様
+│   │   └── milestones/
 │   │       ├── m0-skeleton.md
 │   │       ├── m1-docker-workspace.md
 │   │       ├── m2-quality-gates.md
@@ -42,49 +48,44 @@ agent-company/
 │   │       ├── m4-gui.md
 │   │       └── m5-hiring-system.md
 │   ├── company/                 # 不変のポリシー
-│   │   ├── policies.md          # 会社ポリシー
-│   │   ├── definition-of-done.md # 完了基準
-│   │   ├── review-standards.md  # レビュー基準
-│   │   └── waiver-policy.md     # 例外承認ルール
+│   │   ├── policies.md
+│   │   ├── definition-of-done.md
+│   │   ├── review-standards.md
+│   │   └── waiver-policy.md
 │   ├── playbooks/               # 運用手順書
-│   │   └── hiring.md            # 採用手順
+│   │   └── hiring.md
 │   └── architecture/            # 設計ドキュメント
-│       ├── README.md            # アーキテクチャインデックス
-│       ├── overview.md          # アーキテクチャ概要
-│       ├── execution-engine.md  # コア実行エンジン
-│       ├── orchestrator-server.md # Orchestrator Server（GUI連携API）
-│       ├── ai-integration.md    # AI実行統合
-│       ├── workflow-engine.md   # Company Workflow Engine
+│       ├── README.md
+│       ├── overview.md
+│       ├── execution-engine.md
+│       ├── orchestrator-server.md
+│       ├── ai-integration.md
+│       ├── workflow-engine.md
 │       ├── container-isolation.md
 │       └── worker-management.md
 │
 ├── agents/                      # エージェント定義
 │   ├── registry/                # 採用済みエージェント
-│   │   ├── coo_pm.yaml          # COO/PM
-│   │   ├── quality_authority.yaml # Quality Authority
-│   │   ├── hiring_manager.yaml  # Hiring Manager
-│   │   ├── reviewer.yaml        # Reviewer Agent
-│   │   ├── merger.yaml          # Merger Agent
-│   │   └── templates/           # テンプレート
+│   │   ├── coo_pm.yaml
+│   │   ├── quality_authority.yaml
+│   │   ├── hiring_manager.yaml
+│   │   ├── reviewer.yaml
+│   │   ├── merger.yaml
+│   │   └── templates/
 │   │       ├── agent_template.yaml
 │   │       └── worker.yaml
 │   └── prompts/                 # 役割別プロンプト
-│       ├── shared/              # 共通プロンプト
-│       ├── roles/               # 役割別
+│       ├── shared/
+│       ├── roles/
 │       │   ├── manager.md
 │       │   └── worker.md
-│       └── rubrics/             # 評価基準
+│       └── rubrics/
 │
 ├── workflows/                   # 作業管理
 │   ├── backlog/                 # チケット（1件=1ファイル）
-│   │   ├── TEMPLATE.md
-│   │   └── 0001-sample.md
 │   ├── reports/                 # レポート
-│   │   ├── daily/
-│   │   └── weekly/
 │   ├── decisions/               # ADR（意思決定ログ）
 │   └── waivers/                 # 例外承認記録
-│       └── TEMPLATE.md
 │
 ├── tools/                       # 実行ツール
 │   ├── cli/                     # AgentCompany CLI
@@ -93,16 +94,21 @@ agent-company/
 │   │   ├── workflow.ts          # ワークフロー実行
 │   │   ├── validator.ts         # エージェント検証
 │   │   ├── deliverable-validator.ts # 成果物検証
+│   │   ├── demo.ts              # デモ実行
+│   │   ├── README.md            # CLI説明
 │   │   ├── commands/            # CLIコマンド
 │   │   │   ├── execute.ts       # 実行コマンド
 │   │   │   ├── hire.ts          # 採用コマンド
 │   │   │   ├── judge.ts         # 判定コマンド
 │   │   │   ├── project.ts       # プロジェクト管理
+│   │   │   ├── server.ts        # Orchestrator APIサーバー
+│   │   │   ├── ticket.ts        # チケット管理
 │   │   │   └── waiver.ts        # Waiver管理
 │   │   └── lib/                 # ライブラリ
 │   │       ├── execution/       # 実行エンジン
 │   │       │   ├── types.ts     # 型定義
 │   │       │   ├── orchestrator.ts
+│   │       │   ├── orchestrator-server.ts
 │   │       │   ├── state-manager.ts
 │   │       │   ├── agent-bus.ts
 │   │       │   ├── worker-pool.ts
@@ -112,83 +118,83 @@ agent-company/
 │   │       │   ├── git-credentials.ts
 │   │       │   ├── decomposer.ts
 │   │       │   ├── quality-gate.ts
+│   │       │   ├── quality-gate-integration.ts
 │   │       │   ├── error-handler.ts
 │   │       │   ├── process-monitor.ts
 │   │       │   ├── message-queue.ts
 │   │       │   ├── project-manager.ts
-│   │       │   ├── ticket-manager.ts      # チケット階層管理
-│   │       │   ├── worker-type-registry.ts # ワーカータイプ定義
-│   │       │   ├── pr-creator.ts          # PR作成
-│   │       │   ├── review-workflow.ts     # レビューワークフロー
-│   │       │   ├── workflow-engine.ts     # ワークフローエンジン（5フェーズ）
-│   │       │   ├── meeting-coordinator.ts # 会議コーディネーター
-│   │       │   ├── approval-gate.ts       # 承認ゲート
+│   │       │   ├── ticket-manager.ts
+│   │       │   ├── worker-type-registry.ts
+│   │       │   ├── pr-creator.ts
+│   │       │   ├── review-workflow.ts
+│   │       │   ├── workflow-engine.ts     # 5フェーズワークフロー
+│   │       │   ├── meeting-coordinator.ts
+│   │       │   ├── approval-gate.ts
+│   │       │   ├── ai-health-checker.ts   # AI可用性チェック
+│   │       │   ├── execution-reporter.ts  # 実行レポート生成
+│   │       │   ├── run-directory-manager.ts # 実行ディレクトリ管理
+│   │       │   ├── settings-manager.ts    # 設定管理
+│   │       │   ├── workspace-manager.ts   # ワークスペース管理
 │   │       │   ├── tools.ts
 │   │       │   └── agents/      # エージェント実装
-│   │       │       ├── manager-agent.ts
-│   │       │       ├── worker-agent.ts
-│   │       │       ├── reviewer-agent.ts
-│   │       │       └── merger-agent.ts
+│   │       │       ├── manager.ts
+│   │       │       ├── worker.ts
+│   │       │       ├── reviewer.ts
+│   │       │       └── merger.ts
 │   │       ├── hiring/          # 採用システム
+│   │       │   ├── index.ts
+│   │       │   ├── types.ts
 │   │       │   ├── jd-generator.ts
 │   │       │   ├── interview-generator.ts
 │   │       │   ├── trial-runner.ts
 │   │       │   ├── scoring-engine.ts
-│   │       │   └── registry-manager.ts
-│   │       ├── judgment.ts      # 品質判定
+│   │       │   ├── registry-manager.ts
+│   │       │   ├── hiring-logger.ts
+│   │       │   └── notification.ts
+│   │       ├── judgment.ts
 │   │       └── waiver-validator.ts
 │   ├── installers/              # 許可リスト管理
-│   │   ├── install.sh           # インストーラ
+│   │   ├── install.sh
 │   │   ├── allowlist-parser.ts
 │   │   ├── installer.ts
 │   │   ├── log-writer.ts
-│   │   └── allowlist/           # 許可リスト
+│   │   └── allowlist/
 │   │       ├── apt.txt
 │   │       ├── pip.txt
 │   │       └── npm.txt
 │   ├── validators/              # ルール検査
 │   ├── adapters/                # AI CLIアダプタ（テキスト生成用）
-│   │   ├── base.ts              # 基底クラス
-│   │   ├── index.ts             # エクスポート
-│   │   └── ollama.ts            # Ollama実装
+│   │   ├── base.ts
+│   │   ├── index.ts
+│   │   └── ollama.ts
 │   └── coding-agents/           # コーディングエージェントCLIラッパー
-│       ├── base.ts              # 基底インターフェース・エラークラス
-│       ├── opencode.ts          # OpenCodeAdapter
-│       ├── claude-code.ts       # ClaudeCodeAdapter
-│       ├── kiro-cli.ts          # KiroCliAdapter
-│       └── index.ts             # CodingAgentRegistry
+│       ├── base.ts
+│       ├── opencode.ts
+│       ├── claude-code.ts
+│       ├── kiro-cli.ts
+│       └── index.ts
 │
 ├── runtime/                     # 実行時データ（自動生成）
+│   ├── .pids/                   # プロセスID管理
 │   ├── runs/                    # 実行ログ・成果物
-│   │   └── <date>-<run-id>/
-│   │       ├── logs.txt
-│   │       ├── report.md
-│   │       ├── result.json
-│   │       └── judgment.json
-│   ├── cache/                   # キャッシュ
-│   ├── logs/                    # ログ
-│   │   └── install/             # インストールログ
+│   ├── cache/
+│   ├── logs/
+│   │   └── install/
+│   ├── notifications/           # 通知データ
 │   ├── state/                   # ジョブ状態
-│   │   ├── config.json          # システム設定
-│   │   ├── bus/                 # Agent Bus状態
-│   │   │   ├── history/
-│   │   │   └── queues/
+│   │   ├── config.json
+│   │   ├── bus/
 │   │   └── runs/
-│   ├── e2e-artifacts/           # E2Eテスト成果物
-│   └── e2e-report/              # E2Eレポート
+│   ├── e2e-artifacts/
+│   └── e2e-report/
 │
 ├── infra/                       # インフラ定義
 │   ├── docker/
-│   │   ├── compose.yaml         # Docker Compose
+│   │   ├── compose.yaml
 │   │   ├── README.md
 │   │   ├── images/
-│   │   │   ├── base/            # ベースイメージ
-│   │   │   │   ├── Dockerfile
-│   │   │   │   ├── install.sh
-│   │   │   │   └── allowlist/
-│   │   │   └── worker/          # ワーカーイメージ
-│   │   │       ├── Dockerfile
-│   │   │       └── entrypoint.sh
+│   │   │   ├── base/
+│   │   │   └── worker/
 │   │   └── policies/
 │   └── ci/
 │
@@ -202,13 +208,15 @@ agent-company/
 │       │   │   ├── backlog/
 │       │   │   ├── command/
 │       │   │   ├── dashboard/
+│       │   │   ├── projects/
 │       │   │   ├── reports/
 │       │   │   ├── review/
 │       │   │   ├── runs/
 │       │   │   ├── settings/
-│       │   │   │   └── coding-agents/  # コーディングエージェント設定API
+│       │   │   │   └── coding-agents/
 │       │   │   ├── tasks/
-│       │   │   └── workflows/       # ワークフローAPI
+│       │   │   ├── tickets/
+│       │   │   └── workflows/
 │       │   │       └── [id]/
 │       │   │           ├── approve/
 │       │   │           ├── meetings/
@@ -216,24 +224,31 @@ agent-company/
 │       │   │           ├── quality/
 │       │   │           ├── escalation/
 │       │   │           └── rollback/
-│       │   ├── backlog/         # Backlog画面
-│       │   ├── command/         # Command Center
-│       │   ├── dashboard/       # Dashboard
-│       │   ├── reports/         # Reports画面
-│       │   ├── review/          # Review画面
-│       │   ├── runs/            # Runs画面
-│       │   ├── settings/        # Settings画面
-│       │   ├── tasks/           # Task詳細
-│       │   └── workflows/       # Workflows画面
-│       │       └── [id]/        # ワークフロー詳細
-│       ├── components/          # UIコンポーネント
+│       │   ├── backlog/
+│       │   ├── command/
+│       │   ├── dashboard/
+│       │   ├── projects/
+│       │   ├── reports/
+│       │   ├── review/
+│       │   ├── runs/
+│       │   ├── settings/
+│       │   ├── tasks/
+│       │   ├── tickets/         # チケット管理画面
+│       │   │   ├── page.tsx
+│       │   │   ├── create/
+│       │   │   └── [id]/
+│       │   └── workflows/
+│       │       └── [id]/
+│       ├── components/
 │       │   ├── backlog/
 │       │   ├── layout/
+│       │   ├── projects/
 │       │   ├── reports/
 │       │   ├── runs/
-│       │   ├── workflows/       # ワークフローコンポーネント
-│       │   └── ui/              # 共通UI
-│       ├── lib/                 # ユーティリティ
+│       │   ├── tickets/
+│       │   ├── workflows/
+│       │   └── ui/
+│       ├── lib/
 │       │   ├── types.ts
 │       │   └── parsers/
 │       ├── package.json
@@ -241,32 +256,20 @@ agent-company/
 │       └── vitest.config.ts
 │
 ├── tests/                       # テスト
-│   ├── execution/               # 実行エンジンテスト
-│   │   ├── orchestrator.test.ts
-│   │   ├── agent-bus.test.ts
-│   │   ├── worker-container.test.ts
-│   │   ├── worker-coding-integration.test.ts
-│   │   ├── workspace-manager.test.ts
-│   │   ├── workspace-manager.property.test.ts
-│   │   └── *.property.test.ts   # Property-based
+│   ├── execution/               # 実行エンジンテスト（*.test.ts, *.property.test.ts）
 │   ├── coding-agents/           # コーディングエージェントテスト
-│   │   ├── base.test.ts
-│   │   ├── base.property.test.ts
-│   │   ├── opencode.test.ts
-│   │   ├── claude-code.test.ts
-│   │   ├── kiro-cli.test.ts
-│   │   ├── registry.test.ts
-│   │   └── registry.property.test.ts
-│   ├── adapters/
-│   └── *.test.ts
+│   ├── cli/                     # CLIコマンドテスト
+│   ├── adapters/                # アダプタテスト
+│   └── *.test.ts                # ルートレベルテスト
 │
 ├── e2e/                         # E2Eテスト
+│   ├── ai-execution-workflow.spec.ts
 │   ├── cli-workflow.spec.ts
 │   ├── execution-engine.spec.ts
 │   ├── governance.spec.ts
 │   ├── gui.spec.ts
-│   ├── ticket-workflow.spec.ts      # チケットワークフローE2E
-│   └── project-management.spec.ts   # プロジェクト管理E2E
+│   ├── project-management.spec.ts
+│   └── ticket-workflow.spec.ts
 │
 ├── workspaces/                  # 対象案件管理
 │   └── projects.json
@@ -274,17 +277,20 @@ agent-company/
 ├── scripts/                     # 起動・停止スクリプト
 │   ├── start.ps1                # ワンコマンド起動（Windows）
 │   ├── start.sh                 # ワンコマンド起動（Linux/macOS）
+│   ├── status.ps1               # 起動状態確認（Windows）
 │   ├── stop.ps1                 # 一括停止（Windows）
 │   └── stop.sh                  # 一括停止（Linux/macOS）
 │
 ├── coverage/                    # カバレッジレポート
-├── Makefile                     # 統一コマンド（make up/down/status含む）
+├── Makefile
 ├── package.json
 ├── tsconfig.json
 ├── vitest.config.ts
 ├── playwright.config.ts
-├── MVP.md                       # MVPロードマップ
-└── README.md
+├── MVP.md
+├── README.md
+├── QUICKSTART.md                # クイックスタートガイド
+└── CONTRIBUTING.md              # コントリビューションガイド
 ```
 
 ## 境界の意図
@@ -329,6 +335,7 @@ agent-company/
 - `runtime/state/config.json`: システム設定
 - `runtime/state/bus/`: Agent Bus状態
 - `runtime/state/runs/`: 実行状態
+- `runtime/.pids/`: プロセスID管理
 
 ## ファイル命名規則
 

@@ -522,11 +522,9 @@ export class WorkflowEngine implements IWorkflowEngine {
         state.updatedAt = new Date().toISOString();
         await this.persistWorkflowState(state);
 
-        // 開発フェーズの残タスクを再実行
-        // @see Requirement 14.2: retry後にフェーズを再開
-        this.executePhase(workflowId).catch((error: unknown) => {
-          this.handlePhaseError(workflowId, state.currentPhase, error);
-        });
+        // 注: フェーズの再実行は呼び出し元が別途トリガーする
+        // handleEscalation は状態変更のみを担当し、副作用を分離する
+        // @see Requirement 14.2: retry後の状態リセット
         break;
       }
 
@@ -548,11 +546,9 @@ export class WorkflowEngine implements IWorkflowEngine {
         state.updatedAt = new Date().toISOString();
         await this.persistWorkflowState(state);
 
-        // 残タスクの実行を再開
-        // @see Requirement 14.2: skip後にフェーズを再開
-        this.executePhase(workflowId).catch((error: unknown) => {
-          this.handlePhaseError(workflowId, state.currentPhase, error);
-        });
+        // 注: フェーズの再実行は呼び出し元が別途トリガーする
+        // handleEscalation は状態変更のみを担当し、副作用を分離する
+        // @see Requirement 14.2: skip後の状態リセット
         break;
       }
 

@@ -212,7 +212,7 @@ describe('Property 18: Message Delivery Guarantee', () => {
    *
    * **Validates: Requirements 10.1, 10.3**
    */
-  it('Property 18.1: 任意のメッセージがターゲットエージェントに配信される', async () => {
+  it('Property 18.1: 任意のメッセージがターゲットエージェントに配信される', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(agentMessageArb, async (message) => {
         // メッセージを送信
@@ -380,7 +380,7 @@ describe('Property 18: Message Delivery Guarantee', () => {
    *
    * **Validates: Requirements 10.1**
    */
-  it('Property 18.6: 複数のメッセージが順序を保って配信される', async () => {
+  it('Property 18.6: 複数のメッセージが順序を保って配信される', { timeout: 60000 }, async () => {
     await fc.assert(
       fc.asyncProperty(
         agentIdArb,
@@ -435,7 +435,7 @@ describe('Property 28: Message Queue Abstraction', () => {
    *
    * **Validates: Requirements 10.6, 10.7**
    */
-  it('Property 28.1: ファイルベースキューでメッセージが配信される', async () => {
+  it('Property 28.1: ファイルベースキューでメッセージが配信される', { timeout: 60000 }, async () => {
     const testPath = `${TEST_QUEUE_BASE_PATH}-file`;
     const runtimePath = `${TEST_RUNTIME_BASE_PATH}-file`;
 

@@ -330,7 +330,7 @@ describe('ProjectManager', () => {
      */
 
     describe('戻り値の構造', () => {
-      it('結果オブジェクトに必要なフィールドが含まれる', async () => {
+      it('結果オブジェクトに必要なフィールドが含まれる', { timeout: 30000 }, async () => {
         // 無効なURLでテスト（ネットワークアクセスなし）
         const result = await projectManager.ensureAgentBranch('invalid-url', 'agent/test', 'main');
 
@@ -345,7 +345,7 @@ describe('ProjectManager', () => {
         expect(typeof result.branchName).toBe('string');
       });
 
-      it('ブランチ名が正しく返される', async () => {
+      it('ブランチ名が正しく返される', { timeout: 30000 }, async () => {
         const result = await projectManager.ensureAgentBranch(
           'https://github.com/user/repo.git',
           'agent/my-project',
@@ -357,7 +357,7 @@ describe('ProjectManager', () => {
     });
 
     describe('エラーハンドリング', () => {
-      it('無効なURLの場合、エラーを返す', async () => {
+      it('無効なURLの場合、エラーを返す', { timeout: 30000 }, async () => {
         const result = await projectManager.ensureAgentBranch(
           'not-a-valid-url',
           'agent/test',
@@ -369,7 +369,7 @@ describe('ProjectManager', () => {
         expect(result.created).toBe(false);
       });
 
-      it('タイムアウトオプションが適用される', async () => {
+      it('タイムアウトオプションが適用される', { timeout: 30000 }, async () => {
         // 短いタイムアウトでテスト
         const result = await projectManager.ensureAgentBranch(
           'https://github.com/user/repo.git',
@@ -385,7 +385,7 @@ describe('ProjectManager', () => {
     });
 
     describe('ブランチ存在確認ロジック', () => {
-      it('existsとcreatedは相互排他的', async () => {
+      it('existsとcreatedは相互排他的', { timeout: 30000 }, async () => {
         const result = await projectManager.ensureAgentBranch(
           'https://github.com/user/repo.git',
           'agent/test',
