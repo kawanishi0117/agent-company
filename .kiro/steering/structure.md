@@ -25,15 +25,22 @@ agent-company/
 │
 ├── docs/                        # 会社の規程（人が読める）
 │   ├── specs/                   # 機能仕様書（正式版）
+│   │   ├── README.md            # 仕様書インデックス
 │   │   ├── agent-execution-engine.md
 │   │   ├── ai-adapters.md
+│   │   ├── ai-execution-integration.md
+│   │   ├── autonomous-agent-workflow.md
+│   │   ├── coding-agent-integration.md
 │   │   ├── company-workflow-engine.md
-│   │   ├── m0-skeleton.md
-│   │   ├── m1-docker-workspace.md
-│   │   ├── m2-quality-gates.md
-│   │   ├── m3-governance.md
-│   │   ├── m4-gui.md
-│   │   └── m5-hiring-system.md
+│   │   ├── end-to-end-workflow-wiring.md
+│   │   ├── workflow-production-ready.md
+│   │   └── milestones/          # マイルストーン仕様
+│   │       ├── m0-skeleton.md
+│   │       ├── m1-docker-workspace.md
+│   │       ├── m2-quality-gates.md
+│   │       ├── m3-governance.md
+│   │       ├── m4-gui.md
+│   │       └── m5-hiring-system.md
 │   ├── company/                 # 不変のポリシー
 │   │   ├── policies.md          # 会社ポリシー
 │   │   ├── definition-of-done.md # 完了基準
@@ -42,9 +49,13 @@ agent-company/
 │   ├── playbooks/               # 運用手順書
 │   │   └── hiring.md            # 採用手順
 │   └── architecture/            # 設計ドキュメント
+│       ├── README.md            # アーキテクチャインデックス
 │       ├── overview.md          # アーキテクチャ概要
+│       ├── execution-engine.md  # コア実行エンジン
+│       ├── orchestrator-server.md # Orchestrator Server（GUI連携API）
+│       ├── ai-integration.md    # AI実行統合
+│       ├── workflow-engine.md   # Company Workflow Engine
 │       ├── container-isolation.md
-│       ├── execution-engine.md
 │       └── worker-management.md
 │
 ├── agents/                      # エージェント定義

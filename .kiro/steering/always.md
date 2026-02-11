@@ -94,7 +94,7 @@ spec（`.kiro/specs/`）のタスク完了時、以下を必ず実施：
 | allowlist    | `tools/installers/` + `docs/company/policies.md`     |
 | エージェント | `agents/registry/` + `docs/playbooks/hiring.md`      |
 | GUI          | `gui/web/README.md`                                  |
-| 実行エンジン | `docs/architecture/execution-engine.md`              |
+| 実行エンジン | `docs/architecture/execution-engine.md` + 分割先ファイル |
 
 ## 作業フロー
 
