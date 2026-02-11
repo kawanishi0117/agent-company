@@ -34,6 +34,7 @@ interface CommandHistoryItem {
   status: 'pending' | 'decomposing' | 'executing' | 'completed' | 'failed';
   ticketId?: string;
   taskId?: string;
+  workflowId?: string; // WorkflowEngine のワークフローID
   createdAt: string;
   updatedAt: string;
   subTasks?: Array<{
@@ -169,36 +170,36 @@ ${instruction}
 }
 
 /**
- * Orchestrator APIにタスクを送信
+ * Orchestrator API にワークフロー開始を送信
+ * WorkflowEngine 経由で提案→承認→開発→QA→納品の全フローを実行
  * @see Requirement 23.2: GUIからの指示でManager Agentが自動処理開始
  */
-async function submitTaskToOrchestrator(
+async function submitWorkflowToOrchestrator(
   instruction: string,
-  projectId: string,
-  priority?: 'low' | 'medium' | 'high'
-): Promise<{ success: boolean; taskId?: string; error?: string }> {
+  projectId: string
+): Promise<{ success: boolean; workflowId?: string; error?: string }> {
   try {
-    const response = await fetch(`${ORCHESTRATOR_API_URL}/api/tasks`, {
+    // WorkflowEngine の /api/workflows エンドポイントに送信
+    const response = await fetch(`${ORCHESTRATOR_API_URL}/api/workflows`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instruction,
-        projectId,
-        priority: priority || 'medium',
-      }),
+      body: JSON.stringify({ instruction, projectId }),
     });
 
     const result = await response.json();
 
     if (result.success) {
-      return { success: true, taskId: result.data.taskId };
+      return { success: true, workflowId: result.data.workflowId };
     } else {
       return { success: false, error: result.error || 'Unknown error' };
     }
   } catch (error) {
     // Orchestrator APIが起動していない場合はフォールバック
     console.warn('[Command API] Orchestrator API not available:', error);
-    return { success: false, error: 'Orchestrator API not available. Run "agentcompany server" first.' };
+    return {
+      success: false,
+      error: 'Orchestrator API not available. Run "agentcompany server" first.',
+    };
   }
 }
 
@@ -319,7 +320,7 @@ export async function POST(request: NextRequest): Promise<
       preview?: DecompositionPreview;
       orchestratorStatus?: {
         connected: boolean;
-        taskId?: string;
+        workflowId?: string;
         error?: string;
       };
     }>
@@ -382,23 +383,22 @@ export async function POST(request: NextRequest): Promise<
       updatedAt: new Date().toISOString(),
     };
 
-    // Orchestratorにタスクを送信（autoExecuteが有効な場合）
-    let orchestratorResult: { success: boolean; taskId?: string; error?: string } = {
+    // Orchestratorにワークフロー開始を送信（autoExecuteが有効な場合）
+    let orchestratorResult: { success: boolean; workflowId?: string; error?: string } = {
       success: false,
       error: 'Auto-execute disabled',
     };
 
     if (autoExecute) {
-      orchestratorResult = await submitTaskToOrchestrator(
+      orchestratorResult = await submitWorkflowToOrchestrator(
         instruction,
-        project?.id || 'default',
-        body.priority
+        project?.id || 'default'
       );
 
       // Orchestratorからの応答に基づいてステータスを更新
-      if (orchestratorResult.success && orchestratorResult.taskId) {
-        newCommand.taskId = orchestratorResult.taskId;
-        newCommand.status = 'decomposing'; // タスク分解中
+      if (orchestratorResult.success && orchestratorResult.workflowId) {
+        newCommand.workflowId = orchestratorResult.workflowId;
+        newCommand.status = 'decomposing'; // ワークフロー開始（提案フェーズ）
       } else {
         // Orchestratorが利用不可でもチケットは作成済み
         // 後でCLIから実行可能
@@ -418,7 +418,7 @@ export async function POST(request: NextRequest): Promise<
         preview,
         orchestratorStatus: {
           connected: orchestratorResult.success,
-          taskId: orchestratorResult.taskId,
+          workflowId: orchestratorResult.workflowId,
           error: orchestratorResult.error,
         },
       },

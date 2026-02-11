@@ -35,6 +35,11 @@ import {
 import { MeetingCoordinator, createMeetingCoordinator } from './meeting-coordinator.js';
 import { ApprovalGate, createApprovalGate } from './approval-gate.js';
 import { createAgentBus } from './agent-bus.js';
+import {
+  CodingAgentRegistry,
+  globalCodingAgentRegistry,
+} from '../../../coding-agents/index.js';
+import { createWorkspaceManager } from './workspace-manager.js';
 import type {
   ApprovalDecision,
   EscalationDecision,
@@ -108,6 +113,8 @@ export interface OrchestratorServerConfig {
   approvalGate?: ApprovalGate;
   /** MeetingCoordinator（DI用、省略時は自動生成） */
   meetingCoordinator?: MeetingCoordinator;
+  /** CodingAgentRegistry（DI用、省略時はグローバルレジストリを使用） */
+  codingAgentRegistry?: CodingAgentRegistry;
 }
 
 // =============================================================================
@@ -142,6 +149,8 @@ export class OrchestratorServer {
   private workflowEngine: WorkflowEngine;
   /** 承認ゲート @see Requirements: 15.4 */
   private approvalGate: ApprovalGate;
+  /** コーディングエージェントレジストリ @see REQ-2.1 */
+  private codingAgentRegistry: CodingAgentRegistry;
   private port: number;
   private running: boolean = false;
 
@@ -152,6 +161,9 @@ export class OrchestratorServer {
     this.aiHealthChecker = config?.aiHealthChecker ?? createAIHealthChecker();
     this.settingsManager = config?.settingsManager ?? createSettingsManager();
 
+    // CodingAgentRegistry（DI or グローバルシングルトン）
+    this.codingAgentRegistry = config?.codingAgentRegistry ?? globalCodingAgentRegistry;
+
     // ワークフロー関連コンポーネント初期化
     const agentBus = createAgentBus({
       messageQueueConfig: { type: 'file', basePath: 'runtime/state/bus' },
@@ -160,8 +172,14 @@ export class OrchestratorServer {
     const meetingCoordinator = config?.meetingCoordinator
       ?? createMeetingCoordinator(agentBus, 'runtime/runs');
     this.approvalGate = config?.approvalGate ?? createApprovalGate('runtime/runs');
+
+    // WorkflowEngine に CodingAgentRegistry を接続
+    // @see REQ-2.1: OrchestratorServer で WorkflowEngine に CodingAgentRegistry を渡す
     this.workflowEngine = config?.workflowEngine
-      ?? createWorkflowEngine(meetingCoordinator, this.approvalGate, 'runtime/runs');
+      ?? createWorkflowEngine(meetingCoordinator, this.approvalGate, 'runtime/runs', {
+        codingAgentRegistry: this.codingAgentRegistry,
+        workspaceManager: createWorkspaceManager(),
+      });
   }
 
   /**
@@ -432,24 +450,31 @@ export class OrchestratorServer {
   /**
    * AIヘルスチェック
    *
-   * AI実行基盤（Ollama）の可用性を確認し、ステータスを返す。
-   * 利用不可の場合はセットアップ手順を含むレスポンスを返す。
+   * AI実行基盤（Ollama + CodingAgent）の可用性を確認し、ステータスを返す。
    *
    * @param res - HTTPレスポンス
-   *
    * @see Requirement 1.3: THE System SHALL provide a health check endpoint `/api/health/ai`
+   * @see REQ-3.3: CodingAgentAdapter の可用性情報も返す
    */
   private async handleAIHealth(res: http.ServerResponse): Promise<void> {
-    const status = await this.aiHealthChecker.getHealthStatus();
+    const [status, availableCodingAgents] = await Promise.all([
+      this.aiHealthChecker.getHealthStatus(),
+      this.codingAgentRegistry.getAvailableAgents(),
+    ]);
 
     this.sendResponse(res, 200, {
       success: true,
       data: {
-        available: status.available,
+        available: status.available || availableCodingAgents.length > 0,
         ollamaRunning: status.ollamaRunning,
         modelsInstalled: status.modelsInstalled,
         recommendedModels: status.recommendedModels,
         setupInstructions: status.setupInstructions,
+        codingAgents: {
+          available: availableCodingAgents.length > 0,
+          agents: availableCodingAgents.map((a) => a.name),
+          registeredAgents: this.codingAgentRegistry.getRegisteredNames(),
+        },
       },
     });
   }
@@ -488,16 +513,22 @@ export class OrchestratorServer {
       return;
     }
 
-    // AI可用性チェック
-    // @see Requirement 1.1: タスク送信前にAI実行基盤の可用性を確認
+    // AI可用性チェック（Ollama OR CodingAgent で許可）
+    // @see REQ-3.1: Ollama だけでなく CodingAgentRegistry の可用性も考慮
+    // @see REQ-3.2: Ollama 利用不可でも CodingAgent 利用可能ならタスク送信許可
     const aiStatus = await this.aiHealthChecker.checkOllamaAvailability();
-    if (!aiStatus.available) {
+    const availableCodingAgents = await this.codingAgentRegistry.getAvailableAgents();
+    const hasCodingAgent = availableCodingAgents.length > 0;
+
+    if (!aiStatus.available && !hasCodingAgent) {
+      // 両方利用不可 → 503 エラー
       this.sendResponse(res, 503, {
         success: false,
         error: 'AI execution platform is not available',
         code: 'AI_UNAVAILABLE',
         data: {
           ollamaRunning: aiStatus.ollamaRunning,
+          codingAgentsAvailable: false,
           setupInstructions: aiStatus.setupInstructions,
           recommendedModels: aiStatus.recommendedModels,
         },
@@ -895,11 +926,12 @@ export class OrchestratorServer {
    */
   private async handleDashboardStatus(res: http.ServerResponse): Promise<void> {
     // 並列で各データを取得（個別エラーハンドリング付き）
-    const [agents, config, tasks, aiHealth] = await Promise.all([
+    const [agents, config, tasks, aiHealth, availableCodingAgents] = await Promise.all([
       this.orchestrator.getActiveAgents().catch(() => []),
       this.orchestrator.getConfig().catch(() => null),
       Promise.resolve(this.orchestrator.getAllTasks()),
       this.aiHealthChecker.getHealthStatus().catch(() => null),
+      this.codingAgentRegistry.getAvailableAgents().catch(() => []),
     ]);
 
     // タスクサマリーを計算
@@ -933,11 +965,13 @@ export class OrchestratorServer {
           initialized: this.orchestrator.isInitialized(),
         },
         // AI可用性ステータスを統合
-        // @see Requirement 7.1: Dashboard SHALL show active workers
+        // @see REQ-3.4: CodingAgentAdapter の状態を含める
         aiStatus: aiHealth ? {
-          available: aiHealth.available,
+          available: aiHealth.available || availableCodingAgents.length > 0,
           ollamaRunning: aiHealth.ollamaRunning,
           modelsInstalled: aiHealth.modelsInstalled,
+          codingAgentsAvailable: availableCodingAgents.length > 0,
+          codingAgentNames: availableCodingAgents.map((a) => a.name),
         } : null,
         config: config ? {
           maxConcurrentWorkers: config.maxConcurrentWorkers,

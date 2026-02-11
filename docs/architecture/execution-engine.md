@@ -1103,3 +1103,72 @@ runtime/runs/<run-id>/
 ### Orchestrator統合
 
 OrchestratorのコンストラクタでWorkflowEngine、MeetingCoordinator、ApprovalGateをオプショナルに初期化。getterメソッド（`getWorkflowEngine()`, `getMeetingCoordinator()`, `getApprovalGate()`）で外部からアクセス可能。
+
+
+## エンドツーエンド ワークフロー接続
+
+### 概要
+
+GUI Command Center → OrchestratorServer → WorkflowEngine → CodingAgent の完全フローを実現する接続レイヤー。CEO がブラウザから自然言語で指示を出し、エージェントが自律的にコーディング作業を実行する。
+
+### フロー図
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     GUI Layer (Next.js)                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │ Command      │  │  Workflows   │  │  Dashboard   │          │
+│  │ Center       │  │  一覧/詳細   │  │  ステータス  │          │
+│  │ (CEO指示)    │  │  (承認操作)  │  │  (監視)      │          │
+│  └──────┬───────┘  └──────────────┘  └──────────────┘          │
+│         │                                                       │
+│  POST /api/command (Next.js API Route)                          │
+│         │                                                       │
+│         ├─ チケットファイル作成 (workflows/backlog/)              │
+│         │                                                       │
+│         └─ POST /api/workflows → OrchestratorServer              │
+└─────────┼───────────────────────────────────────────────────────┘
+          │ HTTP (port 3001)
+┌─────────┼───────────────────────────────────────────────────────┐
+│         │        Orchestrator Server                             │
+│  ┌──────┴──────────────────────────────────────────────────┐    │
+│  │  handleStartWorkflow()                                   │    │
+│  │    ├─ AI可用性チェック (Ollama OR CodingAgent)            │    │
+│  │    └─ WorkflowEngine.startWorkflow(instruction, projId)  │    │
+│  └──────┬──────────────────────────────────────────────────┘    │
+│         │                                                       │
+│  ┌──────┴──────────────────────────────────────────────────┐    │
+│  │  CodingAgentRegistry (globalCodingAgentRegistry)         │    │
+│  │    ├─ ClaudeCodeAdapter                                  │    │
+│  │    ├─ OpenCodeAdapter                                    │    │
+│  │    └─ KiroCliAdapter                                     │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────┬───────────────────────────────────────────────────────┘
+          │
+┌─────────┼───────────────────────────────────────────────────────┐
+│         │        Workflow Engine (5フェーズ)                      │
+│  ┌──────┴──────────────────────────────────────────────────┐    │
+│  │  1. proposal     → MeetingCoordinator (Ollama)          │    │
+│  │  2. approval     → ApprovalGate (CEO承認待ち)            │    │
+│  │  3. development  → CodingAgentAdapter.execute()          │    │
+│  │  4. QA           → Quality Gate (lint/test)              │    │
+│  │  5. delivery     → ApprovalGate (CEO最終承認)            │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### AI可用性チェック
+
+OrchestratorServer はタスク送信時に AI の可用性を OR 条件で判定する。
+
+| Ollama | CodingAgent | 結果 |
+|--------|-------------|------|
+| ✅ | ✅ | 送信許可 |
+| ✅ | ❌ | 送信許可 |
+| ❌ | ✅ | 送信許可（警告付き） |
+| ❌ | ❌ | 503 エラー |
+
+### 関連ドキュメント
+
+- [エンドツーエンド ワークフロー接続 仕様](../specs/end-to-end-workflow-wiring.md)
+- [Coding Agent Integration 仕様](../specs/coding-agent-integration.md)

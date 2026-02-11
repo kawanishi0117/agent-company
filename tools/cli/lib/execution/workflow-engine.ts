@@ -1646,11 +1646,25 @@ export class WorkflowEngine implements IWorkflowEngine {
 // =============================================================================
 
 /**
+ * WorkflowEngine生成オプション
+ * @description ファクトリ関数用のオプション型
+ */
+export interface WorkflowEngineOptions {
+  /** コーディングエージェントレジストリ（開発フェーズで使用） */
+  codingAgentRegistry?: CodingAgentRegistry;
+  /** ワークスペースマネージャー（git操作用） */
+  workspaceManager?: WorkspaceManager;
+  /** 優先コーディングエージェント名 */
+  preferredCodingAgent?: string;
+}
+
+/**
  * WorkflowEngineインスタンスを生成するファクトリ関数
  *
  * @param meetingCoordinator - 会議調整コンポーネント
  * @param approvalGate - 承認ゲートコンポーネント
  * @param basePath - 状態保存ベースパス（オプション）
+ * @param options - 追加オプション（コーディングエージェント統合用）
  * @returns WorkflowEngineインスタンス
  *
  * @example
@@ -1660,13 +1674,18 @@ export class WorkflowEngine implements IWorkflowEngine {
  * const approvalGate = createApprovalGate();
  * const engine = createWorkflowEngine(meetingCoordinator, approvalGate);
  *
- * const workflowId = await engine.startWorkflow('機能を実装してください', 'project-1');
+ * // CodingAgentRegistry付きで生成
+ * const engineWithCoding = createWorkflowEngine(
+ *   meetingCoordinator, approvalGate, 'runtime/runs',
+ *   { codingAgentRegistry: new CodingAgentRegistry() }
+ * );
  * ```
  */
 export function createWorkflowEngine(
   meetingCoordinator: MeetingCoordinator,
   approvalGate: ApprovalGate,
-  basePath?: string
+  basePath?: string,
+  options?: WorkflowEngineOptions
 ): WorkflowEngine {
-  return new WorkflowEngine(meetingCoordinator, approvalGate, basePath);
+  return new WorkflowEngine(meetingCoordinator, approvalGate, basePath, options);
 }

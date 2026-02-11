@@ -27,6 +27,7 @@ interface CommandHistoryItem {
   projectName: string;
   status: 'pending' | 'decomposing' | 'executing' | 'completed' | 'failed';
   ticketId?: string;
+  workflowId?: string; // WorkflowEngine のワークフローID
   createdAt: string;
   updatedAt: string;
   subTasks?: Array<{ id: string; title: string; status: string }>;
@@ -84,6 +85,8 @@ export default function CommandCenterPage(): JSX.Element {
   const [submitting, setSubmitting] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [orchestratorConnected, setOrchestratorConnected] = useState<boolean | null>(null);
 
   // データ読み込み
   const loadData = useCallback(async () => {
@@ -147,11 +150,12 @@ export default function CommandCenterPage(): JSX.Element {
   };
 
   // 指示送信
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     if (!instruction.trim()) return;
 
     setSubmitting(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       const response = await fetch('/api/command', {
@@ -168,10 +172,27 @@ export default function CommandCenterPage(): JSX.Element {
       if (result.error) {
         setError(result.error);
       } else {
-        // 成功時はフォームをクリアして履歴を更新
+        // Orchestrator 接続状態を更新
+        const orchStatus = result.data.orchestratorStatus;
+        setOrchestratorConnected(orchStatus?.connected ?? false);
+
+        if (orchStatus?.connected && orchStatus?.workflowId) {
+          setSuccessMessage(
+            `ワークフロー開始: ${orchStatus.workflowId}`
+          );
+        } else if (!orchStatus?.connected) {
+          setSuccessMessage(
+            'チケットを作成しました（Orchestrator未接続のため手動実行が必要です）'
+          );
+        }
+
+        // フォームをクリアして履歴を更新
         setInstruction('');
         setPreview(null);
         await loadData();
+
+        // 成功メッセージを5秒後に自動クリア
+        setTimeout(() => setSuccessMessage(null), 5000);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '指示の送信に失敗しました');
@@ -232,6 +253,30 @@ export default function CommandCenterPage(): JSX.Element {
       {error && (
         <div className="p-4 bg-status-fail/10 border border-status-fail/30 rounded-lg text-status-fail">
           {error}
+        </div>
+      )}
+
+      {/* 成功メッセージ */}
+      {successMessage && (
+        <div className="p-4 bg-status-pass/10 border border-status-pass/30 rounded-lg text-status-pass flex items-center gap-2">
+          <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          {successMessage}
+        </div>
+      )}
+
+      {/* Orchestrator 接続ステータス */}
+      {orchestratorConnected !== null && (
+        <div className={`flex items-center gap-2 text-sm ${
+          orchestratorConnected ? 'text-status-pass' : 'text-status-waiver'
+        }`}>
+          <span className={`w-2 h-2 rounded-full ${
+            orchestratorConnected ? 'bg-status-pass' : 'bg-status-waiver'
+          }`} />
+          {orchestratorConnected
+            ? 'Orchestrator 接続中'
+            : 'Orchestrator 未接続（agentcompany server を起動してください）'}
         </div>
       )}
 
@@ -468,10 +513,22 @@ export default function CommandCenterPage(): JSX.Element {
                     </span>
                   </div>
                   {item.ticketId && (
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center gap-3">
                       <span className="text-xs text-accent-primary">
                         チケット: {item.ticketId}
                       </span>
+                      {item.workflowId && (
+                        <a
+                          href={`/workflows/${item.workflowId}`}
+                          className="text-xs text-accent-primary hover:underline flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                          </svg>
+                          WF: {item.workflowId.slice(0, 12)}...
+                        </a>
+                      )}
                     </div>
                   )}
                 </div>

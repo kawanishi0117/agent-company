@@ -161,23 +161,47 @@ Merger Agent（ブランチマージ）
 
 5フェーズの業務フローを管理するエンジン。
 
-### ワークフローフロー
+### エンドツーエンドフロー（GUI → CodingAgent）
 
 ```
-社長の指示 → 提案（会議） → 承認 → 開発 → 品質確認 → 納品
+[Command Center GUI]  ── CEO が自然言語で指示
+    │
+    ├─ POST /api/command (Next.js API Route)
+    │      │
+    │      ├─ チケットファイル作成（workflows/backlog/）
+    │      │
+    │      └─ POST http://localhost:3001/api/workflows
+    │              │
+    │              └─ OrchestratorServer → WorkflowEngine.startWorkflow()
+    │                      │
+    │                      ├─ 1. proposal:     MeetingCoordinator（Ollama）
+    │                      ├─ 2. approval:     ApprovalGate（CEO承認待ち）
+    │                      ├─ 3. development:  CodingAgentAdapter.execute()
+    │                      ├─ 4. QA:           品質ゲート（lint/test）
+    │                      └─ 5. delivery:     ApprovalGate（CEO最終承認）
 ```
 
 ### コンポーネント
 
-| コンポーネント     | 役割                           | 場所                                             |
-| ------------------ | ------------------------------ | ------------------------------------------------ |
-| WorkflowEngine     | ワークフロー全体制御           | `tools/cli/lib/execution/workflow-engine.ts`     |
-| MeetingCoordinator | エージェント間会議の開催・記録 | `tools/cli/lib/execution/meeting-coordinator.ts` |
-| ApprovalGate       | CEO承認ゲート管理              | `tools/cli/lib/execution/approval-gate.ts`       |
+| コンポーネント       | 役割                           | 場所                                             |
+| -------------------- | ------------------------------ | ------------------------------------------------ |
+| WorkflowEngine       | ワークフロー全体制御           | `tools/cli/lib/execution/workflow-engine.ts`     |
+| MeetingCoordinator   | エージェント間会議の開催・記録 | `tools/cli/lib/execution/meeting-coordinator.ts` |
+| ApprovalGate         | CEO承認ゲート管理              | `tools/cli/lib/execution/approval-gate.ts`       |
+| OrchestratorServer   | GUI連携HTTPサーバー            | `tools/cli/lib/execution/orchestrator-server.ts` |
+| CodingAgentRegistry  | コーディングエージェント管理   | `tools/coding-agents/index.ts`                   |
+
+### AI可用性
+
+- Ollama OR CodingAgent のいずれかが利用可能であればタスク送信許可
+- 両方利用不可の場合は 503 エラー
+- 提案フェーズは Ollama、開発フェーズは CodingAgent と役割分担
 
 ### GUI
 
+- Command Center: `/command`（CEO指示入力、ワークフロー開始）
 - Workflows一覧: `/workflows`（フィルタ・ソート対応）
 - ワークフロー詳細: `/workflows/[id]`（6タブ: 概要/提案書/会議録/進捗/品質/承認履歴）
 - Dashboard: 承認待ち通知カード、ワークフローサマリー
+- Settings: `/settings`（コーディングエージェント設定）
 - Navigation: 承認待ち数の通知バッジ
