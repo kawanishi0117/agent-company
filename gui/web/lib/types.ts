@@ -212,3 +212,160 @@ export interface GroupedReports {
   /** 週次レポートの配列 */
   weekly: ReportSummary[];
 }
+
+
+// =============================================================================
+// ワークフロー関連の型定義
+// =============================================================================
+
+/**
+ * ワークフローフェーズ
+ * @description 5フェーズの業務フロー
+ */
+export type WorkflowPhase =
+  | 'proposal'
+  | 'approval'
+  | 'development'
+  | 'quality_assurance'
+  | 'delivery';
+
+/**
+ * ワークフローステータス
+ */
+export type WorkflowStatus =
+  | 'running'
+  | 'waiting_approval'
+  | 'completed'
+  | 'failed'
+  | 'terminated';
+
+/**
+ * フェーズ遷移記録
+ */
+export interface PhaseTransition {
+  from: WorkflowPhase | 'init';
+  to: WorkflowPhase;
+  timestamp: string;
+  reason?: string;
+}
+
+/**
+ * サブタスク進捗
+ */
+export interface SubtaskProgressItem {
+  taskId: string;
+  title: string;
+  status: 'pending' | 'working' | 'review' | 'completed' | 'failed' | 'skipped';
+  workerType?: string;
+  assignedWorker?: string;
+  retryCount?: number;
+  error?: string;
+}
+
+/**
+ * 品質結果
+ */
+export interface QualityResultsData {
+  lint?: { passed: boolean; errors: number; warnings: number; details?: string };
+  test?: { passed: boolean; total: number; passed_count: number; failed: number; coverage?: number; details?: string };
+  review?: { passed: boolean; reviewer?: string; feedback?: string };
+}
+
+/**
+ * 承認決定
+ */
+export interface ApprovalDecisionData {
+  action: 'approve' | 'request_revision' | 'reject';
+  phase: WorkflowPhase;
+  feedback?: string;
+  timestamp: string;
+}
+
+/**
+ * 提案書
+ */
+export interface ProposalData {
+  summary: string;
+  scope: string;
+  taskBreakdown: Array<{
+    taskNumber: number;
+    title: string;
+    workerType: string;
+    estimatedEffort: string;
+    dependencies: string[];
+  }>;
+  workerAssignments: Array<{
+    workerType: string;
+    taskNumbers: number[];
+  }>;
+  risks: Array<{
+    description: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    mitigation: string;
+  }>;
+  dependencies: Array<{
+    from: string;
+    to: string;
+    type: string;
+  }>;
+  meetingId?: string;
+  version?: number;
+}
+
+/**
+ * 納品物
+ */
+export interface DeliverableData {
+  summaryReport: string;
+  changes: string[];
+  testResults: { passed: number; failed: number; coverage?: number };
+  reviewHistory: Array<{ reviewer: string; result: string; feedback: string }>;
+  artifacts: string[];
+}
+
+/**
+ * 会議録
+ */
+export interface MeetingMinutesData {
+  meetingId: string;
+  date: string;
+  facilitator: string;
+  participants: Array<{ agentId: string; role: string }>;
+  agendaItems: Array<{ topic: string; description: string }>;
+  discussions: Array<{
+    agendaIndex: number;
+    statements: Array<{ speaker: string; role: string; content: string; timestamp: string }>;
+    summary?: string;
+  }>;
+  decisions: Array<{ topic: string; decision: string; rationale: string }>;
+  actionItems: Array<{ assignee: string; task: string; deadline?: string }>;
+}
+
+/**
+ * エスカレーション情報
+ */
+export interface EscalationData {
+  taskId: string;
+  workerType: string;
+  retryCount: number;
+  error: string;
+  timestamp: string;
+}
+
+/**
+ * ワークフロー状態
+ */
+export interface WorkflowStateData {
+  workflowId: string;
+  instruction: string;
+  projectId: string;
+  currentPhase: WorkflowPhase;
+  status: WorkflowStatus;
+  phaseHistory: PhaseTransition[];
+  proposal?: ProposalData;
+  deliverable?: DeliverableData;
+  approvalHistory: ApprovalDecisionData[];
+  escalation?: EscalationData;
+  createdAt: string;
+  updatedAt: string;
+}

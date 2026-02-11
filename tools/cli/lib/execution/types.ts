@@ -1763,3 +1763,758 @@ export interface FailureReportData {
   /** リカバリー手順 */
   recoverySteps: string[];
 }
+
+
+// =============================================================================
+// ワークフローエンジン関連の型定義
+// @see Requirements: 1.1, 1.2, 1.3, 2.8, 2.9, 3.2, 3.6, 6.1, 9.5, 9.7, 13.3, 14.2, 12.2
+// =============================================================================
+
+/**
+ * ワークフローフェーズ
+ * @description ワークフローの実行段階を表す列挙型
+ * @see Requirement 1.1: THE Workflow_Engine SHALL manage five sequential phases
+ */
+export type WorkflowPhase =
+  | 'proposal'           // 提案フェーズ
+  | 'approval'           // 承認フェーズ
+  | 'development'        // 開発フェーズ
+  | 'quality_assurance'  // 品質確認フェーズ
+  | 'delivery';          // 納品フェーズ
+
+/**
+ * 有効なワークフローフェーズ一覧
+ * @see Requirement 1.1
+ */
+export const VALID_WORKFLOW_PHASES: WorkflowPhase[] = [
+  'proposal',
+  'approval',
+  'development',
+  'quality_assurance',
+  'delivery',
+];
+
+/**
+ * ワークフロー状態ステータス
+ * @description ワークフロー全体の状態を表す列挙型
+ */
+export type WorkflowStatus =
+  | 'running'            // 実行中
+  | 'waiting_approval'   // 承認待ち
+  | 'completed'          // 完了
+  | 'terminated'         // 終了（却下等）
+  | 'failed';            // 失敗
+
+/**
+ * 有効なワークフローステータス一覧
+ */
+export const VALID_WORKFLOW_STATUSES: WorkflowStatus[] = [
+  'running',
+  'waiting_approval',
+  'completed',
+  'terminated',
+  'failed',
+];
+
+/**
+ * エラーログエントリ
+ * @description ワークフロー実行中に発生したエラーのログ
+ */
+export interface ErrorLogEntry {
+  /** エラーメッセージ */
+  message: string;
+  /** 発生フェーズ */
+  phase: WorkflowPhase;
+  /** 発生日時（ISO8601形式） */
+  timestamp: string;
+  /** 復旧可能フラグ */
+  recoverable: boolean;
+}
+
+/**
+ * フェーズ遷移イベント
+ * @description フェーズ間の状態遷移を記録するイベント
+ * @see Requirement 1.2: THE Workflow_Engine SHALL transition to the next phase and record the Phase_Transition event
+ */
+export interface PhaseTransition {
+  /** 遷移元フェーズ */
+  from: WorkflowPhase;
+  /** 遷移先フェーズ */
+  to: WorkflowPhase;
+  /** 遷移日時（ISO8601形式） */
+  timestamp: string;
+  /** 遷移理由 */
+  reason: string;
+}
+
+/**
+ * ワークフロー状態
+ * @description ワークフローの完全な状態を表す構造体
+ * @see Requirement 1.3: THE Workflow_Engine SHALL persist the current phase and transition history
+ * @see Requirement 13.3: THE persisted workflow state SHALL contain: current phase, phase history, approval decisions, worker assignments, and error log
+ */
+export interface WorkflowState {
+  /** ワークフローID */
+  workflowId: string;
+  /** 実行ID */
+  runId: string;
+  /** プロジェクトID */
+  projectId: string;
+  /** 社長からの指示 */
+  instruction: string;
+  /** 現在のフェーズ */
+  currentPhase: WorkflowPhase;
+  /** ワークフローステータス */
+  status: WorkflowStatus;
+  /** フェーズ遷移履歴 */
+  phaseHistory: PhaseTransition[];
+  /** 承認決定履歴 */
+  approvalDecisions: ApprovalDecision[];
+  /** ワーカー割り当てマップ（タスクID -> ワーカーID） */
+  workerAssignments: Record<string, string>;
+  /** エラーログ */
+  errorLog: ErrorLogEntry[];
+  /** 提案書（オプション） */
+  proposal?: Proposal;
+  /** 納品物（オプション） */
+  deliverable?: Deliverable;
+  /** 会議録ID一覧 */
+  meetingMinutesIds: string[];
+  /** エスカレーション情報（オプション） */
+  escalation?: WorkflowEscalation;
+  /** 開発進捗情報（オプション） */
+  progress?: WorkflowProgress;
+  /** 品質結果情報（オプション） */
+  qualityResults?: QualityResults;
+  /** 作成日時（ISO8601形式） */
+  createdAt: string;
+  /** 更新日時（ISO8601形式） */
+  updatedAt: string;
+}
+
+// =============================================================================
+// 開発進捗関連の型定義
+// @see Requirements: 9.5, 9.6
+// =============================================================================
+
+/**
+ * 開発進捗情報
+ * @description GUI Progress タブ用の進捗データ
+ * @see Requirement 9.5: THE Progress tab SHALL display a real-time view of development phase progress
+ */
+export interface WorkflowProgress {
+  /** 総タスク数 */
+  totalTasks: number;
+  /** 完了タスク数 */
+  completedTasks: number;
+  /** 失敗タスク数 */
+  failedTasks: number;
+  /** サブタスク進捗一覧 */
+  subtasks: SubtaskProgress[];
+}
+
+/**
+ * サブタスク進捗
+ * @description 個別サブタスクの進捗情報
+ * @see Requirement 9.5, 9.6
+ */
+export interface SubtaskProgress {
+  /** サブタスクID */
+  id: string;
+  /** タイトル */
+  title: string;
+  /** ステータス */
+  status: 'pending' | 'working' | 'review' | 'completed' | 'failed' | 'skipped';
+  /** ワーカータイプ */
+  workerType: WorkerType;
+  /** 割り当てワーカーID（オプション） */
+  assignedWorkerId?: string;
+  /** 開始日時（ISO8601形式、オプション） */
+  startedAt?: string;
+  /** 完了日時（ISO8601形式、オプション） */
+  completedAt?: string;
+  /** レビューステータス（オプション） */
+  reviewStatus?: 'pending' | 'approved' | 'rejected';
+}
+
+// =============================================================================
+// 品質結果関連の型定義
+// @see Requirement 9.7
+// =============================================================================
+
+/**
+ * 品質結果情報
+ * @description GUI Quality タブ用の品質データ
+ * @see Requirement 9.7: THE Quality tab SHALL display quality gate results
+ */
+export interface QualityResults {
+  /** Lint結果（オプション） */
+  lintResult?: {
+    /** 合格フラグ */
+    passed: boolean;
+    /** エラー数 */
+    errorCount: number;
+    /** 警告数 */
+    warningCount: number;
+    /** 詳細 */
+    details: string;
+  };
+  /** テスト結果（オプション） */
+  testResult?: {
+    /** 合格フラグ */
+    passed: boolean;
+    /** テスト総数 */
+    total: number;
+    /** 成功数 */
+    passed_count: number;
+    /** 失敗数 */
+    failed_count: number;
+    /** カバレッジ（%） */
+    coverage: number;
+  };
+  /** 最終レビュー結果（オプション） */
+  finalReviewResult?: {
+    /** 合格フラグ */
+    passed: boolean;
+    /** レビュアー名 */
+    reviewer: string;
+    /** フィードバック */
+    feedback: string;
+  };
+}
+
+// =============================================================================
+// 承認ゲート関連の型定義
+// @see Requirements: 3.2, 3.6
+// =============================================================================
+
+/**
+ * 承認アクション
+ * @description CEOが取れる承認アクションの種類
+ * @see Requirement 3.2: THE Approval_Gate SHALL support three CEO actions: approve, request_revision, reject
+ */
+export type ApprovalAction = 'approve' | 'request_revision' | 'reject';
+
+/**
+ * 有効な承認アクション一覧
+ */
+export const VALID_APPROVAL_ACTIONS: ApprovalAction[] = [
+  'approve',
+  'request_revision',
+  'reject',
+];
+
+/**
+ * 承認決定
+ * @description CEOの承認決定を記録する構造体
+ * @see Requirement 3.6: THE Approval_Gate SHALL persist the CEO decision and feedback
+ */
+export interface ApprovalDecision {
+  /** ワークフローID */
+  workflowId: string;
+  /** 対象フェーズ */
+  phase: WorkflowPhase;
+  /** 承認アクション */
+  action: ApprovalAction;
+  /** フィードバック（オプション） */
+  feedback?: string;
+  /** 決定日時（ISO8601形式） */
+  decidedAt: string;
+}
+
+/**
+ * 承認待ちアイテム
+ * @description 承認待ちのワークフロー情報
+ */
+export interface PendingApproval {
+  /** ワークフローID */
+  workflowId: string;
+  /** 対象フェーズ */
+  phase: WorkflowPhase;
+  /** 承認対象コンテンツ（提案書または納品物） */
+  content: Proposal | Deliverable;
+  /** 作成日時（ISO8601形式） */
+  createdAt: string;
+}
+
+// =============================================================================
+// 会議プロセス関連の型定義
+// @see Requirements: 2.8, 12.2
+// =============================================================================
+
+/**
+ * 会議参加者
+ * @description 会議に参加するエージェントの情報
+ * @see Requirement 2.2: THE Meeting SHALL include at minimum the COO_PM as facilitator
+ */
+export interface MeetingParticipant {
+  /** エージェントID */
+  agentId: string;
+  /** 役割名 */
+  role: string;
+  /** ワーカータイプ */
+  workerType: WorkerType;
+  /** 専門分野一覧 */
+  expertise: string[];
+}
+
+/**
+ * 議題
+ * @description 会議の議題アイテム
+ * @see Requirement 12.1: THE Meeting SHALL support multiple agenda items
+ */
+export interface AgendaItem {
+  /** 議題ID */
+  id: string;
+  /** トピック */
+  topic: string;
+  /** 説明 */
+  description: string;
+  /** ステータス */
+  status: 'pending' | 'discussing' | 'concluded';
+  /** まとめ（オプション） */
+  summary?: string;
+}
+
+/**
+ * 会議発言
+ * @description 会議中の個別発言を記録する構造体
+ * @see Requirement 12.2: WHEN a Meeting_Participant provides input, THE Meeting SHALL record the participant role, statement content, and timestamp
+ */
+export interface MeetingStatement {
+  /** 発言者ID */
+  participantId: string;
+  /** 発言者の役割 */
+  participantRole: string;
+  /** 発言内容 */
+  content: string;
+  /** 対象議題ID */
+  agendaItemId: string;
+  /** 発言日時（ISO8601形式） */
+  timestamp: string;
+}
+
+/**
+ * 決定事項
+ * @description 会議で決定された事項
+ */
+export interface MeetingDecision {
+  /** 対象議題ID */
+  agendaItemId: string;
+  /** 決定内容 */
+  decision: string;
+  /** 根拠 */
+  rationale: string;
+}
+
+/**
+ * アクションアイテム
+ * @description 会議で決まったアクション項目
+ */
+export interface ActionItem {
+  /** 説明 */
+  description: string;
+  /** 担当者 */
+  assignee: string;
+  /** ワーカータイプ */
+  workerType: WorkerType;
+  /** 優先度 */
+  priority: 'low' | 'medium' | 'high';
+}
+
+/**
+ * 会議録
+ * @description 会議の完全な記録
+ * @see Requirement 2.8: THE Meeting_Minutes SHALL contain: meeting ID, agenda, list of participants with roles, chronological list of statements, decisions, and action items
+ */
+export interface MeetingMinutes {
+  /** 会議ID */
+  meetingId: string;
+  /** ワークフローID */
+  workflowId: string;
+  /** 議題一覧 */
+  agenda: AgendaItem[];
+  /** 参加者一覧 */
+  participants: MeetingParticipant[];
+  /** 発言一覧（時系列順） */
+  statements: MeetingStatement[];
+  /** 決定事項一覧 */
+  decisions: MeetingDecision[];
+  /** アクションアイテム一覧 */
+  actionItems: ActionItem[];
+  /** ファシリテーターID */
+  facilitator: string;
+  /** 開始日時（ISO8601形式） */
+  startedAt: string;
+  /** 終了日時（ISO8601形式） */
+  endedAt: string;
+}
+
+// =============================================================================
+// 提案書関連の型定義
+// @see Requirement 2.9
+// =============================================================================
+
+/**
+ * 提案書
+ * @description COO/PMが会議結果を基に作成するプロジェクト計画書
+ * @see Requirement 2.9: THE COO_PM SHALL synthesize Meeting outcomes into a Proposal
+ */
+export interface Proposal {
+  /** ワークフローID */
+  workflowId: string;
+  /** サマリー */
+  summary: string;
+  /** スコープ */
+  scope: string;
+  /** タスク分解一覧 */
+  taskBreakdown: ProposalTask[];
+  /** ワーカー割り当て一覧 */
+  workerAssignments: ProposalWorkerAssignment[];
+  /** リスク評価一覧 */
+  riskAssessment: RiskItem[];
+  /** 依存関係一覧 */
+  dependencies: Dependency[];
+  /** 参照会議録ID一覧 */
+  meetingMinutesIds: string[];
+  /** 作成日時（ISO8601形式） */
+  createdAt: string;
+}
+
+/**
+ * 提案タスク
+ * @description 提案書内のタスク分解項目
+ */
+export interface ProposalTask {
+  /** タスクID */
+  id: string;
+  /** タイトル */
+  title: string;
+  /** 説明 */
+  description: string;
+  /** ワーカータイプ */
+  workerType: WorkerType;
+  /** 見積もり工数 */
+  estimatedEffort: string;
+  /** 依存タスクID一覧 */
+  dependencies: string[];
+}
+
+/**
+ * ワーカー割り当て
+ * @description 提案書内のワーカー割り当て情報
+ */
+export interface ProposalWorkerAssignment {
+  /** タスクID */
+  taskId: string;
+  /** ワーカータイプ */
+  workerType: WorkerType;
+  /** 割り当て根拠 */
+  rationale: string;
+}
+
+/**
+ * リスク項目
+ * @description 提案書内のリスク評価項目
+ */
+export interface RiskItem {
+  /** リスク説明 */
+  description: string;
+  /** 重要度 */
+  severity: 'low' | 'medium' | 'high';
+  /** 対策 */
+  mitigation: string;
+}
+
+/**
+ * 依存関係
+ * @description タスク間の依存関係
+ */
+export interface Dependency {
+  /** 依存元タスクID */
+  from: string;
+  /** 依存先タスクID */
+  to: string;
+  /** 依存タイプ */
+  type: 'blocks' | 'requires';
+}
+
+// =============================================================================
+// 納品物関連の型定義
+// @see Requirement 6.1
+// =============================================================================
+
+/**
+ * 納品物
+ * @description 納品フェーズで社長に提示する成果物一式
+ * @see Requirement 6.1: THE Workflow_Engine SHALL compile a Deliverable containing: summary report, list of changes, test results, and review history
+ */
+export interface Deliverable {
+  /** ワークフローID */
+  workflowId: string;
+  /** サマリーレポート */
+  summaryReport: string;
+  /** 変更一覧 */
+  changes: ChangeEntry[];
+  /** テスト結果サマリー */
+  testResults: TestResultSummary;
+  /** レビュー履歴 */
+  reviewHistory: ReviewLogEntry[];
+  /** 成果物パス一覧 */
+  artifacts: string[];
+  /** 作成日時（ISO8601形式） */
+  createdAt: string;
+}
+
+/**
+ * レビューログエントリ（Deliverable用の再エクスポート型）
+ * @description review-workflow.ts の ReviewLogEntry と同じ構造
+ * @see Requirement 6.1
+ */
+export interface ReviewLogEntry {
+  /** タイムスタンプ */
+  timestamp: string;
+  /** 実行ID */
+  runId: string;
+  /** チケットID */
+  ticketId: string;
+  /** イベントタイプ */
+  eventType: 'request' | 'submit' | 'approve' | 'reject';
+  /** レビュアーID（オプション） */
+  reviewerId?: string;
+  /** ワーカーID（オプション） */
+  workerId?: string;
+  /** フィードバック（オプション） */
+  feedback?: string;
+  /** チェックリスト（オプション） */
+  checklist?: ReviewChecklist;
+}
+
+// =============================================================================
+// エスカレーション関連の型定義
+// @see Requirements: 14.2
+// =============================================================================
+
+/**
+ * エスカレーションアクション
+ * @description CEOが取れるエスカレーション対応アクション
+ * @see Requirement 14.2: THE CEO SHALL be able to choose: retry, skip, or abort
+ */
+export type EscalationAction = 'retry' | 'skip' | 'abort';
+
+/**
+ * 有効なエスカレーションアクション一覧
+ */
+export const VALID_ESCALATION_ACTIONS: EscalationAction[] = [
+  'retry',
+  'skip',
+  'abort',
+];
+
+/**
+ * ワークフローエスカレーション
+ * @description ワーカー失敗時のエスカレーション情報
+ * @see Requirement 14.1: WHEN a worker fails after maximum retries, THE Workflow_Engine SHALL create an Escalation
+ */
+export interface WorkflowEscalation {
+  /** ワークフローID */
+  workflowId: string;
+  /** 失敗したチケットID */
+  ticketId: string;
+  /** 失敗詳細 */
+  failureDetails: string;
+  /** ワーカータイプ */
+  workerType: WorkerType;
+  /** リトライ回数 */
+  retryCount: number;
+  /** 作成日時（ISO8601形式） */
+  createdAt: string;
+}
+
+/**
+ * エスカレーション決定
+ * @description CEOのエスカレーション対応決定
+ */
+export interface EscalationDecision {
+  /** アクション */
+  action: EscalationAction;
+  /** パラメータ（オプション、retry時のワーカータイプ変更等） */
+  parameters?: Record<string, unknown>;
+  /** 理由（オプション） */
+  reason?: string;
+}
+
+// =============================================================================
+// ワークフロー永続化関連の型定義
+// @see Requirements: 1.3, 13.1, 13.3
+// =============================================================================
+
+/**
+ * ワークフロー永続化データ
+ * @description workflow.json の構造
+ * @see Requirement 1.3: THE Workflow_Engine SHALL persist the current phase and transition history
+ * @see Requirement 13.1: THE Workflow_Engine SHALL persist the complete workflow state
+ * @see Requirement 13.3: THE persisted workflow state SHALL contain: current phase, phase history, approval decisions, worker assignments, and error log
+ */
+export interface WorkflowPersistenceData {
+  /** ワークフローID */
+  workflowId: string;
+  /** 実行ID */
+  runId: string;
+  /** プロジェクトID */
+  projectId: string;
+  /** 社長からの指示 */
+  instruction: string;
+  /** 現在のフェーズ */
+  currentPhase: WorkflowPhase;
+  /** ワークフローステータス */
+  status: WorkflowStatus;
+  /** フェーズ遷移履歴 */
+  phaseHistory: PhaseTransition[];
+  /** 承認決定履歴 */
+  approvalDecisions: ApprovalDecision[];
+  /** ワーカー割り当てマップ */
+  workerAssignments: Record<string, string>;
+  /** エラーログ */
+  errorLog: ErrorLogEntry[];
+  /** 会議録ID一覧 */
+  meetingMinutesIds: string[];
+  /** 作成日時（ISO8601形式） */
+  createdAt: string;
+  /** 更新日時（ISO8601形式） */
+  updatedAt: string;
+}
+
+/**
+ * 提案書永続化データ
+ * @description proposal.json の構造（バージョン管理付き）
+ * @see Requirement 2.11: THE Workflow_Engine SHALL persist the Proposal
+ */
+export interface ProposalPersistenceData extends Proposal {
+  /** バージョン番号 */
+  version: number;
+  /** 修正履歴 */
+  revisionHistory: {
+    /** バージョン番号 */
+    version: number;
+    /** フィードバック */
+    feedback: string;
+    /** 修正日時（ISO8601形式） */
+    revisedAt: string;
+  }[];
+}
+
+/**
+ * 承認履歴永続化データ
+ * @description approvals.json の構造
+ * @see Requirement 3.6: THE Approval_Gate SHALL persist the CEO decision and feedback
+ */
+export interface ApprovalsPersistenceData {
+  /** ワークフローID */
+  workflowId: string;
+  /** 承認決定一覧 */
+  decisions: ApprovalDecision[];
+}
+
+
+// =============================================================================
+// コーディングエージェント関連の型定義
+// @see Requirements: Coding Agent Integration 1.1, 1.2, 1.3, 5.1, 6.1, 8.1
+// =============================================================================
+
+/**
+ * コーディングタスクオプション
+ * @description コーディングエージェントに渡す作業指示のオプション
+ * @see Requirement 1.2: THE execute() method SHALL accept workingDirectory, prompt, systemPrompt, model, timeout
+ */
+export interface CodingTaskOptions {
+  /** 作業ディレクトリ（git clone先） */
+  workingDirectory: string;
+  /** 作業指示プロンプト */
+  prompt: string;
+  /** システムプロンプト（オプション） */
+  systemPrompt?: string;
+  /** 使用モデル（オプション） */
+  model?: string;
+  /** 許可ツール（オプション） */
+  allowedTools?: string[];
+  /** タイムアウト秒数（デフォルト: 600） */
+  timeout?: number;
+  /** 環境変数（オプション） */
+  env?: Record<string, string>;
+}
+
+/**
+ * コーディングタスク結果
+ * @description コーディングエージェントの実行結果
+ * @see Requirement 1.3: THE execute() method SHALL return success, output, exitCode, durationMs, filesChanged
+ */
+export interface CodingTaskResult {
+  /** 成功フラグ */
+  success: boolean;
+  /** 標準出力 */
+  output: string;
+  /** 標準エラー出力 */
+  stderr: string;
+  /** 終了コード */
+  exitCode: number;
+  /** 実行時間（ミリ秒） */
+  durationMs: number;
+  /** 変更されたファイル一覧（検出可能な場合） */
+  filesChanged: string[];
+}
+
+/**
+ * コーディングエージェント個別設定
+ * @description エージェント別の設定値
+ * @see Requirement 8.3: THE Settings page SHALL allow configuration of agent-specific options
+ */
+export interface CodingAgentSettings {
+  /** 使用モデル（オプション） */
+  model?: string;
+  /** タイムアウト秒数（オプション） */
+  timeout?: number;
+  /** 追加フラグ（オプション） */
+  additionalFlags?: string[];
+}
+
+/**
+ * コーディングエージェント設定
+ * @description SystemConfigに追加するコーディングエージェント設定
+ * @see Requirement 8.1: THE Settings page SHALL display available coding agents
+ */
+export interface CodingAgentConfig {
+  /** 優先コーディングエージェント名 */
+  preferredAgent: string;
+  /** エージェント別設定 */
+  agentSettings: Record<string, CodingAgentSettings>;
+  /** 新規プロジェクト時にGitHubリポジトリを自動作成するか */
+  autoCreateGithubRepo: boolean;
+  /** ワークスペースルートディレクトリ */
+  workspaceRoot: string;
+}
+
+/**
+ * デフォルトのコーディングエージェント設定
+ */
+export const DEFAULT_CODING_AGENT_CONFIG: CodingAgentConfig = {
+  preferredAgent: 'claude-code',
+  agentSettings: {},
+  autoCreateGithubRepo: false,
+  workspaceRoot: 'runtime/workspaces',
+};
+
+/**
+ * コーディングエージェント名
+ * @description サポートされるコーディングエージェントの名前
+ */
+export type CodingAgentName = 'opencode' | 'claude-code' | 'kiro-cli';
+
+/**
+ * 有効なコーディングエージェント名一覧
+ */
+export const VALID_CODING_AGENT_NAMES: CodingAgentName[] = [
+  'opencode',
+  'claude-code',
+  'kiro-cli',
+];

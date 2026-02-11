@@ -987,4 +987,119 @@ Markdown形式のレポートで、以下のセクションを含む：
 - [ワーカー管理](./worker-management.md)
 - [Autonomous Agent Workflow仕様](../specs/autonomous-agent-workflow.md)
 - [AI実行統合仕様](../specs/ai-execution-integration.md)
+- [Company Workflow Engine仕様](../specs/company-workflow-engine.md)
 - [CLI README](../../tools/cli/README.md)
+
+## Company Workflow Engine
+
+### 概要
+
+Company Workflow Engineは、業務フローを5フェーズ（提案→承認→開発→品質確認→納品）で管理するエンジン。エージェント間の会議プロセス、CEO承認ゲート、エスカレーション管理を統合する。
+
+### アーキテクチャ図
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     GUI Layer (Next.js)                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │ Workflows    │  │  Dashboard   │  │  Navigation  │          │
+│  │ 一覧/詳細    │  │ 承認通知     │  │ 通知バッジ   │          │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │
+└─────────┼─────────────────┼─────────────────┼──────────────────┘
+          │                 │                 │
+          └─────────────────┼─────────────────┘
+                            │ HTTP (port 3001)
+┌───────────────────────────┼─────────────────────────────────────┐
+│              Orchestrator Server                                 │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  /api/workflows/*  (ワークフローAPI)                      │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+┌───────────────────────────┼─────────────────────────────────────┐
+│                    Workflow Engine                                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │ Workflow     │  │ Meeting      │  │ Approval     │          │
+│  │ Engine       │  │ Coordinator  │  │ Gate         │          │
+│  │              │  │              │  │              │          │
+│  │ - 5フェーズ  │  │ - 会議開催   │  │ - 承認要求   │          │
+│  │ - 状態管理   │  │ - 議事録生成 │  │ - 決定処理   │          │
+│  │ - ロールバック│  │ - AgentBus   │  │ - 永続化     │          │
+│  │ - エスカレーション│ └──────────────┘  └──────────────┘          │
+│  └──────┬───────┘                                               │
+└─────────┼───────────────────────────────────────────────────────┘
+          │
+          ├── Orchestrator (タスク管理)
+          ├── Manager Agent (タスク分解)
+          ├── Worker Pool (ワーカー割り当て)
+          ├── Review Workflow (レビュー)
+          ├── Quality Gate Integration (品質チェック)
+          └── PR Creator (PR作成)
+```
+
+### フェーズ遷移
+
+```
+proposal ──→ approval ──→ development ──→ quality_assurance ──→ delivery
+    ↑            │              ↑                │                  │
+    │            │              │                │                  │
+    │      reject/revision      │          QA失敗                   │
+    │            │              └────────────────┘            revision
+    │            ↓                                                 │
+    └──── terminated                                               │
+                                                                   ↓
+                                                              development
+```
+
+### コンポーネント詳細
+
+#### WorkflowEngine
+
+**場所**: `tools/cli/lib/execution/workflow-engine.ts`
+
+ファクトリ関数 `createWorkflowEngine(meetingCoordinator, approvalGate, basePath)` で生成。
+
+| メソッド | 説明 |
+|----------|------|
+| `startWorkflow()` | ワークフロー開始、proposalフェーズへ遷移 |
+| `listWorkflows()` | 全ワークフロー一覧（statusフィルタ対応） |
+| `getProgress()` | 開発進捗取得（SubtaskProgress一覧） |
+| `getQualityResults()` | 品質結果取得 |
+| `rollbackToPhase()` | フェーズロールバック |
+| `terminateWorkflow()` | ワークフロー終了 |
+| `handleEscalation()` | エスカレーション処理（retry/skip/abort） |
+| `restoreWorkflows()` | 状態復元 |
+
+#### MeetingCoordinator
+
+**場所**: `tools/cli/lib/execution/meeting-coordinator.ts`
+
+ファクトリ関数 `createMeetingCoordinator(agentBus, basePath)` で生成。
+
+- ラウンド制の議論ループ
+- 会議録（MeetingMinutes）の永続化
+- `runtime/runs/<run-id>/meeting-minutes/<meeting-id>.json`
+
+#### ApprovalGate
+
+**場所**: `tools/cli/lib/execution/approval-gate.ts`
+
+ファクトリ関数 `createApprovalGate(basePath)` で生成。
+
+- Promise ベースの承認待ち機構
+- 承認決定の永続化: `runtime/runs/<run-id>/approvals.json`
+- `cancelApproval()` でロールバック時の承認キャンセル
+
+### 永続化データ
+
+```
+runtime/runs/<run-id>/
+├── workflow.json                    # ワークフロー状態
+├── approvals.json                   # 承認履歴
+└── meeting-minutes/                 # 会議録
+    └── <meeting-id>.json
+```
+
+### Orchestrator統合
+
+OrchestratorのコンストラクタでWorkflowEngine、MeetingCoordinator、ApprovalGateをオプショナルに初期化。getterメソッド（`getWorkflowEngine()`, `getMeetingCoordinator()`, `getApprovalGate()`）で外部からアクセス可能。

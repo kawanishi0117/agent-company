@@ -28,7 +28,7 @@ import {
 import { StateManager } from './state-manager';
 import { AgentBus, createAgentBus } from './agent-bus';
 import { ManagerAgent, ManagerAgentConfig, createManagerAgent } from './agents/manager';
-import { createWorkerPoolFromConfig } from './worker-pool';
+import { WorkerPool, createWorkerPoolFromConfig } from './worker-pool';
 import {
   ErrorHandler,
   createErrorHandler,
@@ -50,6 +50,9 @@ import {
   QualityGateIntegrationConfig,
 } from './quality-gate-integration';
 import { RunDirectoryManager } from './run-directory-manager';
+import { WorkflowEngine, createWorkflowEngine } from './workflow-engine';
+import { MeetingCoordinator, createMeetingCoordinator } from './meeting-coordinator';
+import { ApprovalGate, createApprovalGate } from './approval-gate';
 
 // =============================================================================
 // 定数定義
@@ -156,6 +159,12 @@ export interface OrchestratorConfig {
   qualityGateIntegration?: QualityGateIntegration;
   /** Run Directory Manager（オプション、指定しない場合は新規作成） */
   runDirectoryManager?: RunDirectoryManager;
+  /** Workflow Engine（オプション、指定しない場合は新規作成） */
+  workflowEngine?: WorkflowEngine;
+  /** Meeting Coordinator（オプション、指定しない場合は新規作成） */
+  meetingCoordinator?: MeetingCoordinator;
+  /** Approval Gate（オプション、指定しない場合は新規作成） */
+  approvalGate?: ApprovalGate;
   /** システム設定（オプション） */
   systemConfig?: Partial<SystemConfig>;
   /** エラーハンドラーオプション（オプション） */
@@ -272,6 +281,15 @@ export class Orchestrator implements IOrchestrator {
   /** Run Directory Manager - 実行ディレクトリ管理 */
   private runDirectoryManager: RunDirectoryManager;
 
+  /** Workflow Engine - ワークフローエンジン */
+  private workflowEngine: WorkflowEngine;
+
+  /** Meeting Coordinator - 会議調整 */
+  private meetingCoordinator: MeetingCoordinator;
+
+  /** Approval Gate - 承認ゲート */
+  private approvalGate: ApprovalGate;
+
   /** AI可用性ステータス（最新のチェック結果） */
   private aiHealthStatus: AIHealthStatus | null = null;
 
@@ -364,6 +382,20 @@ export class Orchestrator implements IOrchestrator {
     // Run Directory Managerを設定
     // @see Requirements: 2.4, 2.5
     this.runDirectoryManager = config?.runDirectoryManager ?? new RunDirectoryManager();
+
+    // Approval Gateを設定
+    // @see Requirements: 3.1, 3.2, 3.6, 3.7
+    this.approvalGate = config?.approvalGate ?? createApprovalGate();
+
+    // Meeting Coordinatorを設定
+    // @see Requirements: 2.1, 2.2, 2.6, 2.7
+    this.meetingCoordinator = config?.meetingCoordinator ?? createMeetingCoordinator(this.agentBus);
+
+    // Workflow Engineを設定
+    // @see Requirements: 1.1, 1.2, 1.3, 7.1
+    this.workflowEngine =
+      config?.workflowEngine ??
+      createWorkflowEngine(this.meetingCoordinator, this.approvalGate);
   }
 
   // ===========================================================================
@@ -630,8 +662,35 @@ export class Orchestrator implements IOrchestrator {
       // 進捗監視を開始
       this.managerAgent.startProgressMonitoring(runId);
 
-      // ワーカーにタスクを割り当て
-      await this.assignSubTasksToWorkers(subTasks, runId, task.projectId);
+      // ワーカーにタスクを割り当て、全結果を待つ
+      const results = await this.assignSubTasksToWorkers(subTasks, runId, task.projectId);
+
+      // ワーカー実行結果をExecutionStateに反映
+      for (const result of results) {
+        // 成果物パスを追加（ArtifactInfo -> string変換）
+        for (const artifact of result.artifacts) {
+          if (typeof artifact === 'string') {
+            executionState.artifacts.push(artifact);
+          } else {
+            executionState.artifacts.push(artifact.path);
+          }
+        }
+
+        // 会話履歴を記録
+        if (result.conversationTurns > 0) {
+          executionState.conversationHistories[result.agentId] = [];
+        }
+
+        // 失敗したワーカーの結果をExecutionStateに反映
+        if (result.status === 'error' || result.status === 'quality_failed') {
+          executionState.status = 'failed';
+        }
+      }
+
+      // 実行状態を保存
+      executionState.lastUpdated = new Date().toISOString();
+      this.executionStates.set(runId, executionState);
+      await this.stateManager.saveState(runId, executionState);
     }
 
     // タスク完了後の後処理（品質ゲート・レポート生成）
@@ -768,13 +827,30 @@ export class Orchestrator implements IOrchestrator {
    * @param runId - 実行ID
    * @param _projectId - プロジェクトID（将来の拡張用）
    */
+  /**
+   * サブタスクをワーカーに割り当て、全ワーカーの実行結果を収集する
+   *
+   * 各ワーカーの executeTask の Promise を収集し、Promise.allSettled で
+   * 全ワーカーの完了を待つ。ワーカーが利用できない場合はキューに追加し、
+   * 割り当て後の結果も収集する。
+   *
+   * @param subTasks - サブタスク一覧
+   * @param runId - 実行ID
+   * @param _projectId - プロジェクトID（将来使用）
+   * @returns 全ワーカーの実行結果配列
+   *
+   * @see Requirements: 9.3, 9.4 (ワーカー管理)
+   */
   private async assignSubTasksToWorkers(
     subTasks: SubTask[],
     runId: RunId,
     _projectId: string
-  ): Promise<void> {
+  ): Promise<ExecutionResult[]> {
     // 並列実行可能なタスクを取得
     const parallelizableTasks = subTasks.filter((t) => t.status === 'pending');
+
+    // 各ワーカーの実行結果Promiseを収集
+    const resultPromises: Promise<ExecutionResult>[] = [];
 
     for (const subTask of parallelizableTasks) {
       // 利用可能なワーカーを取得
@@ -791,15 +867,82 @@ export class Orchestrator implements IOrchestrator {
           state.lastUpdated = new Date().toISOString();
           await this.stateManager.saveState(runId, state);
         }
+
+        // ワーカーのタスク実行Promiseを収集
+        resultPromises.push(
+          worker.executeTask(subTask, { runId })
+        );
       } else {
-        // ワーカーが利用できない場合はキューに追加
-        this.workerPool.addPendingTask(subTask, runId, {
-          onAssigned: async (workerId) => {
-            await this.managerAgent.assignTask(subTask, workerId);
-          },
+        // ワーカーが利用できない場合はキューに追加し、Promiseで結果を待つ
+        const pendingPromise = new Promise<ExecutionResult>((resolve, reject) => {
+          this.workerPool.addPendingTask(subTask, runId, {
+            onAssigned: async (workerId) => {
+              try {
+                await this.managerAgent.assignTask(subTask, workerId);
+
+                // 割り当てられたワーカーの情報を取得
+                const workerInfo = this.workerPool.getWorkerInfo(workerId);
+                if (workerInfo) {
+                  const result = await workerInfo.agent.executeTask(subTask, { runId });
+                  resolve(result);
+                } else {
+                  reject(new OrchestratorError(
+                    `ワーカー ${workerId} の情報が取得できません`,
+                    'WORKER_NOT_FOUND'
+                  ));
+                }
+              } catch (error) {
+                reject(error);
+              }
+            },
+          });
         });
+        resultPromises.push(pendingPromise);
       }
     }
+
+    // 全ワーカーの完了を待つ
+    const settledResults = await Promise.allSettled(resultPromises);
+
+    // 結果を収集（成功・失敗を分けて返す）
+    const results: ExecutionResult[] = [];
+    for (const settled of settledResults) {
+      if (settled.status === 'fulfilled') {
+        results.push(settled.value);
+      } else {
+        // 失敗した場合はエラー結果を生成
+        const errorResult: ExecutionResult = {
+          runId,
+          ticketId: '',
+          agentId: 'unknown',
+          status: 'error',
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          artifacts: [],
+          gitBranch: '',
+          commits: [],
+          qualityGates: {
+            lint: { passed: false, output: '' },
+            test: { passed: false, output: '' },
+            overall: false,
+          },
+          errors: [{
+            code: 'WORKER_EXECUTION_FAILED',
+            message: settled.reason instanceof Error
+              ? settled.reason.message
+              : String(settled.reason),
+            timestamp: new Date().toISOString(),
+            category: 'execution' as ErrorCategory,
+            severity: 'high',
+          }],
+          conversationTurns: 0,
+          tokensUsed: 0,
+        };
+        results.push(errorResult);
+      }
+    }
+
+    return results;
   }
 
   /**
@@ -1451,6 +1594,33 @@ export class Orchestrator implements IOrchestrator {
    */
   getRunDirectoryManager(): RunDirectoryManager {
     return this.runDirectoryManager;
+  }
+
+  /**
+   * Workflow Engineを取得
+   * @returns Workflow Engine
+   * @see Requirements: 1.1, 7.1
+   */
+  getWorkflowEngine(): WorkflowEngine {
+    return this.workflowEngine;
+  }
+
+  /**
+   * Meeting Coordinatorを取得
+   * @returns Meeting Coordinator
+   * @see Requirements: 2.1, 2.2
+   */
+  getMeetingCoordinator(): MeetingCoordinator {
+    return this.meetingCoordinator;
+  }
+
+  /**
+   * Approval Gateを取得
+   * @returns Approval Gate
+   * @see Requirements: 3.1, 3.2
+   */
+  getApprovalGate(): ApprovalGate {
+    return this.approvalGate;
   }
 
   /**

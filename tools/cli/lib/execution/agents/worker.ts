@@ -20,9 +20,12 @@ import {
   ConversationMessage,
   ToolCallRecord,
   WorkerStatus,
+  WorkerType,
   ArtifactInfo,
   QualityGateResult,
   ErrorInfo,
+  CodingTaskOptions,
+  CodingTaskResult,
 } from '../types';
 import { ToolExecutor, toolExecutor, FileEdit } from '../tools';
 import {
@@ -39,6 +42,8 @@ import type {
   QualityGateResult as IntegrationQualityGateResult,
   QualityGateFeedback,
 } from '../quality-gate-integration';
+import type { CodingAgentAdapter } from '../../../../coding-agents/base.js';
+import { CodingAgentRegistry, CodingAgentError } from '../../../../coding-agents/index.js';
 
 // =============================================================================
 // 定数定義
@@ -73,6 +78,12 @@ const COMPLETION_SIGNALS = [
   '完了しました',
 ];
 
+/**
+ * コーディングタスクとして扱うワーカータイプ
+ * @see Requirement 7.1: THE WorkerAgent SHALL use CodingAgentAdapter for coding tasks
+ */
+const CODING_WORKER_TYPES: WorkerType[] = ['developer', 'test'];
+
 // =============================================================================
 // 型定義
 // =============================================================================
@@ -95,6 +106,10 @@ export interface WorkerAgentConfig {
   commandTimeout?: number;
   /** 品質ゲートフィードバックループの最大リトライ回数 */
   maxQualityGateRetries?: number;
+  /** 優先コーディングエージェント名（オプション） */
+  codingAgentName?: string;
+  /** コーディングエージェントレジストリ（オプション、テスト用DI） */
+  codingAgentRegistry?: CodingAgentRegistry;
 }
 
 /**
@@ -107,6 +122,10 @@ export interface ExecuteTaskOptions {
   systemPrompt?: string;
   /** 既存の会話履歴（再開用） */
   existingHistory?: ConversationHistory;
+  /** ワーカータイプ（コーディングタスク判定用） */
+  workerType?: WorkerType;
+  /** 作業ディレクトリ（コーディングエージェント用） */
+  codingWorkDir?: string;
 }
 
 /**
@@ -358,6 +377,20 @@ export class WorkerAgent {
   private qualityGateResultSaver?: (runId: RunId, results: IntegrationQualityGateResult) => Promise<void>;
 
   /**
+   * コーディングエージェントレジストリ
+   * @description コーディングタスク時に使用するエージェントの選択・管理
+   * @see Requirement 7.1: THE WorkerAgent SHALL use CodingAgentAdapter for coding tasks
+   */
+  private codingAgentRegistry: CodingAgentRegistry;
+
+  /**
+   * 優先コーディングエージェント名
+   * @description selectAdapter()に渡す優先エージェント名
+   * @see Requirement 7.2: THE WorkerAgent SHALL select adapter via registry
+   */
+  private codingAgentName?: string;
+
+  /**
    * コンストラクタ
    * @param config - Worker Agent設定
    */
@@ -367,9 +400,13 @@ export class WorkerAgent {
     this.maxQualityGateRetries = config.maxQualityGateRetries ?? MAX_QUALITY_GATE_RETRIES;
     this.modelName = config.modelName ?? 'llama3.2:1b';
 
-    // AIアダプタを取得
+    // AIアダプタを取得（非コーディングタスク用）
     const adapterName = config.adapterName ?? 'ollama';
     this.adapter = getAdapter(adapterName);
+
+    // コーディングエージェントレジストリを設定
+    this.codingAgentRegistry = config.codingAgentRegistry ?? new CodingAgentRegistry();
+    this.codingAgentName = config.codingAgentName;
 
     // ツール実行器を設定
     this.toolExecutor = new ToolExecutor();
@@ -428,6 +465,194 @@ export class WorkerAgent {
 
     // ツール実行器に実行IDを設定
     this.toolExecutor.setRunId(options.runId);
+
+    // コーディングタスク判定: workerTypeがdeveloper/testの場合はCodingAgentAdapterを使用
+    // @see Requirement 7.1: THE WorkerAgent SHALL use CodingAgentAdapter for coding tasks
+    if (this.isCodingTask(options.workerType)) {
+      return this.executeCodingTask(task, options, startTime);
+    }
+
+    // 非コーディングタスク: 既存のOllama会話ループを使用
+    return this.executeConversationTask(task, options, startTime);
+  }
+
+  /**
+   * コーディングタスクかどうかを判定
+   *
+   * @param workerType - ワーカータイプ（オプション）
+   * @returns コーディングタスクの場合true
+   * @see Requirement 7.1: THE WorkerAgent SHALL use CodingAgentAdapter for coding tasks
+   */
+  private isCodingTask(workerType?: WorkerType): boolean {
+    if (!workerType) return false;
+    return CODING_WORKER_TYPES.includes(workerType);
+  }
+
+  /**
+   * コーディングタスクを実行
+   *
+   * CodingAgentAdapterを使用して外部コーディングエージェントCLIでタスクを実行する。
+   * タスク情報からプロンプトを構築し、CLIサブプロセスとして実行する。
+   *
+   * @param task - 実行するサブタスク
+   * @param options - 実行オプション
+   * @param startTime - 開始時刻
+   * @returns 実行結果
+   *
+   * @see Requirement 7.2: THE WorkerAgent SHALL select adapter via registry
+   * @see Requirement 7.3: THE WorkerAgent SHALL build prompt from task context
+   * @see Requirement 7.4: THE WorkerAgent SHALL convert CodingTaskResult to ExecutionResult
+   */
+  private async executeCodingTask(
+    task: SubTask,
+    options: ExecuteTaskOptions,
+    startTime: string
+  ): Promise<ExecutionResult> {
+    const errors: ErrorInfo[] = [];
+
+    try {
+      // コーディングエージェントを選択
+      const adapter = await this.codingAgentRegistry.selectAdapter(this.codingAgentName);
+
+      // 作業ディレクトリを決定
+      const workingDirectory = options.codingWorkDir
+        ?? this.toolExecutor.getContext().workspacePath
+        ?? '.';
+
+      // タスクコンテキストからプロンプトを構築
+      const prompt = this.buildCodingPrompt(task, options.systemPrompt);
+
+      // コーディングエージェントを実行
+      const codingOptions: CodingTaskOptions = {
+        workingDirectory,
+        prompt,
+        systemPrompt: options.systemPrompt,
+        model: this.modelName,
+        timeout: this.toolExecutor.getContext().commandTimeout,
+      };
+
+      const codingResult = await adapter.execute(codingOptions);
+
+      // 変更ファイルを成果物として記録
+      for (const filePath of codingResult.filesChanged) {
+        this.trackArtifact(filePath, 'modified');
+      }
+
+      // 実行結果を構築
+      const endTime = new Date().toISOString();
+      const status: ExecutionStatus = codingResult.success ? 'success' : 'error';
+
+      // 会話履歴を作成（コーディングエージェントの入出力を記録）
+      this.conversationHistory = this.createInitialHistory(options.runId);
+      this.addMessage('system', `コーディングエージェント: ${adapter.displayName}`);
+      this.addMessage('user', prompt);
+      this.addMessage('assistant', codingResult.output || codingResult.stderr);
+      await this.saveConversationHistory(options.runId);
+
+      const loopResult: ConversationLoopResult = {
+        completed: codingResult.success,
+        finalResponse: codingResult.output,
+        iterations: 1,
+        artifacts: [...this.collectedArtifacts],
+        errors: codingResult.success ? [] : [{
+          code: 'CODING_AGENT_ERROR',
+          message: `コーディングエージェント '${adapter.name}' がエラーで終了しました (exit code: ${codingResult.exitCode})`,
+          timestamp: new Date().toISOString(),
+          recoverable: true,
+        }],
+        qualityGateRetries: 0,
+      };
+
+      return this.buildExecutionResult(
+        options.runId,
+        task,
+        status,
+        startTime,
+        endTime,
+        loopResult,
+        errors
+      );
+    } catch (error) {
+      // CodingAgentErrorの場合は詳細情報を含める
+      const errorInfo = this.createErrorInfo(error);
+      if (error instanceof CodingAgentError) {
+        errorInfo.code = error.code;
+      }
+      errors.push(errorInfo);
+
+      const endTime = new Date().toISOString();
+      return this.buildExecutionResult(
+        options.runId,
+        task,
+        'error',
+        startTime,
+        endTime,
+        { completed: false, finalResponse: '', iterations: 0, artifacts: [], errors: [], qualityGateRetries: 0 },
+        errors
+      );
+    } finally {
+      this.setStatus('idle');
+      this.currentRunId = undefined;
+    }
+  }
+
+  /**
+   * コーディングタスク用プロンプトを構築
+   *
+   * タスク情報（タイトル、説明、受け入れ基準）からコーディングエージェント向けの
+   * プロンプトを生成する。
+   *
+   * @param task - サブタスク
+   * @param additionalPrompt - 追加のシステムプロンプト
+   * @returns コーディングエージェント向けプロンプト
+   * @see Requirement 7.3: THE WorkerAgent SHALL build prompt from task context
+   */
+  private buildCodingPrompt(task: SubTask, additionalPrompt?: string): string {
+    const parts: string[] = [
+      `# タスク: ${task.title}`,
+      '',
+      '## 説明',
+      task.description,
+      '',
+      '## 受け入れ基準',
+    ];
+
+    for (const criterion of task.acceptanceCriteria) {
+      parts.push(`- ${criterion}`);
+    }
+
+    parts.push('');
+    parts.push('## 作業指示');
+    parts.push('上記のタスクを実装してください。');
+    parts.push('- コードの品質を保ち、テストも作成してください');
+    parts.push('- 変更が完了したらgit commitしてください');
+
+    if (additionalPrompt) {
+      parts.push('');
+      parts.push('## 追加指示');
+      parts.push(additionalPrompt);
+    }
+
+    return parts.join('\n');
+  }
+
+  /**
+   * 非コーディングタスクを実行（既存の会話ループ）
+   *
+   * Ollamaベースの会話ループを使用してタスクを実行する。
+   * 会議、提案書生成、リサーチなどの非コーディングタスク用。
+   *
+   * @param task - 実行するサブタスク
+   * @param options - 実行オプション
+   * @param startTime - 開始時刻
+   * @returns 実行結果
+   * @see Requirement 7.5: THE WorkerAgent SHALL keep existing Ollama loop for non-coding tasks
+   */
+  private async executeConversationTask(
+    task: SubTask,
+    options: ExecuteTaskOptions,
+    startTime: string
+  ): Promise<ExecutionResult> {
 
     // 会話履歴を初期化または復元
     if (options.existingHistory) {

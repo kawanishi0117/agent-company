@@ -1,7 +1,7 @@
 /**
  * @file Settings Page
- * @description システム設定画面
- * @requirements 15.1, 15.2, 15.5, 15.6
+ * @description システム設定画面（コーディングエージェント設定を含む）
+ * @requirements 15.1, 15.2, 15.5, 15.6, 8.1, 8.2, 8.3, 8.4, 8.5
  */
 
 'use client';
@@ -48,6 +48,43 @@ interface SystemConfig {
   stateRetentionDays: number;
   integrationBranch: string;
   autoRefreshInterval: number;
+}
+
+// コーディングエージェント関連型
+
+/**
+ * コーディングエージェント個別設定
+ */
+interface AgentSetting {
+  /** 使用モデル */
+  model?: string;
+  /** タイムアウト秒数 */
+  timeout?: number;
+  /** 追加フラグ */
+  additionalFlags?: string[];
+}
+
+/**
+ * コーディングエージェント設定
+ */
+interface CodingAgentSettings {
+  /** 優先コーディングエージェント名 */
+  preferredAgent: string;
+  /** エージェント別設定 */
+  agentSettings: Record<string, AgentSetting>;
+  /** 新規プロジェクト時にGitHubリポジトリを自動作成するか */
+  autoCreateGithubRepo: boolean;
+}
+
+/**
+ * エージェント情報（表示用）
+ */
+interface AgentInfo {
+  name: string;
+  displayName: string;
+  command: string;
+  description: string;
+}
 }
 
 // =============================================================================
@@ -102,6 +139,13 @@ export default function SettingsPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // コーディングエージェント設定の状態
+  const [codingAgentSettings, setCodingAgentSettings] = useState<CodingAgentSettings | null>(null);
+  const [agentInfoList, setAgentInfoList] = useState<AgentInfo[]>([]);
+  const [codingAgentLoading, setCodingAgentLoading] = useState(true);
+  const [codingAgentSaving, setCodingAgentSaving] = useState(false);
+  const [connectionTestResults, setConnectionTestResults] = useState<Record<string, 'testing' | 'available' | 'unavailable'>>({});
+
   // 設定を読み込む
   const loadSettings = useCallback(async () => {
     try {
@@ -122,10 +166,32 @@ export default function SettingsPage(): JSX.Element {
     }
   }, []);
 
+  // コーディングエージェント設定を読み込む
+  const loadCodingAgentSettings = useCallback(async () => {
+    try {
+      setCodingAgentLoading(true);
+      const response = await fetch('/api/settings/coding-agents');
+      const result = await response.json();
+
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setCodingAgentSettings(result.data.settings);
+        setAgentInfoList(result.data.agents);
+      }
+    } catch (err) {
+      // コーディングエージェント設定の読み込み失敗はメイン設定に影響させない
+      setCodingAgentSettings(null);
+    } finally {
+      setCodingAgentLoading(false);
+    }
+  }, []);
+
   // 初回読み込み
   useEffect(() => {
     loadSettings();
-  }, [loadSettings]);
+    loadCodingAgentSettings();
+  }, [loadSettings, loadCodingAgentSettings]);
 
   // 設定を保存する
   const saveSettings = async () => {
@@ -149,7 +215,6 @@ export default function SettingsPage(): JSX.Element {
       } else {
         setConfig(result.data);
         setSuccessMessage('設定を保存しました');
-        // 3秒後にメッセージを消す
         setTimeout(() => setSuccessMessage(null), 3000);
       }
     } catch (err) {
@@ -157,6 +222,73 @@ export default function SettingsPage(): JSX.Element {
     } finally {
       setSaving(false);
     }
+  };
+
+  /**
+   * コーディングエージェント設定を保存する
+   * @see Requirement 8.5: 設定の保存
+   */
+  const saveCodingAgentSettings = async (): Promise<void> => {
+    if (!codingAgentSettings) return;
+
+    try {
+      setCodingAgentSaving(true);
+      setError(null);
+      setSuccessMessage(null);
+
+      const response = await fetch('/api/settings/coding-agents', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(codingAgentSettings),
+      });
+
+      const result = await response.json();
+
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setCodingAgentSettings(result.data);
+        setSuccessMessage('コーディングエージェント設定を保存しました');
+        setTimeout(() => setSuccessMessage(null), 3000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'コーディングエージェント設定の保存に失敗しました');
+    } finally {
+      setCodingAgentSaving(false);
+    }
+  };
+
+  /**
+   * 接続テスト（CLIの存在確認をシミュレート）
+   * 実際にはOrchestratorのAPIを叩いて確認する想定
+   * @param agentName - テスト対象のエージェント名
+   */
+  const testConnection = async (agentName: string): Promise<void> => {
+    setConnectionTestResults((prev) => ({ ...prev, [agentName]: 'testing' }));
+
+    try {
+      // Orchestrator APIに接続テストを依頼
+      const response = await fetch(`/api/settings/coding-agents?test=${agentName}`);
+      const result = await response.json();
+
+      // APIが正常応答すればavailable扱い（実際のCLI検出はサーバーサイドで行う）
+      if (result.data) {
+        setConnectionTestResults((prev) => ({ ...prev, [agentName]: 'available' }));
+      } else {
+        setConnectionTestResults((prev) => ({ ...prev, [agentName]: 'unavailable' }));
+      }
+    } catch {
+      setConnectionTestResults((prev) => ({ ...prev, [agentName]: 'unavailable' }));
+    }
+
+    // 5秒後にテスト結果をクリア
+    setTimeout(() => {
+      setConnectionTestResults((prev) => {
+        const next = { ...prev };
+        delete next[agentName];
+        return next;
+      });
+    }, 5000);
   };
 
   // 設定値を更新するヘルパー
@@ -367,6 +499,207 @@ export default function SettingsPage(): JSX.Element {
         </div>
       </Card>
 
+      {/* コーディングエージェント設定 */}
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+            <svg className="w-5 h-5 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+            コーディングエージェント設定
+          </h2>
+          <button
+            onClick={saveCodingAgentSettings}
+            disabled={codingAgentSaving || !codingAgentSettings}
+            className={`
+              px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+              ${codingAgentSaving || !codingAgentSettings
+                ? 'bg-bg-tertiary text-text-muted cursor-not-allowed'
+                : 'bg-accent-primary text-white hover:bg-accent-primary/90'
+              }
+            `}
+          >
+            {codingAgentSaving ? '保存中...' : 'エージェント設定を保存'}
+          </button>
+        </div>
+
+        {codingAgentLoading ? (
+          <div className="flex items-center gap-2 text-text-secondary py-4">
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <span className="text-sm">コーディングエージェント設定を読み込み中...</span>
+          </div>
+        ) : codingAgentSettings ? (
+          <div className="space-y-5">
+            {/* 優先エージェント選択 */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                優先コーディングエージェント
+              </label>
+              <select
+                value={codingAgentSettings.preferredAgent}
+                onChange={(e) => setCodingAgentSettings({
+                  ...codingAgentSettings,
+                  preferredAgent: e.target.value,
+                })}
+                className="w-full px-3 py-2 bg-bg-primary border border-bg-tertiary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent"
+              >
+                {agentInfoList.map((agent) => (
+                  <option key={agent.name} value={agent.name}>
+                    {agent.displayName}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-text-muted mt-1">
+                開発タスク実行時に優先的に使用されるエージェント。利用不可の場合は自動フォールバック。
+              </p>
+            </div>
+
+            {/* エージェント一覧 */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-3">
+                登録済みエージェント
+              </label>
+              <div className="space-y-3">
+                {agentInfoList.map((agent) => {
+                  const agentSetting = codingAgentSettings.agentSettings[agent.name] ?? {};
+                  const testStatus = connectionTestResults[agent.name];
+                  const isPreferred = codingAgentSettings.preferredAgent === agent.name;
+
+                  return (
+                    <div
+                      key={agent.name}
+                      className={`
+                        p-4 rounded-lg border transition-colors
+                        ${isPreferred
+                          ? 'border-accent-primary bg-accent-primary/5'
+                          : 'border-bg-tertiary'
+                        }
+                      `}
+                    >
+                      {/* エージェントヘッダー */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-text-primary">{agent.displayName}</span>
+                          {isPreferred && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-accent-primary/20 text-accent-primary">
+                              優先
+                            </span>
+                          )}
+                          {/* 接続テスト結果 */}
+                          {testStatus === 'testing' && (
+                            <span className="flex items-center gap-1 text-xs text-text-muted">
+                              <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              テスト中...
+                            </span>
+                          )}
+                          {testStatus === 'available' && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-status-pass/20 text-status-pass">
+                              利用可能
+                            </span>
+                          )}
+                          {testStatus === 'unavailable' && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-status-fail/20 text-status-fail">
+                              利用不可
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => testConnection(agent.name)}
+                          disabled={testStatus === 'testing'}
+                          className="px-3 py-1 text-xs rounded-md border border-bg-tertiary text-text-secondary hover:border-accent-primary hover:text-accent-primary transition-colors disabled:opacity-50"
+                        >
+                          接続テスト
+                        </button>
+                      </div>
+
+                      {/* エージェント説明 */}
+                      <p className="text-xs text-text-muted mb-3">{agent.description}</p>
+                      <p className="text-xs text-text-muted mb-3 font-mono bg-bg-primary/50 px-2 py-1 rounded inline-block">
+                        {agent.command}
+                      </p>
+
+                      {/* エージェント個別設定 */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                        <div>
+                          <label className="block text-xs font-medium text-text-muted mb-1">
+                            モデル（オプション）
+                          </label>
+                          <input
+                            type="text"
+                            value={agentSetting.model ?? ''}
+                            onChange={(e) => setCodingAgentSettings({
+                              ...codingAgentSettings,
+                              agentSettings: {
+                                ...codingAgentSettings.agentSettings,
+                                [agent.name]: {
+                                  ...agentSetting,
+                                  model: e.target.value || undefined,
+                                },
+                              },
+                            })}
+                            placeholder="デフォルト"
+                            className="w-full px-2 py-1.5 text-sm bg-bg-primary border border-bg-tertiary rounded-md text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-text-muted mb-1">
+                            タイムアウト（秒）
+                          </label>
+                          <input
+                            type="number"
+                            min={30}
+                            max={3600}
+                            value={agentSetting.timeout ?? 600}
+                            onChange={(e) => setCodingAgentSettings({
+                              ...codingAgentSettings,
+                              agentSettings: {
+                                ...codingAgentSettings.agentSettings,
+                                [agent.name]: {
+                                  ...agentSetting,
+                                  timeout: parseInt(e.target.value) || 600,
+                                },
+                              },
+                            })}
+                            className="w-full px-2 py-1.5 text-sm bg-bg-primary border border-bg-tertiary rounded-md text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* GitHub自動リポジトリ作成 */}
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="autoCreateGithubRepo"
+                checked={codingAgentSettings.autoCreateGithubRepo}
+                onChange={(e) => setCodingAgentSettings({
+                  ...codingAgentSettings,
+                  autoCreateGithubRepo: e.target.checked,
+                })}
+                className="accent-accent-primary"
+              />
+              <label htmlFor="autoCreateGithubRepo" className="text-sm text-text-secondary cursor-pointer">
+                新規プロジェクト時にGitHubリポジトリを自動作成する
+              </label>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-text-muted py-2">
+            コーディングエージェント設定を読み込めませんでした。
+          </p>
+        )}
+      </Card>
+
       {/* コンテナランタイム設定 */}
       <Card>
         <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
@@ -503,6 +836,14 @@ export default function SettingsPage(): JSX.Element {
             <div className="text-text-muted">ランタイム</div>
             <div className="text-text-primary font-medium">{config.containerRuntime.toUpperCase()}</div>
           </div>
+          {codingAgentSettings && (
+            <div>
+              <div className="text-text-muted">コーディングエージェント</div>
+              <div className="text-text-primary font-medium">
+                {agentInfoList.find((a) => a.name === codingAgentSettings.preferredAgent)?.displayName ?? codingAgentSettings.preferredAgent}
+              </div>
+            </div>
+          )}
         </div>
       </Card>
     </div>

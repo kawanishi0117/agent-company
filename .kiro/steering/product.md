@@ -133,10 +133,51 @@ Merger Agent（ブランチマージ）
 
 ## AI実行基盤
 
+### テキスト生成（会議・提案書）
+
 | 項目             | 設定                                   |
 | ---------------- | -------------------------------------- |
 | MVP              | Ollama（ローカル、認証不要）           |
 | モデル           | codellama / llama3 / deepseek-coder    |
 | インターフェース | REST API (`localhost:11434`)           |
 | アダプタ         | `tools/adapters/ollama.ts`             |
-| 将来対応         | Claude Code, Kiro CLI, Codex, OpenCode |
+
+### コーディングエージェント（コード生成・実装）
+
+外部CLIツールをサブプロセスとして実行し、実際のコーディング作業を委譲する。
+
+| エージェント | CLIコマンド | 特徴 |
+|-------------|------------|------|
+| Claude Code | `claude -p "prompt"` | 高品質コード生成、JSON出力対応 |
+| OpenCode | `opencode run "prompt"` | マルチモデル対応、オープンソース |
+| Kiro CLI | `kiro chat -p "prompt"` | AWS統合 |
+
+- 統一インターフェース: `CodingAgentAdapter`
+- 自動検出・フォールバック: `CodingAgentRegistry`
+- ワークスペース管理: `WorkspaceManager`（git clone/branch/cleanup）
+- GUI設定: Settings画面でエージェント選択・個別設定・接続テスト
+
+## Company Workflow Engine
+
+5フェーズの業務フローを管理するエンジン。
+
+### ワークフローフロー
+
+```
+社長の指示 → 提案（会議） → 承認 → 開発 → 品質確認 → 納品
+```
+
+### コンポーネント
+
+| コンポーネント     | 役割                           | 場所                                             |
+| ------------------ | ------------------------------ | ------------------------------------------------ |
+| WorkflowEngine     | ワークフロー全体制御           | `tools/cli/lib/execution/workflow-engine.ts`     |
+| MeetingCoordinator | エージェント間会議の開催・記録 | `tools/cli/lib/execution/meeting-coordinator.ts` |
+| ApprovalGate       | CEO承認ゲート管理              | `tools/cli/lib/execution/approval-gate.ts`       |
+
+### GUI
+
+- Workflows一覧: `/workflows`（フィルタ・ソート対応）
+- ワークフロー詳細: `/workflows/[id]`（6タブ: 概要/提案書/会議録/進捗/品質/承認履歴）
+- Dashboard: 承認待ち通知カード、ワークフローサマリー
+- Navigation: 承認待ち数の通知バッジ

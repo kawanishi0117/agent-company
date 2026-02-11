@@ -27,6 +27,19 @@ import {
   createSettingsManager,
 } from './settings-manager.js';
 import type { SystemConfig } from './types.js';
+import {
+  WorkflowEngine,
+  WorkflowEngineError,
+  createWorkflowEngine,
+} from './workflow-engine.js';
+import { MeetingCoordinator, createMeetingCoordinator } from './meeting-coordinator.js';
+import { ApprovalGate, createApprovalGate } from './approval-gate.js';
+import { createAgentBus } from './agent-bus.js';
+import type {
+  ApprovalDecision,
+  EscalationDecision,
+  WorkflowPhase,
+} from './types.js';
 
 // =============================================================================
 // 定数
@@ -89,6 +102,12 @@ export interface OrchestratorServerConfig {
   aiHealthChecker?: AIHealthChecker;
   /** SettingsManager（DI用、省略時は自動生成） */
   settingsManager?: SettingsManager;
+  /** WorkflowEngine（DI用、省略時は自動生成） */
+  workflowEngine?: WorkflowEngine;
+  /** ApprovalGate（DI用、省略時は自動生成） */
+  approvalGate?: ApprovalGate;
+  /** MeetingCoordinator（DI用、省略時は自動生成） */
+  meetingCoordinator?: MeetingCoordinator;
 }
 
 // =============================================================================
@@ -119,6 +138,10 @@ export class OrchestratorServer {
   private aiHealthChecker: AIHealthChecker;
   /** 設定マネージャー @see Requirements: 8.1-8.5 */
   private settingsManager: SettingsManager;
+  /** ワークフローエンジン @see Requirements: 15.1-15.11 */
+  private workflowEngine: WorkflowEngine;
+  /** 承認ゲート @see Requirements: 15.4 */
+  private approvalGate: ApprovalGate;
   private port: number;
   private running: boolean = false;
 
@@ -128,6 +151,17 @@ export class OrchestratorServer {
     this.ticketManager = config?.ticketManager ?? createTicketManager();
     this.aiHealthChecker = config?.aiHealthChecker ?? createAIHealthChecker();
     this.settingsManager = config?.settingsManager ?? createSettingsManager();
+
+    // ワークフロー関連コンポーネント初期化
+    const agentBus = createAgentBus({
+      messageQueueConfig: { type: 'file', basePath: 'runtime/state/bus' },
+      runtimeBasePath: 'runtime/runs',
+    });
+    const meetingCoordinator = config?.meetingCoordinator
+      ?? createMeetingCoordinator(agentBus, 'runtime/runs');
+    this.approvalGate = config?.approvalGate ?? createApprovalGate('runtime/runs');
+    this.workflowEngine = config?.workflowEngine
+      ?? createWorkflowEngine(meetingCoordinator, this.approvalGate, 'runtime/runs');
   }
 
   /**
@@ -345,6 +379,29 @@ export class OrchestratorServer {
     if (pathname === '/api/dashboard/status' && method === 'GET') {
       await this.handleDashboardStatus(res);
       return true;
+    }
+
+    // --- ワークフロー関連 ---
+    // @see Requirements: 15.1-15.11
+
+    // POST /api/workflows: ワークフロー開始
+    if (pathname === '/api/workflows' && method === 'POST') {
+      await this.handleStartWorkflow(req, res);
+      return true;
+    }
+
+    // GET /api/workflows: ワークフロー一覧
+    if (pathname === '/api/workflows' && method === 'GET') {
+      const parsedUrl = url.parse(req.url ?? '', true);
+      const status = parsedUrl.query.status as string | undefined;
+      await this.handleListWorkflows(status, res);
+      return true;
+    }
+
+    // ワークフロー個別エンドポイント（サブリソース優先でマッチ）
+    if (pathname.startsWith('/api/workflows/')) {
+      const matched = await this.routeWorkflowSubResource(pathname, method, req, res);
+      if (matched) return true;
     }
 
     return false;
@@ -1052,6 +1109,369 @@ export class OrchestratorServer {
    */
   getPort(): number {
     return this.port;
+  }
+
+  // ===========================================================================
+  // ワークフローAPI ハンドラー
+  // @see Requirements: 15.1-15.11
+  // ===========================================================================
+
+  /**
+   * ワークフローサブリソースのルーティング
+   * @param pathname - リクエストパス
+   * @param method - HTTPメソッド
+   * @param req - リクエスト
+   * @param res - レスポンス
+   * @returns マッチした場合true
+   */
+  private async routeWorkflowSubResource(
+    pathname: string,
+    method: string,
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ): Promise<boolean> {
+    // /api/workflows/:id/approve
+    if (pathname.endsWith('/approve') && method === 'POST') {
+      const workflowId = this.extractWorkflowId(pathname, '/approve');
+      await this.handleWorkflowApprove(workflowId, req, res);
+      return true;
+    }
+
+    // /api/workflows/:id/escalation
+    if (pathname.endsWith('/escalation') && method === 'POST') {
+      const workflowId = this.extractWorkflowId(pathname, '/escalation');
+      await this.handleWorkflowEscalation(workflowId, req, res);
+      return true;
+    }
+
+    // /api/workflows/:id/rollback
+    if (pathname.endsWith('/rollback') && method === 'POST') {
+      const workflowId = this.extractWorkflowId(pathname, '/rollback');
+      await this.handleWorkflowRollback(workflowId, req, res);
+      return true;
+    }
+
+    // /api/workflows/:id/proposal
+    if (pathname.endsWith('/proposal') && method === 'GET') {
+      const workflowId = this.extractWorkflowId(pathname, '/proposal');
+      await this.handleGetWorkflowProposal(workflowId, res);
+      return true;
+    }
+
+    // /api/workflows/:id/deliverable
+    if (pathname.endsWith('/deliverable') && method === 'GET') {
+      const workflowId = this.extractWorkflowId(pathname, '/deliverable');
+      await this.handleGetWorkflowDeliverable(workflowId, res);
+      return true;
+    }
+
+    // /api/workflows/:id/meetings
+    if (pathname.endsWith('/meetings') && method === 'GET') {
+      const workflowId = this.extractWorkflowId(pathname, '/meetings');
+      await this.handleGetWorkflowMeetings(workflowId, res);
+      return true;
+    }
+
+    // /api/workflows/:id/progress
+    if (pathname.endsWith('/progress') && method === 'GET') {
+      const workflowId = this.extractWorkflowId(pathname, '/progress');
+      await this.handleGetWorkflowProgress(workflowId, res);
+      return true;
+    }
+
+    // /api/workflows/:id/quality
+    if (pathname.endsWith('/quality') && method === 'GET') {
+      const workflowId = this.extractWorkflowId(pathname, '/quality');
+      await this.handleGetWorkflowQuality(workflowId, res);
+      return true;
+    }
+
+    // GET /api/workflows/:id（サブリソースなし = 詳細取得）
+    if (method === 'GET') {
+      const workflowId = pathname.replace('/api/workflows/', '');
+      if (workflowId && !workflowId.includes('/')) {
+        await this.handleGetWorkflowState(workflowId, res);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * パスからワークフローIDを抽出
+   */
+  private extractWorkflowId(pathname: string, suffix: string): string {
+    return pathname.replace('/api/workflows/', '').replace(suffix, '');
+  }
+
+  /**
+   * POST /api/workflows - ワークフロー開始
+   * @see Requirement 15.1
+   */
+  private async handleStartWorkflow(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ): Promise<void> {
+    const body = await this.parseBody<{ instruction: string; projectId: string }>(req);
+
+    if (!body.instruction || !body.projectId) {
+      this.sendErrorResponse(res, 400, 'instruction と projectId は必須です', 'VALIDATION_ERROR');
+      return;
+    }
+
+    const workflowId = await this.workflowEngine.startWorkflow(
+      body.instruction,
+      body.projectId
+    );
+    this.sendResponse(res, 201, { success: true, data: { workflowId } });
+  }
+
+  /**
+   * GET /api/workflows - ワークフロー一覧
+   * @see Requirement 15.2
+   */
+  private async handleListWorkflows(
+    status: string | undefined,
+    res: http.ServerResponse
+  ): Promise<void> {
+    try {
+      const filter = status ? { status: status as import('./types.js').WorkflowStatus } : undefined;
+      const workflows = await this.workflowEngine.listWorkflows(filter);
+      this.sendResponse(res, 200, { success: true, data: { workflows } });
+    } catch (error) {
+      this.handleRouteError(res, error);
+    }
+  }
+
+  /**
+   * GET /api/workflows/:id - ワークフロー状態取得
+   * @see Requirement 15.3
+   */
+  private async handleGetWorkflowState(
+    workflowId: string,
+    res: http.ServerResponse
+  ): Promise<void> {
+    try {
+      const state = await this.workflowEngine.getWorkflowState(workflowId);
+      if (!state) {
+        this.sendErrorResponse(res, 404, `ワークフローが見つかりません: ${workflowId}`, 'WORKFLOW_NOT_FOUND');
+        return;
+      }
+      this.sendResponse(res, 200, { success: true, data: { workflow: state } });
+    } catch (error) {
+      this.handleRouteError(res, error);
+    }
+  }
+
+  /**
+   * POST /api/workflows/:id/approve - CEO承認決定送信
+   * @see Requirement 15.4
+   */
+  private async handleWorkflowApprove(
+    workflowId: string,
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ): Promise<void> {
+    const body = await this.parseBody<{
+      action: 'approve' | 'request_revision' | 'reject';
+      feedback?: string;
+    }>(req);
+
+    if (!body.action) {
+      this.sendErrorResponse(res, 400, 'action は必須です', 'VALIDATION_ERROR');
+      return;
+    }
+
+    try {
+      const state = await this.workflowEngine.getWorkflowState(workflowId);
+      if (!state) {
+        this.sendErrorResponse(res, 404, `ワークフローが見つかりません: ${workflowId}`, 'WORKFLOW_NOT_FOUND');
+        return;
+      }
+
+      const decision: ApprovalDecision = {
+        workflowId,
+        phase: state.currentPhase,
+        action: body.action,
+        feedback: body.feedback,
+        decidedAt: new Date().toISOString(),
+      };
+
+      await this.approvalGate.submitDecision(workflowId, decision);
+      this.sendResponse(res, 200, { success: true, data: { message: '承認決定を送信しました' } });
+    } catch (error) {
+      this.handleRouteError(res, error);
+    }
+  }
+
+  /**
+   * GET /api/workflows/:id/proposal - 提案書取得
+   * @see Requirement 15.5
+   */
+  private async handleGetWorkflowProposal(
+    workflowId: string,
+    res: http.ServerResponse
+  ): Promise<void> {
+    try {
+      const state = await this.workflowEngine.getWorkflowState(workflowId);
+      if (!state) {
+        this.sendErrorResponse(res, 404, `ワークフローが見つかりません: ${workflowId}`, 'WORKFLOW_NOT_FOUND');
+        return;
+      }
+      this.sendResponse(res, 200, { success: true, data: { proposal: state.proposal ?? null } });
+    } catch (error) {
+      this.handleRouteError(res, error);
+    }
+  }
+
+  /**
+   * GET /api/workflows/:id/deliverable - 納品物取得
+   * @see Requirement 15.6
+   */
+  private async handleGetWorkflowDeliverable(
+    workflowId: string,
+    res: http.ServerResponse
+  ): Promise<void> {
+    try {
+      const state = await this.workflowEngine.getWorkflowState(workflowId);
+      if (!state) {
+        this.sendErrorResponse(res, 404, `ワークフローが見つかりません: ${workflowId}`, 'WORKFLOW_NOT_FOUND');
+        return;
+      }
+      this.sendResponse(res, 200, { success: true, data: { deliverable: state.deliverable ?? null } });
+    } catch (error) {
+      this.handleRouteError(res, error);
+    }
+  }
+
+  /**
+   * GET /api/workflows/:id/meetings - 会議録一覧取得
+   * @see Requirement 15.7
+   */
+  private async handleGetWorkflowMeetings(
+    workflowId: string,
+    res: http.ServerResponse
+  ): Promise<void> {
+    try {
+      const state = await this.workflowEngine.getWorkflowState(workflowId);
+      if (!state) {
+        this.sendErrorResponse(res, 404, `ワークフローが見つかりません: ${workflowId}`, 'WORKFLOW_NOT_FOUND');
+        return;
+      }
+      this.sendResponse(res, 200, {
+        success: true,
+        data: { meetingMinutesIds: state.meetingMinutesIds },
+      });
+    } catch (error) {
+      this.handleRouteError(res, error);
+    }
+  }
+
+  /**
+   * POST /api/workflows/:id/escalation - エスカレーション決定送信
+   * @see Requirement 15.8
+   */
+  private async handleWorkflowEscalation(
+    workflowId: string,
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ): Promise<void> {
+    const body = await this.parseBody<{
+      action: 'retry' | 'skip' | 'abort';
+      reason?: string;
+    }>(req);
+
+    if (!body.action) {
+      this.sendErrorResponse(res, 400, 'action は必須です', 'VALIDATION_ERROR');
+      return;
+    }
+
+    try {
+      const decision: EscalationDecision = {
+        action: body.action as EscalationDecision['action'],
+        reason: body.reason ?? '',
+        decidedAt: new Date().toISOString(),
+      };
+
+      await this.workflowEngine.handleEscalation(workflowId, decision);
+      this.sendResponse(res, 200, { success: true, data: { message: 'エスカレーション決定を処理しました' } });
+    } catch (error) {
+      this.handleRouteError(res, error);
+    }
+  }
+
+  /**
+   * POST /api/workflows/:id/rollback - フェーズロールバック
+   * @see Requirement 15.9
+   */
+  private async handleWorkflowRollback(
+    workflowId: string,
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ): Promise<void> {
+    const body = await this.parseBody<{ targetPhase: string }>(req);
+
+    if (!body.targetPhase) {
+      this.sendErrorResponse(res, 400, 'targetPhase は必須です', 'VALIDATION_ERROR');
+      return;
+    }
+
+    try {
+      await this.workflowEngine.rollbackToPhase(
+        workflowId,
+        body.targetPhase as WorkflowPhase
+      );
+      this.sendResponse(res, 200, { success: true, data: { message: 'ロールバックを実行しました' } });
+    } catch (error) {
+      this.handleRouteError(res, error);
+    }
+  }
+
+  /**
+   * GET /api/workflows/:id/progress - 開発進捗取得
+   * @see Requirement 15.10
+   */
+  private async handleGetWorkflowProgress(
+    workflowId: string,
+    res: http.ServerResponse
+  ): Promise<void> {
+    try {
+      const progress = await this.workflowEngine.getProgress(workflowId);
+      this.sendResponse(res, 200, { success: true, data: { progress } });
+    } catch (error) {
+      this.handleRouteError(res, error);
+    }
+  }
+
+  /**
+   * GET /api/workflows/:id/quality - 品質結果取得
+   * @see Requirement 15.11
+   */
+  private async handleGetWorkflowQuality(
+    workflowId: string,
+    res: http.ServerResponse
+  ): Promise<void> {
+    try {
+      const quality = await this.workflowEngine.getQualityResults(workflowId);
+      this.sendResponse(res, 200, { success: true, data: { quality } });
+    } catch (error) {
+      this.handleRouteError(res, error);
+    }
+  }
+
+  /**
+   * WorkflowEngineインスタンスを取得（テスト・統合用）
+   */
+  getWorkflowEngine(): WorkflowEngine {
+    return this.workflowEngine;
+  }
+
+  /**
+   * ApprovalGateインスタンスを取得（テスト・統合用）
+   */
+  getApprovalGate(): ApprovalGate {
+    return this.approvalGate;
   }
 }
 

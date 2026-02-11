@@ -2,11 +2,13 @@
  * @file Dashboard Page
  * @description エージェント実行エンジンのダッシュボード画面
  * @requirements 16.1, 16.2, 16.3, 16.4, 16.5, 16.6, 16.7
+ * @requirements 10.1, 10.2, 10.4, 10.5 - ワークフロー承認通知・サマリー
  */
 
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { Card } from '@/components/ui';
 
 // =============================================================================
@@ -42,6 +44,22 @@ interface DashboardData {
   lastUpdated: string;
 }
 
+/** ワークフローサマリー（ダッシュボード用） */
+interface WorkflowSummary {
+  running: number;
+  waitingApproval: number;
+  completed: number;
+  failed: number;
+}
+
+/** 承認待ちワークフロー情報 */
+interface PendingWorkflow {
+  workflowId: string;
+  instruction: string;
+  currentPhase: string;
+  createdAt: string;
+}
+
 const AUTO_REFRESH_INTERVAL = 5000;
 
 function StatCard({ title, value, icon, color }: { title: string; value: number; icon: React.ReactNode; color: string }): JSX.Element {
@@ -70,6 +88,10 @@ export default function DashboardPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [workflowSummary, setWorkflowSummary] = useState<WorkflowSummary>({
+    running: 0, waitingApproval: 0, completed: 0, failed: 0,
+  });
+  const [pendingWorkflows, setPendingWorkflows] = useState<PendingWorkflow[]>([]);
 
   const loadData = useCallback(async () => {
     try {
@@ -85,11 +107,53 @@ export default function DashboardPage(): JSX.Element {
     }
   }, []);
 
+  /** ワークフローサマリーと承認待ちデータを取得 */
+  const loadWorkflowData = useCallback(async () => {
+    try {
+      // 全ワークフローを取得してサマリーを集計
+      const res = await fetch('/api/workflows');
+      if (!res.ok) return;
+      const json = await res.json();
+      const workflows = Array.isArray(json) ? json : (json.data ?? []);
+
+      const summary: WorkflowSummary = {
+        running: 0, waitingApproval: 0, completed: 0, failed: 0,
+      };
+      const pending: PendingWorkflow[] = [];
+
+      for (const wf of workflows) {
+        const status = wf.status ?? '';
+        if (status === 'completed') summary.completed++;
+        else if (status === 'failed' || status === 'terminated') summary.failed++;
+        else if (status === 'waiting_approval') {
+          summary.waitingApproval++;
+          pending.push({
+            workflowId: wf.workflowId ?? wf.id ?? '',
+            instruction: wf.instruction ?? '',
+            currentPhase: wf.currentPhase ?? '',
+            createdAt: wf.createdAt ?? '',
+          });
+        } else {
+          summary.running++;
+        }
+      }
+
+      setWorkflowSummary(summary);
+      setPendingWorkflows(pending);
+    } catch {
+      // ワークフローデータ取得失敗時は前回の値を維持
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, AUTO_REFRESH_INTERVAL);
+    loadWorkflowData();
+    const interval = setInterval(() => {
+      loadData();
+      loadWorkflowData();
+    }, AUTO_REFRESH_INTERVAL);
     return () => clearInterval(interval);
-  }, [loadData]);
+  }, [loadData, loadWorkflowData]);
 
   const handlePauseAll = async () => { setActionLoading('pause'); await new Promise(r => setTimeout(r, 500)); await loadData(); setActionLoading(null); };
   const handleResumeAll = async () => { setActionLoading('resume'); await new Promise(r => setTimeout(r, 500)); await loadData(); setActionLoading(null); };
@@ -112,6 +176,81 @@ export default function DashboardPage(): JSX.Element {
         <StatCard title="保留中タスク" value={data.tasks.pending + data.tasks.executing} color="text-status-waiver" icon={<svg className="w-6 h-6 text-status-waiver" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
         <StatCard title="完了タスク" value={data.tasks.completed} color="text-status-pass" icon={<svg className="w-6 h-6 text-status-pass" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
         <StatCard title="エラー" value={data.tasks.failed} color="text-status-fail" icon={<svg className="w-6 h-6 text-status-fail" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
+      </div>
+      {/* ワークフロー承認待ち通知カード */}
+      {pendingWorkflows.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+            <svg className="w-5 h-5 text-status-waiver" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            承認待ちワークフロー
+            <span className="text-sm font-normal text-text-muted">({pendingWorkflows.length}件)</span>
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {pendingWorkflows.map((wf) => (
+              <Link key={wf.workflowId} href={`/workflows/${wf.workflowId}`}>
+                <Card className="p-4 border border-accent-primary/30 shadow-[0_0_12px_rgba(59,130,246,0.15)] hover:shadow-[0_0_20px_rgba(59,130,246,0.25)] transition-shadow cursor-pointer">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text-primary truncate">
+                        {wf.instruction || wf.workflowId}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs px-2 py-0.5 rounded bg-status-waiver/10 text-status-waiver">
+                          {wf.currentPhase}
+                        </span>
+                        {wf.createdAt && (
+                          <span className="text-xs text-text-muted">
+                            {new Date(wf.createdAt).toLocaleDateString('ja-JP')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <svg className="w-5 h-5 text-accent-primary flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* ワークフローサマリーセクション */}
+      <div>
+        <h2 className="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
+          <svg className="w-5 h-5 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          ワークフロー
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Link href="/workflows?status=running">
+            <Card className="p-3 hover:bg-bg-tertiary/30 transition-colors cursor-pointer">
+              <p className="text-xs text-text-muted">実行中</p>
+              <p className="text-xl font-bold text-accent-primary">{workflowSummary.running}</p>
+            </Card>
+          </Link>
+          <Link href="/workflows?status=waiting_approval">
+            <Card className="p-3 hover:bg-bg-tertiary/30 transition-colors cursor-pointer">
+              <p className="text-xs text-text-muted">承認待ち</p>
+              <p className="text-xl font-bold text-status-waiver">{workflowSummary.waitingApproval}</p>
+            </Card>
+          </Link>
+          <Link href="/workflows?status=completed">
+            <Card className="p-3 hover:bg-bg-tertiary/30 transition-colors cursor-pointer">
+              <p className="text-xs text-text-muted">完了</p>
+              <p className="text-xl font-bold text-status-pass">{workflowSummary.completed}</p>
+            </Card>
+          </Link>
+          <Link href="/workflows?status=failed">
+            <Card className="p-3 hover:bg-bg-tertiary/30 transition-colors cursor-pointer">
+              <p className="text-xs text-text-muted">失敗</p>
+              <p className="text-xl font-bold text-status-fail">{workflowSummary.failed}</p>
+            </Card>
+          </Link>
+        </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">

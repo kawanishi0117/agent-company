@@ -1,13 +1,18 @@
 /**
  * @file Navigation コンポーネント
- * @description ナビゲーションリンクコンポーネント
+ * @description ナビゲーションリンクコンポーネント（承認待ち通知バッジ付き）
  * @requirements 2.2, 2.3 - ナビゲーションリンクと現在ページのハイライト
+ * @requirements 8.8, 10.3, 16.12 - ワークフロー承認待ち通知バッジ
  */
 
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+
+/** 承認待ちポーリング間隔（ミリ秒） */
+const APPROVAL_POLL_INTERVAL = 10000;
 
 /**
  * ナビゲーションアイテムの定義
@@ -19,6 +24,8 @@ interface NavItem {
   label: string;
   /** アイコン（SVGパス） */
   iconPath: string;
+  /** 通知バッジ表示用カウント（0以下で非表示） */
+  badgeCount?: number;
 }
 
 /**
@@ -29,6 +36,11 @@ const navItems: NavItem[] = [
     href: '/dashboard',
     label: 'Dashboard',
     iconPath: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+  },
+  {
+    href: '/workflows',
+    label: 'Workflows',
+    iconPath: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
   },
   {
     href: '/command',
@@ -78,23 +90,62 @@ interface NavigationProps {
 }
 
 /**
+ * 承認待ちワークフロー数を取得するカスタムフック
+ * @returns 承認待ちワークフロー数
+ * @see Requirements: 8.8, 10.3, 16.12
+ */
+function useApprovalCount(): number {
+  const [count, setCount] = useState(0);
+
+  const fetchCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/workflows?status=waiting_approval');
+      if (!res.ok) return;
+      const json = await res.json();
+      // APIレスポンスが配列の場合はその長さ、data配列の場合はdata.length
+      const workflows = Array.isArray(json) ? json : json.data;
+      if (Array.isArray(workflows)) {
+        setCount(workflows.length);
+      }
+    } catch {
+      // ポーリング失敗時は前回の値を維持
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCount();
+    const interval = setInterval(fetchCount, APPROVAL_POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchCount]);
+
+  return count;
+}
+
+/**
  * ナビゲーションコンポーネント
- * 各画面へのリンクを表示
+ * 各画面へのリンクを表示し、承認待ちワークフローの通知バッジを表示
  */
 export function Navigation({ className = '' }: NavigationProps): JSX.Element {
   const pathname = usePathname();
+  const approvalCount = useApprovalCount();
+
+  // Workflows アイテムにバッジカウントを動的に設定
+  const itemsWithBadge = navItems.map((item) =>
+    item.href === '/workflows' ? { ...item, badgeCount: approvalCount } : item
+  );
 
   return (
     <nav className={`flex items-center gap-1 ${className}`}>
-      {navItems.map((item) => {
+      {itemsWithBadge.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const showBadge = item.badgeCount !== undefined && item.badgeCount > 0;
 
         return (
           <Link
             key={item.href}
             href={item.href}
             className={`
-              flex items-center gap-2 px-4 py-2
+              relative flex items-center gap-2 px-4 py-2
               text-sm font-medium rounded-md
               transition-colors duration-200
               ${
@@ -119,6 +170,18 @@ export function Navigation({ className = '' }: NavigationProps): JSX.Element {
               />
             </svg>
             <span>{item.label}</span>
+            {/* 承認待ち通知バッジ */}
+            {showBadge && (
+              <span
+                className="absolute -top-1 -right-1 flex items-center justify-center
+                  min-w-[18px] h-[18px] px-1 text-[10px] font-bold
+                  text-white bg-status-fail rounded-full
+                  animate-pulse"
+                aria-label={`${item.badgeCount}件の承認待ち`}
+              >
+                {item.badgeCount}
+              </span>
+            )}
           </Link>
         );
       })}

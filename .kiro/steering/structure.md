@@ -27,6 +27,7 @@ agent-company/
 │   ├── specs/                   # 機能仕様書（正式版）
 │   │   ├── agent-execution-engine.md
 │   │   ├── ai-adapters.md
+│   │   ├── company-workflow-engine.md
 │   │   ├── m0-skeleton.md
 │   │   ├── m1-docker-workspace.md
 │   │   ├── m2-quality-gates.md
@@ -108,6 +109,9 @@ agent-company/
 │   │       │   ├── worker-type-registry.ts # ワーカータイプ定義
 │   │       │   ├── pr-creator.ts          # PR作成
 │   │       │   ├── review-workflow.ts     # レビューワークフロー
+│   │       │   ├── workflow-engine.ts     # ワークフローエンジン（5フェーズ）
+│   │       │   ├── meeting-coordinator.ts # 会議コーディネーター
+│   │       │   ├── approval-gate.ts       # 承認ゲート
 │   │       │   ├── tools.ts
 │   │       │   └── agents/      # エージェント実装
 │   │       │       ├── manager-agent.ts
@@ -132,10 +136,16 @@ agent-company/
 │   │       ├── pip.txt
 │   │       └── npm.txt
 │   ├── validators/              # ルール検査
-│   └── adapters/                # AI CLIアダプタ
-│       ├── base.ts              # 基底クラス
-│       ├── index.ts             # エクスポート
-│       └── ollama.ts            # Ollama実装
+│   ├── adapters/                # AI CLIアダプタ（テキスト生成用）
+│   │   ├── base.ts              # 基底クラス
+│   │   ├── index.ts             # エクスポート
+│   │   └── ollama.ts            # Ollama実装
+│   └── coding-agents/           # コーディングエージェントCLIラッパー
+│       ├── base.ts              # 基底インターフェース・エラークラス
+│       ├── opencode.ts          # OpenCodeAdapter
+│       ├── claude-code.ts       # ClaudeCodeAdapter
+│       ├── kiro-cli.ts          # KiroCliAdapter
+│       └── index.ts             # CodingAgentRegistry
 │
 ├── runtime/                     # 実行時データ（自動生成）
 │   ├── runs/                    # 実行ログ・成果物
@@ -185,7 +195,16 @@ agent-company/
 │       │   │   ├── review/
 │       │   │   ├── runs/
 │       │   │   ├── settings/
-│       │   │   └── tasks/
+│       │   │   │   └── coding-agents/  # コーディングエージェント設定API
+│       │   │   ├── tasks/
+│       │   │   └── workflows/       # ワークフローAPI
+│       │   │       └── [id]/
+│       │   │           ├── approve/
+│       │   │           ├── meetings/
+│       │   │           ├── progress/
+│       │   │           ├── quality/
+│       │   │           ├── escalation/
+│       │   │           └── rollback/
 │       │   ├── backlog/         # Backlog画面
 │       │   ├── command/         # Command Center
 │       │   ├── dashboard/       # Dashboard
@@ -193,12 +212,15 @@ agent-company/
 │       │   ├── review/          # Review画面
 │       │   ├── runs/            # Runs画面
 │       │   ├── settings/        # Settings画面
-│       │   └── tasks/           # Task詳細
+│       │   ├── tasks/           # Task詳細
+│       │   └── workflows/       # Workflows画面
+│       │       └── [id]/        # ワークフロー詳細
 │       ├── components/          # UIコンポーネント
 │       │   ├── backlog/
 │       │   ├── layout/
 │       │   ├── reports/
 │       │   ├── runs/
+│       │   ├── workflows/       # ワークフローコンポーネント
 │       │   └── ui/              # 共通UI
 │       ├── lib/                 # ユーティリティ
 │       │   ├── types.ts
@@ -212,7 +234,18 @@ agent-company/
 │   │   ├── orchestrator.test.ts
 │   │   ├── agent-bus.test.ts
 │   │   ├── worker-container.test.ts
+│   │   ├── worker-coding-integration.test.ts
+│   │   ├── workspace-manager.test.ts
+│   │   ├── workspace-manager.property.test.ts
 │   │   └── *.property.test.ts   # Property-based
+│   ├── coding-agents/           # コーディングエージェントテスト
+│   │   ├── base.test.ts
+│   │   ├── base.property.test.ts
+│   │   ├── opencode.test.ts
+│   │   ├── claude-code.test.ts
+│   │   ├── kiro-cli.test.ts
+│   │   ├── registry.test.ts
+│   │   └── registry.property.test.ts
 │   ├── adapters/
 │   └── *.test.ts
 │
@@ -261,7 +294,8 @@ agent-company/
 ### 1. 採用と実行を分離
 
 - `agents/registry/`: エージェント定義（YAML）
-- `tools/adapters/`: AI実行アダプタ（TypeScript）
+- `tools/adapters/`: AI実行アダプタ（テキスト生成用、TypeScript）
+- `tools/coding-agents/`: コーディングエージェントCLIラッパー（コード生成用）
 - 混ぜない
 
 ### 2. 成果物集約

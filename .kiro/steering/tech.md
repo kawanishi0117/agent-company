@@ -271,6 +271,54 @@ export interface AIAdapter {
 // Docker内: http://ollama:11434
 ```
 
+## コーディングエージェント統合
+
+### 概要
+
+外部コーディングエージェントCLIをサブプロセスとして実行し、実際のコーディング作業を委譲する。
+既存のAI Adapter（Ollama等）はテキスト生成（会議・提案書）に継続使用。
+
+### 対応エージェント
+
+| エージェント | CLIコマンド | 用途 |
+|-------------|------------|------|
+| Claude Code | `claude -p "prompt"` | 高品質コード生成 |
+| OpenCode | `opencode run "prompt"` | マルチモデル対応 |
+| Kiro CLI | `kiro chat -p "prompt"` | AWS統合 |
+
+### ディレクトリ構成
+
+| ファイル | 役割 |
+|---------|------|
+| `tools/coding-agents/base.ts` | 基底インターフェース、エラークラス |
+| `tools/coding-agents/opencode.ts` | OpenCodeAdapter |
+| `tools/coding-agents/claude-code.ts` | ClaudeCodeAdapter |
+| `tools/coding-agents/kiro-cli.ts` | KiroCliAdapter |
+| `tools/coding-agents/index.ts` | CodingAgentRegistry |
+| `tools/cli/lib/execution/workspace-manager.ts` | ワークスペース管理 |
+
+### 設定
+
+```json
+// runtime/state/config.json の codingAgent フィールド
+{
+  "codingAgent": {
+    "preferredAgent": "claude-code",
+    "agentSettings": {
+      "claude-code": { "timeout": 600 },
+      "opencode": { "timeout": 600, "model": "claude-sonnet-4-20250514" },
+      "kiro-cli": { "timeout": 600 }
+    },
+    "autoCreateGithubRepo": false
+  }
+}
+```
+
+### GUI設定
+
+- Settings画面（`/settings`）にコーディングエージェント設定セクション
+- API: `GET/PUT /api/settings/coding-agents`
+
 ## 環境変数
 
 | 変数名                 | 用途                     | デフォルト                                     |
