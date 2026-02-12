@@ -13,6 +13,7 @@ AgentCompanyのシステムアーキテクチャに関するドキュメント�
 | [workflow-engine.md](./workflow-engine.md) | Company Workflow Engine（5フェーズ業務フロー） |
 | [container-isolation.md](./container-isolation.md) | コンテナ隔離（セキュリティ、ネットワーク分離） |
 | [worker-management.md](./worker-management.md) | ワーカー管理（スケーリング、ヘルスモニタリング） |
+| [company-evolution.md](./company-evolution.md) | 組織進化（パフォーマンス追跡・スキルギャップ・エスカレーション分析） |
 
 ## 読む順序
 
@@ -22,3 +23,4 @@ AgentCompanyのシステムアーキテクチャに関するドキュメント�
 4. `ai-integration.md` — AI実行基盤との接続
 5. `workflow-engine.md` — 5フェーズ業務フローの管理
 6. `container-isolation.md` / `worker-management.md` — 詳細設計
+7. `company-evolution.md` — 組織進化機能のアーキテクチャ

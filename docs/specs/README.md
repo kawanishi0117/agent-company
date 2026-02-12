@@ -14,6 +14,7 @@ AgentCompanyの正式な機能仕様書一覧。
 | [company-workflow-engine.md](./company-workflow-engine.md) | Company Workflow Engine |
 | [end-to-end-workflow-wiring.md](./end-to-end-workflow-wiring.md) | エンドツーエンド ワークフロー接続 |
 | [workflow-production-ready.md](./workflow-production-ready.md) | ワークフロー本番対応 |
+| [company-evolution.md](./company-evolution.md) | 組織進化（QAパース・パフォーマンス追跡・スキルギャップ・エスカレーション分析） |
 
 ## マイルストーン仕様
 

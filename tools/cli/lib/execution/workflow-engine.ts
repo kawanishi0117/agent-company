@@ -42,6 +42,9 @@ import { CodingAgentRegistry, selectCodingAgent } from '../../../coding-agents/i
 import type { CodingAgentAdapter } from '../../../coding-agents/base.js';
 import { CodingAgentError } from '../../../coding-agents/base.js';
 import { WorkspaceManager, createWorkspaceManager } from './workspace-manager.js';
+import { parseVitestOutput, parseEslintOutput } from './qa-result-parser.js';
+import { AgentPerformanceTracker } from './agent-performance-tracker.js';
+import { EscalationAnalyzer } from './escalation-analyzer.js';
 
 // =============================================================================
 // 定数定義
@@ -213,6 +216,12 @@ export class WorkflowEngine implements IWorkflowEngine {
   /** 優先コーディングエージェント名（オプション） */
   private readonly preferredCodingAgent?: string;
 
+  /** パフォーマンストラッカー（オプション） */
+  private readonly performanceTracker?: AgentPerformanceTracker;
+
+  /** エスカレーション分析器（オプション） */
+  private readonly escalationAnalyzer?: EscalationAnalyzer;
+
   /**
    * コンストラクタ
    * @param meetingCoordinator - 会議調整コンポーネント
@@ -236,6 +245,8 @@ export class WorkflowEngine implements IWorkflowEngine {
     this.codingAgentRegistry = options?.codingAgentRegistry;
     this.workspaceManager = options?.workspaceManager;
     this.preferredCodingAgent = options?.preferredCodingAgent;
+    this.performanceTracker = options?.performanceTracker;
+    this.escalationAnalyzer = options?.escalationAnalyzer;
   }
 
   // ===========================================================================
@@ -1242,19 +1253,20 @@ export class WorkflowEngine implements IWorkflowEngine {
       // CodingAgent を使って実際に lint/test を実行
       const workingDirectory = await this.resolveWorkingDirectory(state.projectId);
 
-      // lint 実行
+      // lint 実行: CodingAgent 経由で実行し、出力をパーサーで解析
       try {
         const lintExec = await codingAgent.execute({
           workingDirectory,
-          prompt: 'プロジェクトの lint を実行してください。`npm run lint` または `make lint` を実行し、結果を報告してください。エラー数、警告数を含めてください。',
+          prompt: 'プロジェクトの lint を実行してください。`npm run lint` を実行し、出力をそのまま表示してください。',
           timeout: 120,
         });
-        const lintPassed = lintExec.success;
+        // パーサーで実際の出力を解析
+        const lintParsed = parseEslintOutput(lintExec.output + '\n' + lintExec.stderr);
         lintResult = {
-          passed: lintPassed,
-          errorCount: lintPassed ? 0 : 1,
-          warningCount: 0,
-          details: lintExec.output.slice(0, 500) || (lintPassed ? 'lint完了: エラーなし' : 'lint失敗'),
+          passed: lintParsed.parsed ? lintParsed.passed : lintExec.success,
+          errorCount: lintParsed.errorCount,
+          warningCount: lintParsed.warningCount,
+          details: lintParsed.details || lintExec.output.slice(0, 500),
         };
       } catch (_error) {
         lintResult = {
@@ -1265,21 +1277,33 @@ export class WorkflowEngine implements IWorkflowEngine {
         };
       }
 
-      // test 実行
+      // test 実行: CodingAgent 経由で実行し、出力をパーサーで解析
       try {
         const testExec = await codingAgent.execute({
           workingDirectory,
-          prompt: 'プロジェクトのテストを実行してください。`npm run test` または `make test` を実行し、結果を報告してください。テスト数、成功数、失敗数、カバレッジを含めてください。',
+          prompt: 'プロジェクトのテストを実行してください。`npm run test` を実行し、出力をそのまま表示してください。',
           timeout: 300,
         });
-        const testPassed = testExec.success;
-        testResult = {
-          passed: testPassed,
-          total: testPassed ? 10 : 10,
-          passed_count: testPassed ? 10 : 8,
-          failed_count: testPassed ? 0 : 2,
-          coverage: testPassed ? 85.0 : 70.0,
-        };
+        // パーサーで実際の出力を解析
+        const testParsed = parseVitestOutput(testExec.output + '\n' + testExec.stderr);
+        if (testParsed.parsed) {
+          testResult = {
+            passed: testParsed.failed === 0 && testExec.success,
+            total: testParsed.total,
+            passed_count: testParsed.passed,
+            failed_count: testParsed.failed,
+            coverage: testParsed.coverage >= 0 ? testParsed.coverage : 0,
+          };
+        } else {
+          // パース不能時は exit code で判定
+          testResult = {
+            passed: testExec.success,
+            total: 0,
+            passed_count: 0,
+            failed_count: 0,
+            coverage: 0,
+          };
+        }
       } catch (_error) {
         testResult = {
           passed: false,
@@ -1449,6 +1473,9 @@ export class WorkflowEngine implements IWorkflowEngine {
         state.status = 'completed';
         state.updatedAt = new Date().toISOString();
         await this.persistWorkflowState(state);
+
+        // パフォーマンス記録（成功）
+        await this.recordWorkflowPerformance(state, true);
         break;
 
       case 'request_revision':
@@ -1657,6 +1684,11 @@ export class WorkflowEngine implements IWorkflowEngine {
     this.persistWorkflowState(state).catch(() => {
       // 永続化失敗は無視（既にエラー状態）
     });
+
+    // エスカレーション記録
+    this.recordEscalationEvent(state, phase, errorMessage).catch(() => {
+      // 記録失敗は無視
+    });
   }
 
   // ===========================================================================
@@ -1844,6 +1876,120 @@ export class WorkflowEngine implements IWorkflowEngine {
       (error as NodeJS.ErrnoException).code === 'ENOENT'
     );
   }
+
+  // ===========================================================================
+  // パフォーマンス・エスカレーション記録ヘルパー
+  // ===========================================================================
+
+  /**
+   * ワークフロー完了時のパフォーマンスを記録する
+   *
+   * @param state - ワークフロー状態
+   * @param success - 成功フラグ
+   */
+  private async recordWorkflowPerformance(
+    state: WorkflowState,
+    success: boolean
+  ): Promise<void> {
+    if (!this.performanceTracker) return;
+
+    try {
+      const startTime = new Date(state.createdAt).getTime();
+      const endTime = Date.now();
+      const qualityScore = this.computeQualityScore(state);
+
+      // ワークフローに関与したエージェントごとに記録
+      const agentIds = Object.values(state.workerAssignments);
+      const uniqueAgents = [...new Set(agentIds)];
+
+      for (const agentId of uniqueAgents) {
+        if (!agentId) continue;
+        await this.performanceTracker.recordPerformance({
+          agentId,
+          taskId: state.workflowId,
+          taskCategory: 'coding',
+          success,
+          qualityScore,
+          durationMs: endTime - startTime,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // ワーカー割り当てがない場合はワークフローID自体で記録
+      if (uniqueAgents.length === 0) {
+        await this.performanceTracker.recordPerformance({
+          agentId: `workflow-${state.projectId}`,
+          taskId: state.workflowId,
+          taskCategory: 'coding',
+          success,
+          qualityScore,
+          durationMs: endTime - startTime,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch {
+      // パフォーマンス記録失敗はワークフローに影響させない
+    }
+  }
+
+  /**
+   * 品質スコアを計算する（0-100）
+   */
+  private computeQualityScore(state: WorkflowState): number {
+    let score = 50; // ベーススコア
+
+    const qr = state.qualityResults;
+    if (qr) {
+      if (qr.lintResult?.passed) score += 15;
+      if (qr.testResult?.passed) score += 20;
+      if (qr.testResult?.coverage && qr.testResult.coverage >= 80) score += 10;
+      if (qr.finalReviewResult?.passed) score += 5;
+    }
+
+    // エラーが少ないほど高スコア
+    const errorPenalty = Math.min(state.errorLog.length * 5, 20);
+    score -= errorPenalty;
+
+    return Math.max(0, Math.min(100, score));
+  }
+
+  /**
+   * エスカレーションイベントを記録する
+   *
+   * @param state - ワークフロー状態
+   * @param phase - エラー発生フェーズ
+   * @param errorMessage - エラーメッセージ
+   */
+  private async recordEscalationEvent(
+    state: WorkflowState,
+    phase: WorkflowPhase,
+    errorMessage: string
+  ): Promise<void> {
+    if (!this.escalationAnalyzer) return;
+
+    try {
+      // フェーズからエスカレーションカテゴリを推定
+      const category = phase === 'quality_assurance'
+        ? 'quality_gate_failure' as const
+        : errorMessage.toLowerCase().includes('timeout')
+          ? 'timeout' as const
+          : 'runtime_error' as const;
+
+      await this.escalationAnalyzer.recordEscalation({
+        id: `esc-${state.workflowId}-${Date.now()}`,
+        agentId: Object.values(state.workerAssignments)[0] ?? 'unknown',
+        taskId: state.workflowId,
+        workflowId: state.workflowId,
+        category,
+        errorMessage,
+        escalatedTo: 'coo_pm',
+        timestamp: new Date().toISOString(),
+        resolved: false,
+      });
+    } catch {
+      // エスカレーション記録失敗はワークフローに影響させない
+    }
+  }
 }
 
 // =============================================================================
@@ -1861,6 +2007,10 @@ export interface WorkflowEngineOptions {
   workspaceManager?: WorkspaceManager;
   /** 優先コーディングエージェント名 */
   preferredCodingAgent?: string;
+  /** パフォーマンストラッカー（エージェント実績記録用） */
+  performanceTracker?: AgentPerformanceTracker;
+  /** エスカレーション分析器（エスカレーション履歴記録用） */
+  escalationAnalyzer?: EscalationAnalyzer;
 }
 
 /**

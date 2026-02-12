@@ -228,6 +228,58 @@ docker compose -f infra/docker/compose.yaml exec workspace npm run test  # ✅ 8
 docker compose -f infra/docker/compose.yaml exec workspace npm run e2e   # ✅ 37件通過
 ```
 
+---
+
+### M7: Company Evolution（組織進化） [2-3日] ✅ 完了
+
+エージェントの実行結果を実データとして蓄積・分析し、組織の成長サイクルを実現する。
+
+#### Phase 1: QA結果の実パース ✅
+
+- [x] QA結果パーサー (`tools/cli/lib/execution/qa-result-parser.ts`)
+- [x] Vitest出力パース（テスト件数・カバレッジ抽出）
+- [x] ESLint出力パース（エラー・警告数抽出）
+- [x] WorkflowEngine QAフェーズ統合
+- [x] テスト22件通過 (`tests/execution/qa-result-parser.test.ts`)
+
+#### Phase 2: 採用の本物化 ✅
+
+- [x] CodingAgent連携による実タスク実行 (`tools/cli/lib/hiring/trial-runner.ts`)
+- [x] CodingAgent未利用時のフォールバック
+
+#### Phase 3: エージェント成長メカニズム ✅
+
+- [x] パフォーマンストラッカー (`tools/cli/lib/execution/agent-performance-tracker.ts`)
+- [x] スキルギャップ検出 (`tools/cli/lib/execution/skill-gap-detector.ts`)
+- [x] 自動採用提案生成
+- [x] WorkflowEngine統合（完了時パフォーマンス記録）
+- [x] テスト23件通過 (`tests/execution/agent-performance-tracker.test.ts`, `skill-gap-detector.test.ts`)
+
+#### Phase 4: 部門間連携強化 ✅
+
+- [x] エスカレーション分析 (`tools/cli/lib/execution/escalation-analyzer.ts`)
+- [x] 繰り返しパターン検出
+- [x] 根本原因推定・推奨アクション
+- [x] WorkflowEngine統合（エラー時エスカレーション記録）
+- [x] テスト13件通過 (`tests/execution/escalation-analyzer.test.ts`)
+
+**完了条件**: ワークフロー実行結果が蓄積され、パフォーマンス分析・スキルギャップ検出が動作する ✅
+
+---
+
+## Docker環境での動作確認
+
+```bash
+# Docker環境でのテスト実行（2026-01-31確認済み）
+docker compose -f infra/docker/compose.yaml up -d
+docker compose -f infra/docker/compose.yaml exec workspace npm run ci  # ✅ 全ゲート通過
+
+# 個別実行
+docker compose -f infra/docker/compose.yaml exec workspace npm run lint  # ✅ 通過（警告のみ）
+docker compose -f infra/docker/compose.yaml exec workspace npm run test  # ✅ 88件通過
+docker compose -f infra/docker/compose.yaml exec workspace npm run e2e   # ✅ 37件通過
+```
+
 ### 注意事項
 
 - E2Eテスト実行前に `npx playwright install chromium` が必要

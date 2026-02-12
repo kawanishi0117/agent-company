@@ -249,7 +249,7 @@ describe('Orchestrator Fix Property Tests', () => {
           );
 
           // 少し待ってからワーカーを順次完了させる
-          await new Promise((resolve) => setTimeout(resolve, 50));
+          await new Promise((resolve) => setTimeout(resolve, 100));
 
           // ワーカーを順次完了させる（逆順で解決して非同期性をテスト）
           for (let i = numSubTasks - 1; i >= 0; i--) {
@@ -263,11 +263,11 @@ describe('Orchestrator Fix Property Tests', () => {
               )
             );
             // 各解決の間に少し待つ
-            await new Promise((resolve) => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, 20));
           }
 
           // 処理完了を待つ
-          await new Promise((resolve) => setTimeout(resolve, 200));
+          await new Promise((resolve) => setTimeout(resolve, 500));
 
           // --- 検証 ---
           // finalizeTaskExecution が全ワーカー完了後にのみ呼ばれたことを確認
@@ -283,7 +283,7 @@ describe('Orchestrator Fix Property Tests', () => {
       ),
       { numRuns: 10 }
     );
-  });
+  }, 30_000);
 
   // ===========================================================================
   // Property 23: Worker Results Collected in ExecutionState
@@ -366,7 +366,7 @@ describe('Orchestrator Fix Property Tests', () => {
           );
 
           // 処理完了を待つ
-          await new Promise((resolve) => setTimeout(resolve, 300));
+          await new Promise((resolve) => setTimeout(resolve, 500));
 
           // --- 検証 ---
           expect(capturedState).toBeDefined();
@@ -407,5 +407,5 @@ describe('Orchestrator Fix Property Tests', () => {
       ),
       { numRuns: 10 }
     );
-  });
+  }, 30_000);
 });

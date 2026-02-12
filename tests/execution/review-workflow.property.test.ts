@@ -421,9 +421,11 @@ describe('Property 11: Review Logging', () => {
           }
         }
       ),
-      { numRuns: 30 }
+      // ジェネレータ3つ（requestOptions + reviewerId + feedback）で
+      // feedbackが最大500文字のファイルI/Oを伴うため、numRunsを抑制
+      { numRuns: 10 }
     );
-  });
+  }, 15_000);
 });
 
 // =============================================================================

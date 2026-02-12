@@ -15,6 +15,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { TrialRunOptions, TrialRunResult } from './types.js';
+import { CodingAgentRegistry } from '../../../coding-agents/index.js';
+import type { CodingAgentAdapter } from '../../../coding-agents/base.js';
+import { parseVitestOutput, parseEslintOutput } from '../execution/qa-result-parser.js';
 
 // =============================================================================
 // 定数定義
@@ -185,7 +188,212 @@ function saveTrialResult(result: TrialRunResult, outputPath: string): void {
 // =============================================================================
 
 /**
- * 試用実行をシミュレートする（MVP版）
+ * CodingAgent を使って試用実行を行う（利用可能な場合）
+ *
+ * CodingAgent が利用可能な場合は実際にタスクを実行し、
+ * lint/test の結果をパーサーで解析してスコアに反映する。
+ * CodingAgent が利用不可の場合は従来のシミュレーションにフォールバック。
+ *
+ * @param candidatePath - 候補エージェント定義パス
+ * @param taskPath - 面接課題パス
+ * @param trialDir - 試用実行ディレクトリ
+ * @param logPath - ログファイルパス
+ * @param timeout - タイムアウト（分）
+ * @returns 実行結果
+ */
+async function executeTrialWithAgent(
+  candidatePath: string,
+  taskPath: string,
+  trialDir: string,
+  logPath: string,
+  timeout: number
+): Promise<{
+  status: TrialRunResult['status'];
+  outputs: string[];
+  tokensUsed: number;
+  timeUsed: number;
+  failureReason?: string;
+  qaResults?: {
+    lintPassed: boolean;
+    lintErrorCount: number;
+    lintWarningCount: number;
+    testPassed: boolean;
+    testTotal: number;
+    testPassedCount: number;
+    testFailedCount: number;
+    testCoverage: number;
+  };
+}> {
+  // CodingAgent の利用可能性をチェック
+  let codingAgent: CodingAgentAdapter | null = null;
+  try {
+    const registry = new CodingAgentRegistry();
+    codingAgent = await registry.selectAdapter();
+  } catch (_error) {
+    // 利用不可 → シミュレーションにフォールバック
+  }
+
+  if (!codingAgent) {
+    appendLog(logPath, 'CodingAgent未検出: シミュレーションモードで実行');
+    return simulateTrialExecution(
+      candidatePath,
+      taskPath,
+      trialDir,
+      logPath,
+      timeout
+    );
+  }
+
+  // CodingAgent を使った本番実行
+  appendLog(logPath, `CodingAgent検出: ${codingAgent.displayName} で実行`);
+
+  // 候補エージェント定義と面接課題を読み込み
+  if (!fs.existsSync(candidatePath)) {
+    return {
+      status: 'failed',
+      outputs: [],
+      tokensUsed: 0,
+      timeUsed: 0,
+      failureReason: `CandidateNotFound: ${candidatePath}`,
+    };
+  }
+  if (!fs.existsSync(taskPath)) {
+    return {
+      status: 'failed',
+      outputs: [],
+      tokensUsed: 0,
+      timeUsed: 0,
+      failureReason: `TaskNotFound: ${taskPath}`,
+    };
+  }
+
+  const taskContent = fs.readFileSync(taskPath, 'utf-8');
+  const startMs = Date.now();
+  const outputs: string[] = [];
+
+  // 1. CodingAgent でタスクを実行
+  appendLog(logPath, 'CodingAgent でタスクを実行中...');
+  try {
+    const execResult = await codingAgent.execute({
+      workingDirectory: trialDir,
+      prompt: [
+        '# 面接課題',
+        '',
+        taskContent,
+        '',
+        '上記の課題を実装してください。',
+        '成果物はカレントディレクトリに保存してください。',
+      ].join('\n'),
+      timeout: timeout * 60, // 分→秒
+    });
+
+    // 実行結果を保存
+    const outputPath = path.join(trialDir, 'coding_output.txt');
+    fs.writeFileSync(outputPath, execResult.output || execResult.stderr, 'utf-8');
+    outputs.push(outputPath);
+    appendLog(logPath, `CodingAgent 実行完了: success=${execResult.success}`);
+
+    if (!execResult.success) {
+      const elapsedMin = (Date.now() - startMs) / 60000;
+      return {
+        status: 'failed',
+        outputs,
+        tokensUsed: 0,
+        timeUsed: elapsedMin,
+        failureReason: `CodingAgent実行失敗: exit code ${execResult.exitCode}`,
+      };
+    }
+  } catch (error) {
+    const elapsedMin = (Date.now() - startMs) / 60000;
+    const msg = error instanceof Error ? error.message : String(error);
+    appendLog(logPath, `CodingAgent 実行エラー: ${msg}`, 'ERROR');
+    return {
+      status: 'failed',
+      outputs,
+      tokensUsed: 0,
+      timeUsed: elapsedMin,
+      failureReason: `CodingAgentError: ${msg}`,
+    };
+  }
+
+  // 2. lint/test を実行して品質を評価
+  let qaResults = {
+    lintPassed: true,
+    lintErrorCount: 0,
+    lintWarningCount: 0,
+    testPassed: true,
+    testTotal: 0,
+    testPassedCount: 0,
+    testFailedCount: 0,
+    testCoverage: 0,
+  };
+
+  appendLog(logPath, 'QA チェックを実行中...');
+  try {
+    // lint 実行
+    const lintResult = await codingAgent.execute({
+      workingDirectory: trialDir,
+      prompt: '`npm run lint` を実行し、出力をそのまま表示してください。',
+      timeout: 120,
+    });
+    const lintParsed = parseEslintOutput(lintResult.output + '\n' + lintResult.stderr);
+    qaResults.lintPassed = lintParsed.parsed ? lintParsed.passed : lintResult.success;
+    qaResults.lintErrorCount = lintParsed.errorCount;
+    qaResults.lintWarningCount = lintParsed.warningCount;
+
+    // test 実行
+    const testResult = await codingAgent.execute({
+      workingDirectory: trialDir,
+      prompt: '`npm run test` を実行し、出力をそのまま表示してください。',
+      timeout: 300,
+    });
+    const testParsed = parseVitestOutput(testResult.output + '\n' + testResult.stderr);
+    if (testParsed.parsed) {
+      qaResults.testPassed = testParsed.failed === 0 && testResult.success;
+      qaResults.testTotal = testParsed.total;
+      qaResults.testPassedCount = testParsed.passed;
+      qaResults.testFailedCount = testParsed.failed;
+      qaResults.testCoverage = testParsed.coverage >= 0 ? testParsed.coverage : 0;
+    } else {
+      qaResults.testPassed = testResult.success;
+    }
+
+    appendLog(logPath, `QA結果: lint=${qaResults.lintPassed ? 'PASS' : 'FAIL'}, test=${qaResults.testPassed ? 'PASS' : 'FAIL'}`);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    appendLog(logPath, `QA チェックエラー（スキップ）: ${msg}`, 'WARN');
+  }
+
+  // QA結果を保存
+  const qaPath = path.join(trialDir, 'qa_results.json');
+  fs.writeFileSync(qaPath, JSON.stringify(qaResults, null, 2), 'utf-8');
+  outputs.push(qaPath);
+
+  // サマリーを生成
+  const elapsedMin = (Date.now() - startMs) / 60000;
+  const summaryPath = path.join(trialDir, 'execution_summary.md');
+  const summaryContent = generateExecutionSummary(
+    candidatePath,
+    taskPath,
+    elapsedMin,
+    0
+  );
+  fs.writeFileSync(summaryPath, summaryContent, 'utf-8');
+  outputs.push(summaryPath);
+
+  appendLog(logPath, `試用実行完了: ${elapsedMin.toFixed(2)}分`);
+
+  return {
+    status: 'completed',
+    outputs,
+    tokensUsed: 0,
+    timeUsed: elapsedMin,
+    qaResults,
+  };
+}
+
+/**
+ * 試用実行をシミュレートする（CodingAgent未利用時のフォールバック）（MVP版）
  *
  * 実際のDocker実行は後で追加予定。
  * 現在はシミュレーションとして、成果物の生成とリソース使用量の記録を行う。
@@ -427,7 +635,7 @@ export async function runTrial(options: TrialRunOptions): Promise<TrialRunResult
   appendLog(logPath, `試用実行を開始: Run ID = ${runId}`);
 
   // 試用実行をシミュレート
-  const simulationResult = await simulateTrialExecution(
+  const simulationResult = await executeTrialWithAgent(
     candidatePath,
     taskPath,
     trialDir,
