@@ -11,16 +11,16 @@
 
 ### 許可パッケージ
 
-| 種別 | 許可リスト                           | 管理者         |
-| ---- | ------------------------------------ | -------------- |
-| apt  | `tools/installers/allowlist/apt.txt` | システム管理者 |
-| pip  | `tools/installers/allowlist/pip.txt` | システム管理者 |
-| npm  | `tools/installers/allowlist/npm.txt` | システム管理者 |
+| 種別 | 許可リスト                           | 管理者           |
+| ---- | ------------------------------------ | ---------------- |
+| apt  | `tools/installers/allowlist/apt.txt` | Security Officer |
+| pip  | `tools/installers/allowlist/pip.txt` | Security Officer |
+| npm  | `tools/installers/allowlist/npm.txt` | Security Officer |
 
 ### 新規パッケージ追加手順
 
 1. `workflows/waivers/` にWaiver申請を作成
-2. セキュリティレビュー実施
+2. Security Officerによるセキュリティレビュー実施
 3. 承認後、allowlistに追加
 4. `docs/company/policies.md` を更新
 
@@ -51,6 +51,9 @@ make ci     # 全ゲート統合
 | 状況                      | エスカレーション先 |
 | ------------------------- | ------------------ |
 | 品質ゲート失敗            | Quality Authority  |
-| allowlist外パッケージ必要 | システム管理者     |
-| セキュリティ懸念          | Quality Authority  |
+| allowlist外パッケージ必要 | Security Officer   |
+| セキュリティ懸念          | Security Officer   |
+| 脆弱性（Critical/High）  | Security Officer   |
+| 予算超過（20%以上）       | CFO                |
+| コスト異常検出            | CFO                |
 | 判断困難                  | COO/PM             |

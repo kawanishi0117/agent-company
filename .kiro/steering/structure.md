@@ -33,6 +33,7 @@ agent-company/
 │   ├── specs/                   # 機能仕様書（正式版）
 │   │   ├── README.md
 │   │   ├── agent-execution-engine.md
+│   │   ├── company-evolution.md
 │   │   ├── ai-adapters.md
 │   │   ├── ai-execution-integration.md
 │   │   ├── autonomous-agent-workflow.md
@@ -61,6 +62,7 @@ agent-company/
 │       ├── orchestrator-server.md
 │       ├── ai-integration.md
 │       ├── workflow-engine.md
+│       ├── company-evolution.md
 │       ├── container-isolation.md
 │       └── worker-management.md
 │
@@ -68,12 +70,16 @@ agent-company/
 │   ├── registry/                # 採用済みエージェント
 │   │   ├── coo_pm.yaml
 │   │   ├── quality_authority.yaml
+│   │   ├── security_officer.yaml  # セキュリティ監査（CISO）
+│   │   ├── cfo.yaml               # 財務・コスト管理
 │   │   ├── hiring_manager.yaml
 │   │   ├── reviewer.yaml
 │   │   ├── merger.yaml
 │   │   └── templates/
 │   │       ├── agent_template.yaml
-│   │       └── worker.yaml
+│   │       ├── worker.yaml
+│   │       ├── legal_officer.yaml      # 法務テンプレート（未採用）
+│   │       └── specialist_worker.yaml  # 専門Workerテンプレート（未採用）
 │   └── prompts/                 # 役割別プロンプト
 │       ├── shared/
 │       ├── roles/
@@ -135,6 +141,10 @@ agent-company/
 │   │       │   ├── run-directory-manager.ts # 実行ディレクトリ管理
 │   │       │   ├── settings-manager.ts    # 設定管理
 │   │       │   ├── workspace-manager.ts   # ワークスペース管理
+│   │       │   ├── qa-result-parser.ts    # QA結果パーサー（Vitest/ESLint）
+│   │       │   ├── agent-performance-tracker.ts # エージェントパフォーマンス追跡
+│   │       │   ├── skill-gap-detector.ts  # スキルギャップ検出
+│   │       │   ├── escalation-analyzer.ts # エスカレーション分析
 │   │       │   ├── tools.ts
 │   │       │   └── agents/      # エージェント実装
 │   │       │       ├── manager.ts
@@ -184,7 +194,10 @@ agent-company/
 │   ├── state/                   # ジョブ状態
 │   │   ├── config.json
 │   │   ├── bus/
-│   │   └── runs/
+│   │   ├── runs/
+│   │   ├── performance/         # エージェントパフォーマンス履歴
+│   │   ├── escalations/         # エスカレーション履歴
+│   │   └── hiring-proposals/    # 自動採用提案
 │   ├── e2e-artifacts/
 │   └── e2e-report/
 │

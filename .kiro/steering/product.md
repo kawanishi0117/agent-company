@@ -9,13 +9,15 @@ inclusion: always
 AIエージェントを「会社組織」として運用するフレームワーク。
 エージェントに役割・責任・品質基準を与え、ガバナンス付きで自律的に作業させる。
 
-## 3ライン構造
+## 4ライン構造
 
-| ライン     | 役割       | 担当エージェント                  |
-| ---------- | ---------- | --------------------------------- |
-| Delivery   | 実行・納品 | Worker Agent, Developer           |
-| Governance | 品質判定   | Quality Authority, Reviewer Agent |
-| Talent     | 採用・評価 | Hiring Manager                    |
+| ライン     | 役割             | 担当エージェント                              |
+| ---------- | ---------------- | --------------------------------------------- |
+| Delivery   | 実行・納品       | Worker Agent, Developer                       |
+| Governance | 品質判定         | Quality Authority, Reviewer Agent             |
+| Security   | セキュリティ監査 | Security Officer                              |
+| Talent     | 採用・評価       | Hiring Manager                                |
+| Finance    | コスト・予算管理 | CFO                                           |
 
 ## 固定エージェント
 
@@ -23,6 +25,8 @@ AIエージェントを「会社組織」として運用するフレームワー
 | ----------------- | ---------------------------------------------------------- | ---------------------------------------- |
 | COO/PM            | バックログ管理、アサイン、実行指示、結果収集、レポート生成 | `agents/registry/coo_pm.yaml`            |
 | Quality Authority | PR/差分/ログを見て `PASS/FAIL/WAIVER` 判定                 | `agents/registry/quality_authority.yaml` |
+| Security Officer  | 依存パッケージ監査、Docker設定監査、脆弱性チェック         | `agents/registry/security_officer.yaml`  |
+| CFO               | トークンコスト分析、予算管理、効率性レポート               | `agents/registry/cfo.yaml`               |
 | Hiring Manager    | JD生成、面接課題生成、試用実行、Registry登録               | `agents/registry/hiring_manager.yaml`    |
 | Reviewer          | コードレビュー、品質チェック                               | `agents/registry/reviewer.yaml`          |
 | Merger            | ブランチマージ、コンフリクト解決                           | `agents/registry/merger.yaml`            |
@@ -108,6 +112,10 @@ Merger Agent（ブランチマージ）
 | Execution Reporter    | 実行レポート生成       | `tools/cli/lib/execution/execution-reporter.ts`    |
 | Settings Manager      | 設定管理               | `tools/cli/lib/execution/settings-manager.ts`      |
 | Workspace Manager     | ワークスペース管理     | `tools/cli/lib/execution/workspace-manager.ts`     |
+| QA Result Parser      | QA結果パース（Vitest/ESLint） | `tools/cli/lib/execution/qa-result-parser.ts` |
+| Performance Tracker   | エージェントパフォーマンス追跡 | `tools/cli/lib/execution/agent-performance-tracker.ts` |
+| Skill Gap Detector    | スキルギャップ検出・採用提案 | `tools/cli/lib/execution/skill-gap-detector.ts` |
+| Escalation Analyzer   | エスカレーション分析・パターン検出 | `tools/cli/lib/execution/escalation-analyzer.ts` |
 
 ## 品質判定基準
 
@@ -200,6 +208,28 @@ Merger Agent（ブランチマージ）
 | ApprovalGate         | CEO承認ゲート管理              | `tools/cli/lib/execution/approval-gate.ts`       |
 | OrchestratorServer   | GUI連携HTTPサーバー            | `tools/cli/lib/execution/orchestrator-server.ts` |
 | CodingAgentRegistry  | コーディングエージェント管理   | `tools/coding-agents/index.ts`                   |
+
+## Company Evolution（組織進化機能）
+
+エージェントの実行結果を実データとして蓄積・分析し、組織の成長サイクルを実現する。
+
+### 機能一覧
+
+| 機能 | 説明 | コンポーネント |
+|------|------|---------------|
+| QA結果実パース | Vitest/ESLint出力を構造化データに変換 | QA Result Parser |
+| 採用本物化 | CodingAgentで実際にタスク実行して評価 | Trial Runner + CodingAgent |
+| パフォーマンス追跡 | 成功率・品質スコア・得意/苦手を追跡 | Performance Tracker |
+| スキルギャップ検出 | 組織の不足スキルを検出し採用提案を生成 | Skill Gap Detector |
+| エスカレーション分析 | 繰り返しパターンを検出し根本原因を推定 | Escalation Analyzer |
+
+### データフロー
+
+```
+ワークフロー実行 → QAパーサー → パフォーマンス記録 → スキルギャップ分析 → 採用提案
+                                                    ↑
+                              エスカレーション分析 ──┘
+```
 
 ### AI可用性
 
