@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui';
 import { SystemHealthBanner } from '@/components/ui/SystemHealthBanner';
+import { StatusIndicator } from '@/components/employees';
 
 // =============================================================================
 // 型定義
@@ -62,6 +63,315 @@ interface PendingWorkflow {
 }
 
 const AUTO_REFRESH_INTERVAL = 5000;
+
+/** 社員ステータスカウント */
+interface EmployeeStatusCounts {
+  idle: number;
+  working: number;
+  in_meeting: number;
+  reviewing: number;
+  on_break: number;
+  offline: number;
+}
+
+/**
+ * 社員ステータスオーバービューセクション
+ * @see Requirements: 2.5
+ */
+function EmployeeOverviewSection(): JSX.Element {
+  const [counts, setCounts] = useState<EmployeeStatusCounts | null>(null);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    const load = async (): Promise<void> => {
+      try {
+        const res = await fetch('/api/employees');
+        const json = await res.json();
+        if (json.data) {
+          setCounts(json.data.statusCounts);
+          setTotal(json.data.totalEmployees);
+        }
+      } catch {
+        // 失敗時は非表示
+      }
+    };
+    load();
+    const interval = setInterval(load, AUTO_REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!counts) return <></>;
+
+  const items = [
+    { status: 'working', label: '作業中', count: counts.working },
+    { status: 'in_meeting', label: '会議中', count: counts.in_meeting },
+    { status: 'reviewing', label: 'レビュー', count: counts.reviewing },
+    { status: 'idle', label: 'アイドル', count: counts.idle },
+    { status: 'offline', label: 'オフライン', count: counts.offline },
+  ];
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
+        <svg className="w-5 h-5 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        社員 ({total}名)
+      </h2>
+      <Link href="/employees">
+        <Card className="p-4 hover:bg-bg-tertiary/30 transition-colors cursor-pointer">
+          <div className="flex items-center gap-6 flex-wrap">
+            {items.map((item) => (
+              <div key={item.status} className="flex items-center gap-1.5">
+                <StatusIndicator status={item.status} size="sm" />
+                <span className="text-sm text-text-secondary">
+                  {item.label}: <span className="font-medium text-text-primary">{item.count}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </Link>
+    </div>
+  );
+}
+
+// =============================================================================
+// MVP候補通知セクション（Task 25.6）
+// =============================================================================
+
+/** MVP表彰データ */
+interface MVPAwardData {
+  month: string;
+  agentId: string;
+  score: number;
+  reason: string;
+  awardedAt: string;
+}
+
+/**
+ * MVP候補通知セクション
+ * 最新のMVP受賞者を表示
+ * @see Requirements: 16.2, 16.3
+ */
+function MVPCandidateSection(): JSX.Element {
+  const [latest, setLatest] = useState<MVPAwardData | null>(null);
+
+  useEffect(() => {
+    const load = async (): Promise<void> => {
+      try {
+        const res = await fetch('/api/mvp');
+        if (res.ok) {
+          const json = await res.json();
+          setLatest(json.data?.latest ?? null);
+        }
+      } catch {
+        // 失敗時は非表示
+      }
+    };
+    load();
+  }, []);
+
+  if (!latest) return <></>;
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
+        <span className="text-xl">🏆</span>
+        月間MVP
+      </h2>
+      <Link href={`/employees/${latest.agentId}`}>
+        <Card className="p-4 border border-status-waiver/30 hover:bg-bg-tertiary/30 transition-colors cursor-pointer">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-lg bg-status-waiver/20 flex items-center justify-center">
+              <span className="text-2xl">🏆</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-text-primary">
+                {latest.agentId}
+              </p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                {latest.month} MVP · スコア {latest.score}
+              </p>
+              {latest.reason && (
+                <p className="text-xs text-text-muted mt-0.5 truncate">{latest.reason}</p>
+              )}
+            </div>
+            <svg className="w-5 h-5 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        </Card>
+      </Link>
+    </div>
+  );
+}
+
+// =============================================================================
+// ムードアラートセクション（Task 25.7）
+// =============================================================================
+
+/** ムードアラート */
+interface MoodAlertItem {
+  agentId: string;
+  currentMood: number;
+  trend: 'declining' | 'stable' | 'improving';
+}
+
+/**
+ * ムードアラートセクション
+ * ムードが低い社員を警告表示
+ * @see Requirements: 13.4
+ */
+function MoodAlertSection(): JSX.Element {
+  const [alerts, setAlerts] = useState<MoodAlertItem[]>([]);
+
+  useEffect(() => {
+    const load = async (): Promise<void> => {
+      try {
+        const res = await fetch('/api/mood-alerts');
+        if (res.ok) {
+          const json = await res.json();
+          setAlerts(json.data ?? []);
+        }
+      } catch {
+        // 失敗時は非表示
+      }
+    };
+    load();
+    const interval = setInterval(load, AUTO_REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (alerts.length === 0) return <></>;
+
+  /** トレンドアイコン */
+  const trendIcon = (trend: string): string => {
+    switch (trend) {
+      case 'declining': return '📉';
+      case 'improving': return '📈';
+      default: return '➡️';
+    }
+  };
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
+        <svg className="w-5 h-5 text-status-fail" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        ムードアラート
+        <span className="text-sm font-normal text-text-muted">({alerts.length}名)</span>
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {alerts.map((alert) => (
+          <Link key={alert.agentId} href={`/employees/${alert.agentId}`}>
+            <Card className="p-3 border border-status-fail/20 hover:bg-bg-tertiary/30 transition-colors cursor-pointer">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-status-fail/20 flex items-center justify-center">
+                  <span className="text-sm">😟</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary">{alert.agentId}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-status-fail">ムード: {alert.currentMood}</span>
+                    <span className="text-xs">{trendIcon(alert.trend)}</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// アクティビティストリームセクション
+// =============================================================================
+
+/** アクティビティストリームの項目 */
+interface StreamItem {
+  id: string;
+  type: string;
+  agentId: string;
+  agentTitle: string;
+  message: string;
+  timestamp: string;
+}
+
+/**
+ * アクティビティストリームセクション
+ * 直近のエージェント間通信をリアルタイム表示
+ * @see Requirements: 5.3, 5.4
+ */
+function ActivityStreamSection(): JSX.Element {
+  const [items, setItems] = useState<StreamItem[]>([]);
+  const [streamError, setStreamError] = useState(false);
+
+  useEffect(() => {
+    const load = async (): Promise<void> => {
+      try {
+        const res = await fetch('/api/activity-stream?limit=15');
+        if (!res.ok) { setStreamError(true); return; }
+        const json = await res.json();
+        if (json.data) {
+          setItems(json.data);
+          setStreamError(false);
+        }
+      } catch {
+        setStreamError(true);
+      }
+    };
+    load();
+    const interval = setInterval(load, AUTO_REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, []);
+
+  // データなし or エラー時は非表示
+  if (streamError || items.length === 0) return <></>;
+
+  /** タイプに応じたアイコン色 */
+  const typeColor = (type: string): string => {
+    switch (type) {
+      case 'task_assignment': return 'text-accent-primary';
+      case 'task_completion': return 'text-status-pass';
+      case 'review_request': return 'text-status-waiver';
+      case 'escalation': return 'text-status-fail';
+      default: return 'text-text-muted';
+    }
+  };
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
+        <svg className="w-5 h-5 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        アクティビティストリーム
+      </h2>
+      <Card className="p-4">
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {items.map((item) => (
+            <div key={item.id} className="flex items-start gap-3 py-1.5 border-b border-bg-tertiary/50 last:border-0">
+              <span className={`text-xs mt-0.5 ${typeColor(item.type)}`}>●</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-text-primary truncate">
+                  <span className="font-medium">{item.agentTitle || item.agentId}</span>
+                  {' '}{item.message}
+                </p>
+                <p className="text-xs text-text-muted">
+                  {new Date(item.timestamp).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
 
 function StatCard({ title, value, icon, color }: { title: string; value: number; icon: React.ReactNode; color: string }): JSX.Element {
   return (
@@ -224,6 +534,18 @@ export default function DashboardPage(): JSX.Element {
           </div>
         </div>
       )}
+      {/* 社員ステータスオーバービュー */}
+      <EmployeeOverviewSection />
+
+      {/* MVP候補通知セクション */}
+      <MVPCandidateSection />
+
+      {/* ムードアラートセクション */}
+      <MoodAlertSection />
+
+      {/* アクティビティストリーム */}
+      <ActivityStreamSection />
+
       {/* ワークフローサマリーセクション */}
       <div>
         <h2 className="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">

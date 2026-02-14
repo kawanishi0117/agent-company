@@ -273,54 +273,114 @@ export interface QualityResultsData {
 
 /**
  * 承認決定
+ * @description CLI側 ApprovalDecision に準拠
  */
 export interface ApprovalDecisionData {
+  /** ワークフローID */
+  workflowId?: string;
+  /** 承認アクション */
   action: 'approve' | 'request_revision' | 'reject';
+  /** 対象フェーズ */
   phase: WorkflowPhase;
+  /** フィードバック（オプション） */
   feedback?: string;
-  timestamp: string;
+  /** 決定日時（ISO8601形式） */
+  decidedAt: string;
 }
 
 /**
  * 提案書
+ * @description CLI側 Proposal に準拠
  */
 export interface ProposalData {
+  /** ワークフローID */
+  workflowId?: string;
+  /** サマリー */
   summary: string;
+  /** スコープ */
   scope: string;
+  /** タスク分解一覧 */
   taskBreakdown: Array<{
-    taskNumber: number;
+    /** タスクID */
+    id: string;
+    /** タイトル */
     title: string;
+    /** 説明 */
+    description: string;
+    /** ワーカータイプ */
     workerType: string;
+    /** 見積もり工数 */
     estimatedEffort: string;
+    /** 依存タスクID一覧 */
     dependencies: string[];
   }>;
+  /** ワーカー割り当て一覧 */
   workerAssignments: Array<{
+    /** タスクID */
+    taskId: string;
+    /** ワーカータイプ */
     workerType: string;
-    taskNumbers: number[];
+    /** 割り当て根拠 */
+    rationale: string;
   }>;
-  risks: Array<{
+  /** リスク評価一覧 */
+  riskAssessment: Array<{
+    /** リスク説明 */
     description: string;
-    severity: 'low' | 'medium' | 'high' | 'critical';
+    /** 重要度 */
+    severity: 'low' | 'medium' | 'high';
+    /** 対策 */
     mitigation: string;
   }>;
+  /** 依存関係一覧 */
   dependencies: Array<{
     from: string;
     to: string;
     type: string;
   }>;
-  meetingId?: string;
+  /** 参照会議録ID一覧 */
+  meetingMinutesIds?: string[];
+  /** 作成日時（ISO8601形式） */
+  createdAt?: string;
+  /** バージョン番号（永続化時） */
   version?: number;
 }
 
 /**
  * 納品物
+ * @description CLI側 Deliverable に準拠
  */
 export interface DeliverableData {
+  /** ワークフローID */
+  workflowId?: string;
+  /** サマリーレポート */
   summaryReport: string;
-  changes: string[];
-  testResults: { passed: number; failed: number; coverage?: number };
+  /** 変更一覧 */
+  changes: Array<{
+    /** ファイルパス */
+    path: string;
+    /** アクション種別 */
+    action: 'created' | 'modified' | 'deleted';
+  }>;
+  /** テスト結果サマリー */
+  testResults: {
+    /** lint合格フラグ */
+    lintPassed: boolean;
+    /** lint出力ログ */
+    lintOutput: string;
+    /** test合格フラグ */
+    testPassed: boolean;
+    /** test出力ログ */
+    testOutput: string;
+    /** 総合合格フラグ */
+    overallPassed: boolean;
+  };
+  /** レビュー履歴 */
   reviewHistory: Array<{ reviewer: string; result: string; feedback: string }>;
+  /** 成果物パス一覧 */
   artifacts: string[];
+  /** 作成日時（ISO8601形式） */
+  createdAt?: string;
 }
 
 /**
@@ -354,18 +414,35 @@ export interface EscalationData {
 
 /**
  * ワークフロー状態
+ * @description CLI側 WorkflowState に準拠
  */
 export interface WorkflowStateData {
+  /** ワークフローID */
   workflowId: string;
+  /** 実行ID */
+  runId?: string;
+  /** 社長からの指示 */
   instruction: string;
+  /** プロジェクトID */
   projectId: string;
+  /** 現在のフェーズ */
   currentPhase: WorkflowPhase;
+  /** ワークフローステータス */
   status: WorkflowStatus;
+  /** フェーズ遷移履歴 */
   phaseHistory: PhaseTransition[];
+  /** 承認決定履歴 */
+  approvalDecisions: ApprovalDecisionData[];
+  /** 提案書（オプション） */
   proposal?: ProposalData;
+  /** 納品物（オプション） */
   deliverable?: DeliverableData;
-  approvalHistory: ApprovalDecisionData[];
+  /** 会議録ID一覧 */
+  meetingMinutesIds?: string[];
+  /** エスカレーション情報（オプション） */
   escalation?: EscalationData;
+  /** 作成日時（ISO8601形式） */
   createdAt: string;
+  /** 更新日時（ISO8601形式） */
   updatedAt: string;
 }

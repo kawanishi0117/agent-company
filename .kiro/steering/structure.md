@@ -41,6 +41,7 @@ agent-company/
 │   │   ├── company-workflow-engine.md
 │   │   ├── end-to-end-workflow-wiring.md
 │   │   ├── workflow-production-ready.md
+│   │   ├── real-company-experience.md   # Real Company Experience仕様
 │   │   └── milestones/
 │   │       ├── m0-skeleton.md
 │   │       ├── m1-docker-workspace.md
@@ -146,6 +147,23 @@ agent-company/
 │   │       │   ├── skill-gap-detector.ts  # スキルギャップ検出
 │   │       │   ├── escalation-analyzer.ts # エスカレーション分析
 │   │       │   ├── tools.ts
+│   │       │   ├── # Real Company Experience コンポーネント
+│   │       │   ├── employee-status-tracker.ts   # 社員ステータス追跡
+│   │       │   ├── daily-standup-coordinator.ts  # 朝会自動開催
+│   │       │   ├── report-generator.ts           # 日報/週報生成
+│   │       │   ├── chat-log-capture.ts           # チャットログ
+│   │       │   ├── retrospective-engine.ts       # レトロスペクティブ
+│   │       │   ├── knowledge-base-manager.ts     # ナレッジベース
+│   │       │   ├── spec-compliance-checker.ts    # 仕様適合チェック
+│   │       │   ├── tech-debt-tracker.ts          # 技術的負債追跡
+│   │       │   ├── deliverable-preview.ts        # 成果物プレビュー
+│   │       │   ├── executive-meeting-coordinator.ts # 経営会議
+│   │       │   ├── market-research-agent.ts      # 市場調査
+│   │       │   ├── mood-tracker.ts               # ムード追跡
+│   │       │   ├── relationship-tracker.ts       # 関係性追跡
+│   │       │   ├── career-manager.ts             # キャリア管理
+│   │       │   ├── mvp-selector.ts               # MVP選出
+│   │       │   ├── kpi-aggregator.ts             # KPI集計・OKR管理
 │   │       │   └── agents/      # エージェント実装
 │   │       │       ├── manager.ts
 │   │       │       ├── worker.ts
@@ -197,7 +215,19 @@ agent-company/
 │   │   ├── runs/
 │   │   ├── performance/         # エージェントパフォーマンス履歴
 │   │   ├── escalations/         # エスカレーション履歴
-│   │   └── hiring-proposals/    # 自動採用提案
+│   │   ├── hiring-proposals/    # 自動採用提案
+│   │   ├── employee-status/     # 社員ステータス
+│   │   ├── employee-mood/       # ムードデータ
+│   │   ├── relationships/       # 関係性データ
+│   │   ├── career/              # キャリア履歴
+│   │   ├── awards/              # MVP表彰履歴
+│   │   ├── knowledge-base/      # ナレッジベース
+│   │   ├── standups/            # 朝会記録
+│   │   ├── reports/             # 日報/週報
+│   │   ├── chat-logs/           # チャットログ
+│   │   ├── tech-debt/           # 技術的負債
+│   │   ├── okr/                 # OKRデータ
+│   │   └── market-research/     # 市場調査
 │   ├── e2e-artifacts/
 │   └── e2e-report/
 │
@@ -221,6 +251,19 @@ agent-company/
 │       │   │   ├── backlog/
 │       │   │   ├── command/
 │       │   │   ├── dashboard/
+│       │   │   ├── employees/       # 社員API（mood, career含む）
+│       │   │   ├── relationships/   # 関係性API
+│       │   │   ├── mvp/             # MVP API
+│       │   │   ├── mood-alerts/     # ムードアラートAPI
+│       │   │   ├── meetings/        # 会議API（executive含む）
+│       │   │   ├── knowledge/       # ナレッジAPI
+│       │   │   ├── internal-rules/  # 社内ルールAPI
+│       │   │   ├── kpi/             # KPI API
+│       │   │   ├── okr/             # OKR API
+│       │   │   ├── market-research/ # 市場調査API
+│       │   │   ├── tech-debt/       # 技術的負債API
+│       │   │   ├── activity-stream/ # アクティビティAPI
+│       │   │   ├── chat-logs/       # チャットログAPI
 │       │   │   ├── projects/
 │       │   │   ├── reports/
 │       │   │   ├── review/
@@ -240,6 +283,11 @@ agent-company/
 │       │   ├── backlog/
 │       │   ├── command/
 │       │   ├── dashboard/
+│       │   ├── employees/           # 社員名簿・詳細
+│       │   ├── meetings/            # 会議一覧
+│       │   ├── knowledge/           # ナレッジベース
+│       │   ├── kpi/                 # KPI/OKR
+│       │   ├── market/              # 市場調査
 │       │   ├── projects/
 │       │   ├── reports/
 │       │   ├── review/
@@ -254,6 +302,7 @@ agent-company/
 │       │       └── [id]/
 │       ├── components/
 │       │   ├── backlog/
+│       │   ├── employees/       # 社員関連コンポーネント
 │       │   ├── layout/
 │       │   ├── projects/
 │       │   ├── reports/

@@ -93,8 +93,8 @@ export function ApprovalPanel({
           <h4 className="text-sm font-medium text-text-primary mb-2">提案概要</h4>
           <p className="text-sm text-text-secondary mb-2">{proposal.summary}</p>
           <div className="flex gap-4 text-xs text-text-muted">
-            <span>タスク数: {proposal.taskBreakdown.length}</span>
-            <span>リスク: {proposal.risks.length}件</span>
+            <span>タスク数: {(proposal.taskBreakdown ?? []).length}</span>
+            <span>リスク: {(proposal.riskAssessment ?? []).length}件</span>
           </div>
         </div>
       )}
@@ -105,9 +105,9 @@ export function ApprovalPanel({
           <h4 className="text-sm font-medium text-text-primary mb-2">納品概要</h4>
           <p className="text-sm text-text-secondary mb-2">{deliverable.summaryReport}</p>
           <div className="flex gap-4 text-xs text-text-muted">
-            <span>変更: {deliverable.changes.length}件</span>
-            <span>テスト: {deliverable.testResults.passed}成功 / {deliverable.testResults.failed}失敗</span>
-            <span>成果物: {deliverable.artifacts.length}件</span>
+            <span>変更: {(deliverable.changes ?? []).length}件</span>
+            <span>テスト: {deliverable.testResults?.overallPassed ? '合格' : '不合格'}</span>
+            <span>成果物: {(deliverable.artifacts ?? []).length}件</span>
           </div>
         </div>
       )}

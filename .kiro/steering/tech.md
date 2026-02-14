@@ -110,6 +110,20 @@ agentcompany server --port 8080
 - `POST /api/agents/pause` - 全エージェント一時停止
 - `POST /api/agents/emergency-stop` - 緊急停止
 
+**Real Company Experience API**:
+- `GET /api/employees` - 社員一覧
+- `GET /api/employees/[id]` - 社員詳細
+- `GET /api/employees/[id]/mood` - ムード履歴
+- `GET /api/employees/[id]/career` - キャリア履歴
+- `GET /api/relationships` - 関係性マップ
+- `GET /api/mvp` - MVP履歴
+- `GET /api/mood-alerts` - ムードアラート
+- `GET /api/meetings` - 会議一覧
+- `GET /api/knowledge` - ナレッジ検索
+- `GET /api/kpi` - KPIデータ
+- `GET /api/market-research` - 市場調査レポート
+- `GET /api/tech-debt` - 技術的負債トレンド
+
 ## 品質ゲート
 
 ### 静的解析
@@ -342,21 +356,54 @@ export interface AIAdapter {
 // runtime/state/config.json の codingAgent フィールド
 {
   "codingAgent": {
-    "preferredAgent": "claude-code",
+    "preferredAgent": "opencode",
     "agentSettings": {
-      "claude-code": { "timeout": 600 },
       "opencode": { "timeout": 600, "model": "claude-sonnet-4-20250514" },
+      "claude-code": { "timeout": 600 },
       "kiro-cli": { "timeout": 600 }
     },
-    "autoCreateGithubRepo": false
+    "autoCreateGithubRepo": false,
+    "phaseServices": {
+      "proposal": "opencode",
+      "development": "opencode",
+      "quality_assurance": "opencode"
+    },
+    "agentOverrides": [
+      { "agentId": "reviewer", "service": "claude-code" }
+    ]
   }
 }
 ```
 
+### 統一AIサービス選択
+
+全ワークフローフェーズで使用するAIサービスを統一的に設定可能。
+
+**サービス解決優先順位**:
+1. `agentOverrides`（社員別オーバーライド） ← 最優先
+2. `phaseServices`（フェーズ別設定）
+3. `preferredAgent`（グローバルデフォルト）
+4. レジストリのデフォルト優先順位 ← 最低優先
+
+**型定義** (`tools/cli/lib/execution/types.ts`):
+- `CodingAgentName`: `'opencode' | 'claude-code' | 'kiro-cli'`
+- `PhaseServiceConfig`: フェーズ別サービス設定
+- `AgentServiceOverride`: エージェント別オーバーライド
+- `ServiceDetectionResult`: サービス検出結果
+
+### サービス検出API
+
+| メソッド | パス | 説明 |
+|----------|------|------|
+| GET | `/api/settings/service-detection` | 環境のCLIツール自動検出（バージョン情報付き） |
+
 ### GUI設定
 
 - Settings画面（`/settings`）にコーディングエージェント設定セクション
-- API: `GET/PUT /api/settings/coding-agents`
+- サービス検出結果の表示（利用可能/不可、バージョン情報）
+- フェーズ別AIサービス選択ドロップダウン
+- エージェント（社員）別オーバーライドの追加・削除
+- API: `GET/PUT /api/settings/coding-agents`, `GET /api/settings/service-detection`
 
 ## 環境変数
 

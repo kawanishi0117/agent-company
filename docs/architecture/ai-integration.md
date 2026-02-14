@@ -507,3 +507,67 @@ Markdown形式のレポートで、以下のセクションを含む：
 - [Orchestrator Server](./orchestrator-server.md)
 - [ワークフローエンジン](./workflow-engine.md)
 - [AI実行統合仕様](../specs/ai-execution-integration.md)
+
+## 統一AIサービス選択
+
+### 概要
+
+全ワークフローフェーズ（proposal / development / quality_assurance）で使用するAIサービスを統一的に設定できる機能。フェーズ別・エージェント（社員）別のオーバーライドにも対応する。
+
+### サービス解決優先順位
+
+コーディングエージェントの選択は以下の優先順位で解決される：
+
+```
+1. agentOverrides（社員別オーバーライド）  ← 最優先
+2. phaseServices（フェーズ別設定）
+3. preferredAgent（グローバルデフォルト）
+4. レジストリのデフォルト優先順位          ← 最低優先
+```
+
+### 設定構造（config.json）
+
+```json
+{
+  "codingAgent": {
+    "preferredAgent": "opencode",
+    "phaseServices": {
+      "proposal": "opencode",
+      "development": "claude-code",
+      "quality_assurance": "opencode"
+    },
+    "agentOverrides": [
+      { "agentId": "reviewer", "service": "claude-code" },
+      { "agentId": "coo_pm", "service": "kiro-cli" }
+    ]
+  }
+}
+```
+
+### サービス検出API
+
+`GET /api/settings/service-detection` で環境にインストールされたCLIツールを自動検出する。
+
+| サービス | CLIコマンド | 検出方法 |
+|---------|------------|---------|
+| OpenCode | `opencode` | `where opencode` + `opencode --version` |
+| Claude Code | `claude` | `where claude` + `claude --version` |
+| Kiro CLI | `kiro` | `where kiro` + `kiro --version` |
+
+### GUI設定画面
+
+Settings画面（`/settings`）のコーディングエージェント設定セクションに以下のUIを提供：
+
+- サービス検出結果の表示（利用可能/不可、バージョン情報）
+- フェーズ別AIサービス選択ドロップダウン
+- エージェント（社員）別オーバーライドの追加・削除
+
+### 対応コンポーネント
+
+| コンポーネント | ファイル | 役割 |
+|---------------|---------|------|
+| WorkflowEngine | `tools/cli/lib/execution/workflow-engine.ts` | フェーズ・エージェント別にサービスを解決 |
+| OrchestratorServer | `tools/cli/lib/execution/orchestrator-server.ts` | config.jsonから設定を読み込みWorkflowEngineに渡す |
+| Service Detection API | `gui/web/app/api/settings/service-detection/route.ts` | 環境のCLI検出 |
+| Coding Agents API | `gui/web/app/api/settings/coding-agents/route.ts` | 設定の読み書き・バリデーション |
+| Settings Page | `gui/web/app/settings/page.tsx` | GUI設定画面 |

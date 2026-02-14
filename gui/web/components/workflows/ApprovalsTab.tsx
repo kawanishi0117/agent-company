@@ -56,7 +56,7 @@ export function ApprovalsTab({ approvals }: ApprovalsTabProps): JSX.Element {
 
   // 時系列降順でソート
   const sorted = [...approvals].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    (a, b) => new Date(b.decidedAt).getTime() - new Date(a.decidedAt).getTime()
   );
 
   return (
@@ -77,7 +77,7 @@ export function ApprovalsTab({ approvals }: ApprovalsTabProps): JSX.Element {
                 </span>
               </div>
               <span className="text-xs text-text-muted">
-                {new Date(decision.timestamp).toLocaleString('ja-JP')}
+                {new Date(decision.decidedAt).toLocaleString('ja-JP')}
               </span>
             </div>
             {decision.feedback && (

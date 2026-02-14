@@ -2379,6 +2379,16 @@ export interface WorkflowPersistenceData {
   errorLog: ErrorLogEntry[];
   /** 会議録ID一覧 */
   meetingMinutesIds: string[];
+  /** 提案書（オプション） */
+  proposal?: Proposal;
+  /** 納品物（オプション） */
+  deliverable?: Deliverable;
+  /** 開発進捗情報（オプション） */
+  progress?: WorkflowProgress;
+  /** 品質結果情報（オプション） */
+  qualityResults?: QualityResults;
+  /** エスカレーション情報（オプション） */
+  escalation?: WorkflowEscalation;
   /** 作成日時（ISO8601形式） */
   createdAt: string;
   /** 更新日時（ISO8601形式） */
@@ -2479,19 +2489,49 @@ export interface CodingAgentSettings {
 }
 
 /**
+ * フェーズ別AIサービス設定
+ * @description 各ワークフローフェーズで使用するAIサービスを指定
+ */
+export interface PhaseServiceConfig {
+  /** 提案フェーズで使用するサービス（デフォルト: グローバル設定に従う） */
+  proposal?: CodingAgentName;
+  /** 開発フェーズで使用するサービス */
+  development?: CodingAgentName;
+  /** QAフェーズで使用するサービス */
+  quality_assurance?: CodingAgentName;
+}
+
+/**
+ * エージェント（社員）別AIサービスオーバーライド
+ * @description 特定のエージェントに対してAIサービスを個別指定
+ */
+export interface AgentServiceOverride {
+  /** エージェントID（agents/registry/*.yaml の id） */
+  agentId: string;
+  /** 使用するAIサービス名 */
+  service: CodingAgentName;
+  /** モデル指定（オプション） */
+  model?: string;
+}
+
+/**
  * コーディングエージェント設定
  * @description SystemConfigに追加するコーディングエージェント設定
  * @see Requirement 8.1: THE Settings page SHALL display available coding agents
  */
 export interface CodingAgentConfig {
-  /** 優先コーディングエージェント名 */
+  /** 優先コーディングエージェント名（グローバルデフォルト） */
   preferredAgent: string;
-  /** エージェント別設定 */
+  /** エージェント別設定（タイムアウト・モデル等） */
   agentSettings: Record<string, CodingAgentSettings>;
   /** 新規プロジェクト時にGitHubリポジトリを自動作成するか */
   autoCreateGithubRepo: boolean;
   /** ワークスペースルートディレクトリ */
   workspaceRoot: string;
+  /** フェーズ別AIサービス設定（オプション、未指定時はpreferredAgentを使用） */
+  phaseServices?: PhaseServiceConfig;
+  /** エージェント（社員）別AIサービスオーバーライド（オプション） */
+  agentOverrides?: AgentServiceOverride[];
 }
 
 /**
@@ -2502,6 +2542,8 @@ export const DEFAULT_CODING_AGENT_CONFIG: CodingAgentConfig = {
   agentSettings: {},
   autoCreateGithubRepo: false,
   workspaceRoot: 'runtime/workspaces',
+  phaseServices: {},
+  agentOverrides: [],
 };
 
 /**
@@ -2518,3 +2560,206 @@ export const VALID_CODING_AGENT_NAMES: CodingAgentName[] = [
   'claude-code',
   'kiro-cli',
 ];
+
+/**
+ * AIサービス検出結果
+ * @description 環境で利用可能なAIサービスの検出結果
+ */
+export interface ServiceDetectionResult {
+  /** サービス名 */
+  name: CodingAgentName;
+  /** 表示名 */
+  displayName: string;
+  /** 利用可能かどうか */
+  available: boolean;
+  /** バージョン情報（検出できた場合） */
+  version: string | null;
+  /** 最終チェック日時（ISO8601） */
+  checkedAt: string;
+}
+
+
+// =============================================================================
+// 社員関連の型定義（Real Company Experience）
+// @see Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4
+// =============================================================================
+
+/**
+ * 社員のリアルタイムステータス
+ * @description 社員が現在何をしているかを表す列挙型
+ * @see Requirement 2.1: idle, working, in_meeting, reviewing, on_break, offline
+ */
+export type EmployeeStatusType =
+  | 'idle'        // 待機中
+  | 'working'     // 作業中
+  | 'in_meeting'  // 会議中
+  | 'reviewing'   // レビュー中
+  | 'on_break'    // 休憩中
+  | 'offline';    // オフライン
+
+/**
+ * 有効な社員ステータス一覧
+ */
+export const VALID_EMPLOYEE_STATUSES: EmployeeStatusType[] = [
+  'idle',
+  'working',
+  'in_meeting',
+  'reviewing',
+  'on_break',
+  'offline',
+];
+
+/**
+ * 社員ステータス
+ * @description 社員のリアルタイム状態情報
+ * @see Requirement 2.1, 2.2
+ */
+export interface EmployeeStatus {
+  /** エージェントID */
+  agentId: string;
+  /** 現在のステータス */
+  status: EmployeeStatusType;
+  /** 現在のタスク情報（オプション） */
+  currentTask?: {
+    /** タスクID */
+    id: string;
+    /** タスクタイトル */
+    title: string;
+  };
+  /** 最終ステータス変更日時（ISO8601形式） */
+  lastChanged: string;
+}
+
+/**
+ * 社員タイムラインエントリ
+ * @description ステータス変化の1エントリ
+ * @see Requirement 2.4
+ */
+export interface EmployeeTimelineEntry {
+  /** ステータス */
+  status: EmployeeStatusType;
+  /** 変更日時（ISO8601形式） */
+  timestamp: string;
+  /** 継続時間（ミリ秒、オプション） */
+  duration?: number;
+}
+
+/**
+ * 社員タイムライン
+ * @description 1日のステータス変化タイムライン
+ * @see Requirement 2.4
+ */
+export interface EmployeeTimeline {
+  /** エージェントID */
+  agentId: string;
+  /** 対象日（YYYY-MM-DD形式） */
+  date: string;
+  /** タイムラインエントリ一覧 */
+  entries: EmployeeTimelineEntry[];
+}
+
+/**
+ * キャリアレベル
+ * @description 社員のキャリアレベルを表す列挙型（Phase 6で使用）
+ * @see Requirement 15.1
+ */
+export type CareerLevel = 'junior' | 'mid' | 'senior' | 'lead' | 'principal';
+
+/**
+ * 有効なキャリアレベル一覧
+ */
+export const VALID_CAREER_LEVELS: CareerLevel[] = [
+  'junior',
+  'mid',
+  'senior',
+  'lead',
+  'principal',
+];
+
+/**
+ * ムードスコア
+ * @description 社員のモチベーション/疲労度スコア（0-100）（Phase 6で使用）
+ * @see Requirement 13.1
+ */
+export type MoodScore = number;
+
+/**
+ * 社員プロフィール
+ * @description registry YAMLから読み取った社員のプロフィール情報
+ * @see Requirement 1.2, 1.4
+ */
+export interface EmployeeProfile {
+  /** エージェントID */
+  agentId: string;
+  /** 役職名 */
+  title: string;
+  /** 役割（manager/worker/reviewer等） */
+  role: string;
+  /** 能力一覧 */
+  capabilities: string[];
+  /** ペルソナ説明 */
+  persona: string;
+  /** 責務一覧 */
+  responsibilities: string[];
+  /** 品質基準（オプション） */
+  qualityGates?: string[];
+}
+
+/**
+ * 社員パフォーマンスサマリー
+ * @description パフォーマンストラッカーからの集計データ
+ * @see Requirement 1.5
+ */
+export interface EmployeePerformanceSummary {
+  /** 成功率（0-100） */
+  successRate: number;
+  /** 平均品質スコア（0-100） */
+  avgQualityScore: number;
+  /** 総タスク数 */
+  totalTasks: number;
+  /** 強み（カテゴリ名一覧） */
+  strengths: string[];
+  /** 弱み（カテゴリ名一覧） */
+  weaknesses: string[];
+  /** 最近のトレンド */
+  recentTrend: 'improving' | 'stable' | 'declining';
+}
+
+/**
+ * 社員概要
+ * @description 社員名簿で表示する統合データ
+ * @see Requirements: 1.1, 1.2, 1.3, 2.1, 2.2
+ */
+export interface EmployeeOverview {
+  /** プロフィール情報 */
+  profile: EmployeeProfile;
+  /** リアルタイムステータス */
+  status: EmployeeStatus;
+  /** パフォーマンスサマリー（オプション） */
+  performance?: EmployeePerformanceSummary;
+  /** ムードスコア（オプション、Phase 6で使用） */
+  moodScore?: MoodScore;
+  /** キャリアレベル（オプション、Phase 6で使用） */
+  careerLevel?: CareerLevel;
+}
+
+/**
+ * 社員ステータス永続化データ
+ * @description runtime/state/employee-status/<agentId>.json の構造
+ * @see Requirement 2.3
+ */
+export interface EmployeeStatusPersistence {
+  /** エージェントID */
+  agentId: string;
+  /** 現在のステータス */
+  status: EmployeeStatusType;
+  /** 現在のタスク情報（オプション） */
+  currentTask?: {
+    id: string;
+    title: string;
+  };
+  /** 最終ステータス変更日時（ISO8601形式） */
+  lastChanged: string;
+  /** 本日のタイムライン */
+  timeline: EmployeeTimelineEntry[];
+}

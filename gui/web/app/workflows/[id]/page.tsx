@@ -154,16 +154,29 @@ export default function WorkflowDetailPage(): JSX.Element {
     { id: 'proposal', label: '提案書', content: <ProposalTab proposal={workflow.proposal} /> },
     { id: 'meetings', label: '会議録', badge: meetings.length, content: <MeetingsTab meetings={meetings} /> },
     { id: 'progress', label: '進捗', content: <ProgressTab subtasks={progress} /> },
-    { id: 'quality', label: '品質', content: <QualityTab quality={quality} currentPhase={workflow.currentPhase} /> },
-    { id: 'approvals', label: '承認履歴', badge: workflow.approvalHistory.length, content: <ApprovalsTab approvals={workflow.approvalHistory} /> },
+    { id: 'quality', label: '品質', content: <QualityTab quality={quality} currentPhase={workflow.currentPhase} workflowId={workflow.workflowId} /> },
+    { id: 'approvals', label: '承認履歴', badge: (workflow.approvalDecisions ?? []).length, content: <ApprovalsTab approvals={workflow.approvalDecisions ?? []} /> },
   ];
 
   return (
     <div className="space-y-6">
       {/* ページヘッダー */}
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">ワークフロー詳細</h1>
-        <p className="text-xs text-text-muted font-mono mt-1">{workflow.workflowId}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">ワークフロー詳細</h1>
+          <p className="text-xs text-text-muted font-mono mt-1">{workflow.workflowId}</p>
+        </div>
+        {/* プレビューボタン（delivery フェーズ以降で表示） */}
+        {(workflow.currentPhase === 'delivery' || workflow.status === 'completed') && (
+          <a
+            href={`/api/workflows/${workflow.workflowId}/preview`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 text-sm bg-accent-primary hover:bg-accent-hover text-text-primary rounded-md transition-colors"
+          >
+            📦 成果物プレビュー
+          </a>
+        )}
       </div>
 
       {/* フェーズ進捗（フル表示） */}

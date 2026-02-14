@@ -99,6 +99,148 @@ Settings画面（`/settings`）にコーディングエージェント設定セ�
 | サブプロセスクラッシュ | stderr 収集、エラー結果返却 |
 | git clone 失敗 | リトライ後、エスカレーション |
 
+## 統一AIサービス選択
+
+### 概要
+
+全ワークフローフェーズ（proposal / development / quality_assurance）で使用するAIサービスを統一的に設定できる機能。フェーズ別・エージェント（社員）別のオーバーライドにも対応する。
+
+### サービス解決優先順位
+
+コーディングエージェントの選択は以下の4段階の優先順位で解決される：
+
+```
+1. agentOverrides（社員別オーバーライド）  ← 最優先
+2. phaseServices（フェーズ別設定）
+3. preferredAgent（グローバルデフォルト）
+4. レジストリのデフォルト優先順位          ← 最低優先
+```
+
+**解決ロジック**（`WorkflowEngine.resolveCodingAgent()`）:
+
+1. `agentOverrides` に該当 `agentId` のエントリがあれば、そのサービスを使用
+2. なければ `phaseServices` の該当フェーズ設定を使用
+3. なければ `preferredAgent`（グローバルデフォルト）を使用
+4. いずれも未設定の場合は `CodingAgentRegistry` のデフォルト優先順位に従う
+
+### 設定構造
+
+```json
+{
+  "codingAgent": {
+    "preferredAgent": "opencode",
+    "agentSettings": {
+      "opencode": { "timeout": 600, "model": "claude-sonnet-4-20250514" },
+      "claude-code": { "timeout": 600 },
+      "kiro-cli": { "timeout": 600 }
+    },
+    "autoCreateGithubRepo": false,
+    "phaseServices": {
+      "proposal": "opencode",
+      "development": "claude-code",
+      "quality_assurance": "opencode"
+    },
+    "agentOverrides": [
+      { "agentId": "reviewer", "service": "claude-code" },
+      { "agentId": "coo_pm", "service": "kiro-cli", "model": "custom-model" }
+    ]
+  }
+}
+```
+
+### 型定義
+
+```typescript
+// tools/cli/lib/execution/types.ts
+
+/** コーディングエージェント名 */
+type CodingAgentName = 'opencode' | 'claude-code' | 'kiro-cli';
+
+/** フェーズ別AIサービス設定 */
+interface PhaseServiceConfig {
+  proposal?: CodingAgentName;
+  development?: CodingAgentName;
+  quality_assurance?: CodingAgentName;
+}
+
+/** エージェント（社員）別AIサービスオーバーライド */
+interface AgentServiceOverride {
+  agentId: string;
+  service: CodingAgentName;
+  model?: string;
+}
+
+/** AIサービス検出結果 */
+interface ServiceDetectionResult {
+  name: CodingAgentName;
+  displayName: string;
+  available: boolean;
+  version: string | null;
+  checkedAt: string;
+}
+```
+
+### サービス検出API
+
+環境にインストールされたCLIツールを自動検出するAPIエンドポイント。
+
+| メソッド | パス | 説明 |
+|----------|------|------|
+| GET | `/api/settings/service-detection` | 利用可能なCLIツールを検出 |
+
+**検出方法**:
+
+| サービス | CLIコマンド | 検出コマンド |
+|---------|------------|-------------|
+| OpenCode | `opencode` | `where opencode` + `opencode --version` |
+| Claude Code | `claude` | `where claude` + `claude --version` |
+| Kiro CLI | `kiro` | `where kiro` + `kiro --version` |
+
+**レスポンス例**:
+
+```json
+{
+  "services": [
+    {
+      "name": "opencode",
+      "displayName": "OpenCode",
+      "available": true,
+      "version": "v1.1.28",
+      "checkedAt": "2026-02-14T10:00:00.000Z"
+    },
+    {
+      "name": "claude-code",
+      "displayName": "Claude Code",
+      "available": false,
+      "version": null,
+      "checkedAt": "2026-02-14T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+### GUI設定画面
+
+Settings画面（`/settings`）のコーディングエージェント設定セクションに以下のUIを提供：
+
+| セクション | 機能 |
+|-----------|------|
+| サービス検出 | 環境で利用可能なCLIツールの表示（バージョン情報付き）、再検出ボタン |
+| フェーズ別設定 | proposal / development / QA 各フェーズで使用するサービスのドロップダウン選択 |
+| エージェント別オーバーライド | 特定エージェントに対するサービス個別指定の追加・削除 |
+
+### 対応コンポーネント
+
+| コンポーネント | ファイル | 変更内容 |
+|---------------|---------|---------|
+| WorkflowEngine | `tools/cli/lib/execution/workflow-engine.ts` | `resolveCodingAgent(phase, agentId)` メソッド追加、4段階優先順位解決 |
+| WorkflowEngineOptions | `tools/cli/lib/execution/workflow-engine.ts` | `phaseServices`, `agentOverrides` フィールド追加 |
+| OrchestratorServer | `tools/cli/lib/execution/orchestrator-server.ts` | `loadCodingAgentConfigSync()` で config.json から設定読み込み |
+| Service Detection API | `gui/web/app/api/settings/service-detection/route.ts` | 新規作成 |
+| Coding Agents API | `gui/web/app/api/settings/coding-agents/route.ts` | `phaseServices`, `agentOverrides` のバリデーション追加 |
+| Settings Page | `gui/web/app/settings/page.tsx` | サービス検出UI、フェーズ別選択、オーバーライドUI追加 |
+| 型定義 | `tools/cli/lib/execution/types.ts` | `PhaseServiceConfig`, `AgentServiceOverride`, `ServiceDetectionResult`, `CodingAgentName` 追加 |
+
 ## テスト
 
 | テストファイル | 内容 |

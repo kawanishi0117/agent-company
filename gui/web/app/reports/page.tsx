@@ -28,6 +28,8 @@ import type { ReportSummary, Report, GroupedReports, ApiResponse, ReportType } f
 const TAB_IDS = {
   DAILY: 'daily',
   WEEKLY: 'weekly',
+  AUTO_DAILY: 'auto-daily',
+  AUTO_WEEKLY: 'auto-weekly',
 } as const;
 
 // =============================================================================
@@ -154,6 +156,121 @@ function useReportDetail(
     isLoading,
     error,
   };
+}
+
+// =============================================================================
+// 自動生成レポート用フック
+// =============================================================================
+
+/** 自動生成レポートの型 */
+interface AutoReport {
+  id: string;
+  date: string;
+  type: 'daily' | 'weekly';
+  summary: string;
+  metrics?: Record<string, number>;
+  generatedAt: string;
+}
+
+/**
+ * 自動生成レポートを取得するカスタムフック
+ * @see Requirements: 4.4, 4.5, 4.6
+ */
+function useAutoReports(): {
+  dailyAuto: AutoReport[];
+  weeklyAuto: AutoReport[];
+  isLoading: boolean;
+} {
+  const [dailyAuto, setDailyAuto] = useState<AutoReport[]>([]);
+  const [weeklyAuto, setWeeklyAuto] = useState<AutoReport[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async (): Promise<void> => {
+      try {
+        const [dailyRes, weeklyRes] = await Promise.all([
+          fetch('/api/reports/daily').catch(() => null),
+          fetch('/api/reports/weekly').catch(() => null),
+        ]);
+        if (dailyRes?.ok) {
+          const json = await dailyRes.json();
+          setDailyAuto(json.data ?? []);
+        }
+        if (weeklyRes?.ok) {
+          const json = await weeklyRes.json();
+          setWeeklyAuto(json.data ?? []);
+        }
+      } catch {
+        // 失敗時は空配列を維持
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
+  return { dailyAuto, weeklyAuto, isLoading };
+}
+
+/** 自動生成レポートカード */
+function AutoReportCard({ report }: { report: AutoReport }): JSX.Element {
+  return (
+    <div className="p-4 rounded-lg bg-bg-tertiary/30 border border-bg-tertiary hover:border-slate-500 transition-colors">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-text-primary">{report.date}</span>
+        <span className="text-xs text-text-muted">
+          {new Date(report.generatedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+        </span>
+      </div>
+      <p className="text-sm text-text-secondary line-clamp-3">{report.summary}</p>
+      {report.metrics && Object.keys(report.metrics).length > 0 && (
+        <div className="flex flex-wrap gap-3 mt-2 pt-2 border-t border-bg-tertiary">
+          {Object.entries(report.metrics).map(([key, val]) => (
+            <span key={key} className="text-xs text-text-muted">
+              {key}: <span className="text-text-secondary font-medium">{val}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 自動生成レポートリスト */
+function AutoReportList({ reports }: { reports: AutoReport[] }): JSX.Element {
+  if (reports.length === 0) {
+    return (
+      <div className="py-12 text-center text-text-muted">
+        自動生成レポートはありません
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {reports.map((r) => (
+        <AutoReportCard key={r.id} report={r} />
+      ))}
+    </div>
+  );
+}
+
+/** 自動生成日報アイコン */
+function AutoDailyIcon(): JSX.Element {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    </svg>
+  );
+}
+
+/** 自動生成週報アイコン */
+function AutoWeeklyIcon(): JSX.Element {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+    </svg>
+  );
 }
 
 // =============================================================================
@@ -508,6 +625,8 @@ function WeeklyIcon(): JSX.Element {
 export default function ReportsPage(): JSX.Element {
   // レポートデータ取得
   const { dailyReports, weeklyReports, isLoading, error, refresh } = useReports();
+  // 自動生成レポートデータ取得
+  const { dailyAuto, weeklyAuto, isLoading: autoLoading } = useAutoReports();
 
   // モーダル状態
   const [selectedReport, setSelectedReport] = useState<{
@@ -597,6 +716,24 @@ export default function ReportsPage(): JSX.Element {
           onReportClick={handleReportClick}
         />
       ),
+    },
+    {
+      id: TAB_IDS.AUTO_DAILY,
+      label: '自動日報',
+      icon: <AutoDailyIcon />,
+      badge: dailyAuto.length,
+      content: autoLoading
+        ? <div className="py-8 text-center text-text-muted">読み込み中...</div>
+        : <AutoReportList reports={dailyAuto} />,
+    },
+    {
+      id: TAB_IDS.AUTO_WEEKLY,
+      label: '自動週報',
+      icon: <AutoWeeklyIcon />,
+      badge: weeklyAuto.length,
+      content: autoLoading
+        ? <div className="py-8 text-center text-text-muted">読み込み中...</div>
+        : <AutoReportList reports={weeklyAuto} />,
     },
   ];
 

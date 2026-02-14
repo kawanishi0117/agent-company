@@ -237,18 +237,58 @@ Merger Agent（ブランチマージ）
 - 両方利用不可の場合は 503 エラー
 - 提案フェーズは Ollama、開発フェーズは CodingAgent と役割分担
 
+### 統一AIサービス選択
+
+全ワークフローフェーズ（proposal / development / QA）で使用するAIサービスを統一的に設定可能。
+
+- **フェーズ別設定**: 各フェーズで異なるAIサービスを指定可能
+- **エージェント別オーバーライド**: 特定のエージェント（社員）に対して個別にサービスを指定可能
+- **サービス検出**: 環境にインストールされたCLIツール（opencode/claude/kiro）を自動検出
+- **GUI設定**: Settings画面でフェーズ別・エージェント別の設定をドロップダウンで選択
+- **4段階優先順位**: agentOverrides > phaseServices > preferredAgent > レジストリデフォルト
+
 ### GUI画面一覧
 
 | パス | 画面 | 機能 |
 |------|------|------|
-| `/dashboard` | Dashboard | リアルタイム実行状況、承認待ち通知 |
+| `/dashboard` | Dashboard | リアルタイム実行状況、承認待ち通知、MVP通知、ムードアラート |
 | `/command` | Command Center | CEO指示入力、ワークフロー開始 |
 | `/backlog` | Backlog | カンバンボード |
 | `/tickets` | Tickets | チケット一覧・作成・詳細 |
 | `/workflows` | Workflows | ワークフロー一覧（フィルタ・ソート） |
 | `/workflows/[id]` | ワークフロー詳細 | 6タブ: 概要/提案書/会議録/進捗/品質/承認履歴 |
+| `/employees` | 社員名簿 | 組織図・リスト・関係性マップビュー、ムード・MVPバッジ |
+| `/employees/[id]` | 社員詳細 | プロフィール・ムード推移・キャリア履歴・パフォーマンス |
+| `/meetings` | 会議一覧 | 朝会・レトロスペクティブ・経営会議 |
+| `/knowledge` | ナレッジベース | 検索・カテゴリフィルタ・エントリ詳細 |
+| `/kpi` | KPI/OKR | 生産性・品質・コスト・成長指標 |
+| `/market` | 市場調査 | 調査リクエスト・レポート一覧 |
 | `/projects` | Projects | プロジェクト管理 |
 | `/runs` | Runs | 実行ログ・成果物 |
 | `/reports` | Reports | 日次/週次レポート |
 | `/review` | Review | レビュー管理 |
 | `/settings` | Settings | コーディングエージェント設定 |
+
+## Real Company Experience（生きた組織機能）
+
+エージェントに人間的な属性を付与し、組織としての学習・成長サイクルを実現する機能群。
+
+### コンポーネント一覧
+
+| コンポーネント | 役割 | ファイル |
+|---------------|------|---------|
+| EmployeeStatusTracker | 社員ステータスのリアルタイム追跡 | `employee-status-tracker.ts` |
+| DailyStandupCoordinator | 朝会の自動開催 | `daily-standup-coordinator.ts` |
+| ReportGenerator | 日報/週報の自動生成 | `report-generator.ts` |
+| ChatLogCapture | エージェント間通信のキャプチャ | `chat-log-capture.ts` |
+| RetrospectiveEngine | ワークフロー完了後の振り返り | `retrospective-engine.ts` |
+| KnowledgeBaseManager | 組織ナレッジの蓄積・検索 | `knowledge-base-manager.ts` |
+| SpecComplianceChecker | 仕様適合チェック | `spec-compliance-checker.ts` |
+| TechDebtTracker | 技術的負債の追跡 | `tech-debt-tracker.ts` |
+| DeliverablePreview | 成果物プレビュー | `deliverable-preview.ts` |
+| ExecutiveMeetingCoordinator | 経営会議の開催 | `executive-meeting-coordinator.ts` |
+| MarketResearchAgent | 市場調査 | `market-research-agent.ts` |
+| MoodTracker | ムード（感情）追跡 | `mood-tracker.ts` |
+| RelationshipTracker | 社員間関係性の追跡 | `relationship-tracker.ts` |
+| CareerManager | キャリアパス管理 | `career-manager.ts` |
+| MVPSelector | MVP選出エンジン | `mvp-selector.ts` |

@@ -44,6 +44,8 @@ import type {
   ApprovalDecision,
   EscalationDecision,
   WorkflowPhase,
+  PhaseServiceConfig,
+  AgentServiceOverride,
 } from './types.js';
 
 // =============================================================================
@@ -175,11 +177,45 @@ export class OrchestratorServer {
 
     // WorkflowEngine に CodingAgentRegistry を接続
     // @see REQ-2.1: OrchestratorServer で WorkflowEngine に CodingAgentRegistry を渡す
+    // config.json からフェーズ別・エージェント別のAIサービス設定を読み込む
+    const codingAgentConfig = this.loadCodingAgentConfigSync();
     this.workflowEngine = config?.workflowEngine
       ?? createWorkflowEngine(meetingCoordinator, this.approvalGate, 'runtime/runs', {
         codingAgentRegistry: this.codingAgentRegistry,
         workspaceManager: createWorkspaceManager(),
+        preferredCodingAgent: codingAgentConfig.preferredAgent,
+        phaseServices: codingAgentConfig.phaseServices,
+        agentOverrides: codingAgentConfig.agentOverrides,
       });
+  }
+
+  /**
+   * config.json からコーディングエージェント設定を同期的に読み込む
+   * @returns フェーズ別・エージェント別設定を含むオブジェクト
+   */
+  private loadCodingAgentConfigSync(): {
+    preferredAgent?: string;
+    phaseServices?: PhaseServiceConfig;
+    agentOverrides?: AgentServiceOverride[];
+  } {
+    try {
+      const fs = require('fs');
+      const configPath = 'runtime/state/config.json';
+      const configJson = fs.readFileSync(configPath, 'utf-8');
+      const parsed = JSON.parse(configJson) as Record<string, unknown>;
+      const codingAgent = parsed.codingAgent as Record<string, unknown> | undefined;
+      if (!codingAgent) {
+        return {};
+      }
+      return {
+        preferredAgent: codingAgent.preferredAgent as string | undefined,
+        phaseServices: codingAgent.phaseServices as PhaseServiceConfig | undefined,
+        agentOverrides: codingAgent.agentOverrides as AgentServiceOverride[] | undefined,
+      };
+    } catch {
+      // config.json が存在しない場合はデフォルト
+      return {};
+    }
   }
 
   /**
@@ -1324,6 +1360,11 @@ export class OrchestratorServer {
         return;
       }
 
+      if (state.status !== 'waiting_approval') {
+        this.sendErrorResponse(res, 400, `ワークフロー ${workflowId} は承認待ちではありません`, 'INVALID_STATE');
+        return;
+      }
+
       const decision: ApprovalDecision = {
         workflowId,
         phase: state.currentPhase,
@@ -1332,7 +1373,14 @@ export class OrchestratorServer {
         decidedAt: new Date().toISOString(),
       };
 
-      await this.approvalGate.submitDecision(workflowId, decision);
+      // ApprovalGateに送信（resolverの有無を返す）
+      const hadResolver = await this.approvalGate.submitDecision(workflowId, decision);
+
+      if (!hadResolver) {
+        // サーバー再起動後: resolverがないのでWorkflowEngine経由で直接処理
+        await this.workflowEngine.submitApprovalDirectly(workflowId, decision);
+      }
+
       this.sendResponse(res, 200, { success: true, data: { message: '承認決定を送信しました' } });
     } catch (error) {
       this.handleRouteError(res, error);

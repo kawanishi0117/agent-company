@@ -238,12 +238,12 @@ describe('ApprovalGate', () => {
       ).rejects.toThrow(ApprovalGateError);
     });
 
-    it('承認待ちでないワークフローにsubmitDecisionするとエラー', async () => {
+    it('承認待ちでないワークフローにsubmitDecisionするとfalseを返す', async () => {
       const decision = createTestDecision();
 
-      await expect(
-        gate.submitDecision('wf-nonexistent', decision)
-      ).rejects.toThrow(ApprovalGateError);
+      // サーバー再起動後のフォールバック対応: エラーではなくfalseを返す
+      const result = await gate.submitDecision('wf-nonexistent', decision);
+      expect(result).toBe(false);
     });
 
     it('submitDecision後は承認待ち状態が解除される (Req 3.7)', async () => {

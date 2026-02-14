@@ -19,6 +19,7 @@ import {
   createMessageQueue,
   MessageQueueConfig,
 } from './message-queue';
+import type { ChatLogCapture, ChatLogType } from './chat-log-capture';
 
 // =============================================================================
 // 定数定義
@@ -147,6 +148,9 @@ export class AgentBus implements IAgentBus {
   /** 初期化済みフラグ */
   private initialized: boolean = false;
 
+  /** チャットログキャプチャ（オプション） */
+  private chatLogCapture: ChatLogCapture | null = null;
+
   /**
    * コンストラクタ
    * @param config - Agent Bus設定（オプション）
@@ -204,6 +208,18 @@ export class AgentBus implements IAgentBus {
   }
 
   /**
+   * ChatLogCaptureを設定する
+   *
+   * 設定すると、メッセージ送信時に自動的にチャットログに記録される。
+   *
+   * @param capture - ChatLogCaptureインスタンス
+   * @see Requirement 5.1: Agent Busメッセージのキャプチャ
+   */
+  setChatLogCapture(capture: ChatLogCapture): void {
+    this.chatLogCapture = capture;
+  }
+
+  /**
    * メッセージを送信
    * @param message - 送信するメッセージ
    * @param options - 送信オプション
@@ -222,6 +238,23 @@ export class AgentBus implements IAgentBus {
     const runId = options?.runId ?? this.extractRunIdFromPayload(message);
     if (runId) {
       await this.logMessage(runId, message);
+    }
+
+    // チャットログにキャプチャ（設定されている場合）
+    if (this.chatLogCapture) {
+      try {
+        await this.chatLogCapture.capture({
+          sender: message.from,
+          recipient: message.to,
+          type: this.mapMessageTypeToChatLogType(message.type),
+          content: typeof message.payload === 'string'
+            ? message.payload
+            : JSON.stringify(message.payload),
+          workflowId: runId ?? undefined,
+        });
+      } catch {
+        // チャットログのキャプチャ失敗はメッセージ送信に影響させない
+      }
     }
   }
 
@@ -681,6 +714,24 @@ export class AgentBus implements IAgentBus {
       'code' in error &&
       (error as NodeJS.ErrnoException).code === 'ENOENT'
     );
+  }
+
+  /**
+   * AgentMessageTypeをChatLogTypeにマッピングする
+   */
+  private mapMessageTypeToChatLogType(type: AgentMessageType): ChatLogType {
+    const mapping: Record<string, ChatLogType> = {
+      task_assign: 'task_assignment',
+      task_complete: 'task_assignment',
+      task_failed: 'task_assignment',
+      review_request: 'review_feedback',
+      review_response: 'review_feedback',
+      escalate: 'escalation',
+      conflict_escalate: 'escalation',
+      status_request: 'general',
+      status_response: 'general',
+    };
+    return mapping[type] ?? 'general';
   }
 
   // ===========================================================================

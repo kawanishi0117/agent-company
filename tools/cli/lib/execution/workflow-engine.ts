@@ -35,6 +35,8 @@ import type {
   ProposalPersistenceData,
   MeetingMinutes,
   WorkerType,
+  PhaseServiceConfig,
+  AgentServiceOverride,
 } from './types.js';
 import { MeetingCoordinator } from './meeting-coordinator.js';
 import { ApprovalGate } from './approval-gate.js';
@@ -45,6 +47,13 @@ import { WorkspaceManager, createWorkspaceManager } from './workspace-manager.js
 import { parseVitestOutput, parseEslintOutput } from './qa-result-parser.js';
 import { AgentPerformanceTracker } from './agent-performance-tracker.js';
 import { EscalationAnalyzer } from './escalation-analyzer.js';
+import { EmployeeStatusTracker } from './employee-status-tracker.js';
+import type { RetrospectiveEngine } from './retrospective-engine.js';
+import type { KnowledgeBaseManager } from './knowledge-base-manager.js';
+import type { SpecComplianceChecker } from './spec-compliance-checker.js';
+import type { TechDebtTracker } from './tech-debt-tracker.js';
+import type { MoodTracker, MoodInput } from './mood-tracker.js';
+import type { RelationshipTracker } from './relationship-tracker.js';
 
 // =============================================================================
 // 定数定義
@@ -216,11 +225,38 @@ export class WorkflowEngine implements IWorkflowEngine {
   /** 優先コーディングエージェント名（オプション） */
   private readonly preferredCodingAgent?: string;
 
+  /** フェーズ別AIサービス設定（オプション） */
+  private readonly phaseServices?: PhaseServiceConfig;
+
+  /** エージェント（社員）別AIサービスオーバーライド（オプション） */
+  private readonly agentOverrides?: AgentServiceOverride[];
+
   /** パフォーマンストラッカー（オプション） */
   private readonly performanceTracker?: AgentPerformanceTracker;
 
   /** エスカレーション分析器（オプション） */
   private readonly escalationAnalyzer?: EscalationAnalyzer;
+
+  /** 社員ステータストラッカー（オプション） */
+  private readonly employeeStatusTracker?: EmployeeStatusTracker;
+
+  /** レトロスペクティブエンジン（オプション） */
+  private readonly retrospectiveEngine?: RetrospectiveEngine;
+
+  /** ナレッジベースマネージャー（オプション） */
+  private readonly knowledgeBaseManager?: KnowledgeBaseManager;
+
+  /** 仕様適合チェッカー（オプション） */
+  private readonly specComplianceChecker?: SpecComplianceChecker;
+
+  /** 技術的負債トラッカー（オプション） */
+  private readonly techDebtTracker?: TechDebtTracker;
+
+  /** ムードトラッカー（オプション） */
+  private readonly moodTracker?: MoodTracker;
+
+  /** 関係性トラッカー（オプション） */
+  private readonly relationshipTracker?: RelationshipTracker;
 
   /**
    * コンストラクタ
@@ -233,11 +269,7 @@ export class WorkflowEngine implements IWorkflowEngine {
     meetingCoordinator: MeetingCoordinator,
     approvalGate: ApprovalGate,
     basePath: string = RUNTIME_RUNS_DIR,
-    options?: {
-      codingAgentRegistry?: CodingAgentRegistry;
-      workspaceManager?: WorkspaceManager;
-      preferredCodingAgent?: string;
-    }
+    options?: WorkflowEngineOptions
   ) {
     this.meetingCoordinator = meetingCoordinator;
     this.approvalGate = approvalGate;
@@ -245,8 +277,17 @@ export class WorkflowEngine implements IWorkflowEngine {
     this.codingAgentRegistry = options?.codingAgentRegistry;
     this.workspaceManager = options?.workspaceManager;
     this.preferredCodingAgent = options?.preferredCodingAgent;
+    this.phaseServices = options?.phaseServices;
+    this.agentOverrides = options?.agentOverrides;
     this.performanceTracker = options?.performanceTracker;
     this.escalationAnalyzer = options?.escalationAnalyzer;
+    this.employeeStatusTracker = options?.employeeStatusTracker;
+    this.retrospectiveEngine = options?.retrospectiveEngine;
+    this.knowledgeBaseManager = options?.knowledgeBaseManager;
+    this.specComplianceChecker = options?.specComplianceChecker;
+    this.techDebtTracker = options?.techDebtTracker;
+    this.moodTracker = options?.moodTracker;
+    this.relationshipTracker = options?.relationshipTracker;
   }
 
   // ===========================================================================
@@ -436,6 +477,94 @@ export class WorkflowEngine implements IWorkflowEngine {
 
     // 永続化
     await this.persistWorkflowState(state);
+  }
+
+  /**
+   * サーバー再起動後にファイルベースで承認を処理する
+   *
+   * pendingResolversが失われた状態で、ワークフロー状態ファイルを直接更新し
+   * フェーズ遷移を実行する。
+   *
+   * @param workflowId - ワークフローID
+   * @param decision - CEO承認決定
+   * @throws {WorkflowEngineError} ワークフローが存在しない、または承認待ちでない場合
+   */
+  async submitApprovalDirectly(
+    workflowId: string,
+    decision: ApprovalDecision
+  ): Promise<void> {
+    // ワークフロー状態を取得（インメモリまたはファイルから）
+    let state = this.workflows.get(workflowId);
+    if (!state) {
+      state = await this.loadWorkflowState(workflowId);
+    }
+    if (!state) {
+      throw new WorkflowEngineError(`ワークフローが見つかりません: ${workflowId}`);
+    }
+    if (state.status !== 'waiting_approval') {
+      throw new WorkflowEngineError(
+        `ワークフロー ${workflowId} は承認待ちではありません（現在: ${state.status}）`
+      );
+    }
+
+    // 承認決定を記録
+    state.approvalDecisions.push(decision);
+    state.updatedAt = new Date().toISOString();
+
+    // 承認対象フェーズを判定（currentPhaseから推定）
+    const isDeliveryApproval = state.currentPhase === 'delivery';
+
+    // CEO決定に応じてフェーズ遷移
+    switch (decision.action) {
+      case 'approve':
+        if (isDeliveryApproval) {
+          // 納品承認 → ワークフロー完了
+          state.status = 'completed';
+          state.updatedAt = new Date().toISOString();
+          await this.persistWorkflowState(state);
+          await this.recordWorkflowPerformance(state, true);
+        } else {
+          // 提案承認 → developmentへ遷移
+          state.status = 'running';
+          await this.persistWorkflowState(state);
+          await this.transitionToPhase(
+            workflowId,
+            'development',
+            'CEO承認: 開発フェーズへ進行（サーバー再起動後の復元承認）'
+          );
+        }
+        break;
+
+      case 'request_revision':
+        state.status = 'running';
+        await this.persistWorkflowState(state);
+        if (isDeliveryApproval) {
+          await this.transitionToPhase(
+            workflowId,
+            'development',
+            `CEO修正要求（納品）: ${decision.feedback ?? '修正が必要です'}（復元承認）`
+          );
+        } else {
+          await this.transitionToPhase(
+            workflowId,
+            'proposal',
+            `CEO修正要求: ${decision.feedback ?? '修正が必要です'}（復元承認）`
+          );
+        }
+        break;
+
+      case 'reject':
+        state.status = 'running';
+        await this.persistWorkflowState(state);
+        await this.terminateWorkflow(
+          workflowId,
+          `CEO却下: ${decision.feedback ?? '却下されました'}（復元承認）`
+        );
+        break;
+
+      default:
+        throw new WorkflowEngineError(`不明な承認アクション: ${String(decision.action)}`);
+    }
   }
 
   /**
@@ -693,15 +822,40 @@ export class WorkflowEngine implements IWorkflowEngine {
       throw new WorkflowEngineError(`ワークフローが見つかりません: ${workflowId}`);
     }
 
+    // 社員ステータス: 会議参加中に更新
+    await this.employeeStatusTracker?.updateStatus(
+      DEFAULT_FACILITATOR_ID, 'in_meeting', { id: workflowId, title: state.instruction }
+    );
+
+    // ナレッジベースから関連する過去の知見を取得し、会議コンテキストに含める
+    let enrichedInstruction = state.instruction;
+    try {
+      const relevantKnowledge = await this.knowledgeBaseManager?.getRelevantForWorkflow(state.instruction);
+      if (relevantKnowledge && relevantKnowledge.length > 0) {
+        const knowledgeContext = relevantKnowledge
+          .slice(0, 5)
+          .map((k) => `- [${k.category}] ${k.title}: ${k.content.slice(0, 100)}`)
+          .join('\n');
+        enrichedInstruction = `${state.instruction}\n\n【過去の関連ナレッジ】\n${knowledgeContext}`;
+      }
+    } catch (_knowledgeError) {
+      // ナレッジ取得失敗は非ブロッキング
+    }
+
     // 1. MeetingCoordinator で会議開催
     const minutes = await this.meetingCoordinator.conveneMeeting(
       workflowId,
-      state.instruction,
+      enrichedInstruction,
       DEFAULT_FACILITATOR_ID
     );
 
     // 会議録IDを記録
     state.meetingMinutesIds.push(minutes.meetingId);
+
+    // 社員ステータス: 会議終了 → 作業中
+    await this.employeeStatusTracker?.updateStatus(
+      DEFAULT_FACILITATOR_ID, 'working', { id: workflowId, title: state.instruction }
+    );
 
     // 2. 会議結果からProposal生成
     const proposal = this.generateProposalFromMeeting(workflowId, minutes);
@@ -713,6 +867,9 @@ export class WorkflowEngine implements IWorkflowEngine {
     state.proposal = proposal;
     state.updatedAt = new Date().toISOString();
     await this.persistWorkflowState(state);
+
+    // 社員ステータス: フェーズ完了 → アイドル
+    await this.employeeStatusTracker?.updateStatus(DEFAULT_FACILITATOR_ID, 'idle');
 
     // 5. approvalフェーズへ遷移
     await this.transitionToPhase(workflowId, 'approval', 'proposalフェーズ完了: 提案書生成済み');
@@ -851,7 +1008,7 @@ export class WorkflowEngine implements IWorkflowEngine {
     );
 
     // コーディングエージェントが利用可能か判定
-    const codingAgent = await this.resolveCodingAgent();
+    const codingAgent = await this.resolveCodingAgent('development');
 
     // 3. 順序に従ってタスクを実行
     for (const taskId of executionOrder) {
@@ -876,6 +1033,12 @@ export class WorkflowEngine implements IWorkflowEngine {
       state.updatedAt = new Date().toISOString();
       await this.persistWorkflowState(state);
 
+      // 社員ステータス: 作業開始
+      const workerId = subtask.workerType ?? 'worker';
+      await this.employeeStatusTracker?.updateStatus(
+        workerId, 'working', { id: subtask.id, title: subtask.title }
+      );
+
       // コーディングタスクかつエージェントが利用可能な場合は実際に実行
       const isCodingTask = subtask.workerType === 'developer' || subtask.workerType === 'test';
 
@@ -895,6 +1058,23 @@ export class WorkflowEngine implements IWorkflowEngine {
           state.updatedAt = new Date().toISOString();
           await this.persistWorkflowState(state);
 
+          // ムード更新: タスク失敗
+          try {
+            const failedRatio = state.progress!.failedTasks / Math.max(1, state.progress!.totalTasks);
+            await this.moodTracker?.updateAfterTask(
+              subtask.workerType ?? 'worker',
+              {
+                recentSuccessRate: 1 - failedRatio,
+                workloadRatio: 0.7,
+                escalationFrequency: 0.3,
+                consecutiveFailureRatio: failedRatio,
+              },
+              `タスク失敗: ${subtask.title}`
+            );
+          } catch (_moodError) {
+            // ムード更新失敗は非ブロッキング
+          }
+
           // エスカレーション生成
           await this.createEscalation(
             workflowId,
@@ -913,6 +1093,11 @@ export class WorkflowEngine implements IWorkflowEngine {
       subtask.reviewStatus = 'pending';
       state.updatedAt = new Date().toISOString();
       await this.persistWorkflowState(state);
+
+      // 社員ステータス: レビュー中
+      await this.employeeStatusTracker?.updateStatus(
+        'reviewer', 'reviewing', { id: subtask.id, title: subtask.title }
+      );
 
       // CodingAgent によるコードレビュー実行
       const reviewResult = await this.executeCodeReview(
@@ -947,6 +1132,29 @@ export class WorkflowEngine implements IWorkflowEngine {
       state.progress!.completedTasks++;
       state.updatedAt = new Date().toISOString();
       await this.persistWorkflowState(state);
+
+      // ムード更新: タスク成功
+      try {
+        const completedRatio = state.progress!.completedTasks / state.progress!.totalTasks;
+        const failedRatio = state.progress!.failedTasks / Math.max(1, state.progress!.totalTasks);
+        await this.moodTracker?.updateAfterTask(
+          subtask.workerType ?? 'worker',
+          {
+            recentSuccessRate: completedRatio,
+            workloadRatio: 0.5,
+            escalationFrequency: 0,
+            consecutiveFailureRatio: 0,
+          },
+          `タスク完了: ${subtask.title}`
+        );
+      } catch (_moodError) {
+        // ムード更新失敗は非ブロッキング
+      }
+
+      // 社員ステータス: タスク完了 → アイドル
+      const completedWorkerId = subtask.workerType ?? 'worker';
+      await this.employeeStatusTracker?.updateStatus(completedWorkerId, 'idle');
+      await this.employeeStatusTracker?.updateStatus('reviewer', 'idle');
     }
 
     // 4. 全タスク完了 → quality_assurance フェーズへ遷移
@@ -965,12 +1173,45 @@ export class WorkflowEngine implements IWorkflowEngine {
    *
    * @returns コーディングエージェントアダプタ、利用不可の場合null
    */
-  private async resolveCodingAgent(): Promise<CodingAgentAdapter | null> {
+  /**
+   * フェーズ・エージェント別にコーディングエージェントを解決する
+   *
+   * 解決優先順位:
+   * 1. agentOverrides（社員別オーバーライド）
+   * 2. phaseServices（フェーズ別設定）
+   * 3. preferredCodingAgent（グローバルデフォルト）
+   * 4. レジストリのデフォルト優先順位
+   *
+   * @param phase - 現在のワークフローフェーズ（オプション）
+   * @param agentId - 実行エージェントID（オプション）
+   * @returns コーディングエージェントアダプタ、利用不可の場合はnull
+   */
+  private async resolveCodingAgent(
+    phase?: WorkflowPhase,
+    agentId?: string
+  ): Promise<CodingAgentAdapter | null> {
     if (!this.codingAgentRegistry) {
       return null;
     }
 
     try {
+      // 1. エージェント（社員）別オーバーライドを確認
+      if (agentId && this.agentOverrides && this.agentOverrides.length > 0) {
+        const override = this.agentOverrides.find((o) => o.agentId === agentId);
+        if (override) {
+          return await this.codingAgentRegistry.selectAdapter(override.service);
+        }
+      }
+
+      // 2. フェーズ別設定を確認
+      if (phase && this.phaseServices) {
+        const phaseService = this.phaseServices[phase as keyof PhaseServiceConfig];
+        if (phaseService) {
+          return await this.codingAgentRegistry.selectAdapter(phaseService);
+        }
+      }
+
+      // 3. グローバルデフォルト
       return await this.codingAgentRegistry.selectAdapter(this.preferredCodingAgent);
     } catch (_error) {
       // 利用可能なエージェントがない場合はシミュレーションにフォールバック
@@ -1242,8 +1483,13 @@ export class WorkflowEngine implements IWorkflowEngine {
       throw new WorkflowEngineError(`ワークフローが見つかりません: ${workflowId}`);
     }
 
+    // 社員ステータス: QA担当を作業中に更新
+    await this.employeeStatusTracker?.updateStatus(
+      'quality_authority', 'reviewing', { id: workflowId, title: 'QA: ' + state.instruction }
+    );
+
     // コーディングエージェントを取得（QA実行用）
-    const codingAgent = await this.resolveCodingAgent();
+    const codingAgent = await this.resolveCodingAgent('quality_assurance');
 
     let lintResult: { passed: boolean; errorCount: number; warningCount: number; details: string };
     let testResult: { passed: boolean; total: number; passed_count: number; failed_count: number; coverage: number };
@@ -1358,6 +1604,29 @@ export class WorkflowEngine implements IWorkflowEngine {
       lintResult.passed && testResult.passed && finalReviewResult.passed;
 
     if (qualityGatePassed) {
+      // 社員ステータス: QA完了 → アイドル
+      await this.employeeStatusTracker?.updateStatus('quality_authority', 'idle');
+
+      // 技術的負債スナップショットを記録
+      try {
+        await this.techDebtTracker?.recordSnapshot({
+          date: new Date().toISOString().split('T')[0],
+          projectId: state.projectId,
+          workflowId,
+          metrics: {
+            lintErrors: lintResult.errorCount,
+            lintWarnings: lintResult.warningCount,
+            testCoverage: testResult.coverage,
+            testPassRate: testResult.total > 0
+              ? Math.round((testResult.passed_count / testResult.total) * 100)
+              : 100,
+            totalTests: testResult.total,
+          },
+        });
+      } catch (_techDebtError) {
+        // 技術的負債記録失敗は非ブロッキング
+      }
+
       // 全チェック合格: deliveryフェーズへ遷移
       await this.transitionToPhase(
         workflowId,
@@ -1365,6 +1634,29 @@ export class WorkflowEngine implements IWorkflowEngine {
         '品質確認フェーズ完了: 全品質ゲート通過、納品フェーズへ進行'
       );
     } else {
+      // 社員ステータス: QA完了 → アイドル
+      await this.employeeStatusTracker?.updateStatus('quality_authority', 'idle');
+
+      // 技術的負債スナップショットを記録（失敗時も記録）
+      try {
+        await this.techDebtTracker?.recordSnapshot({
+          date: new Date().toISOString().split('T')[0],
+          projectId: state.projectId,
+          workflowId,
+          metrics: {
+            lintErrors: lintResult.errorCount,
+            lintWarnings: lintResult.warningCount,
+            testCoverage: testResult.coverage,
+            testPassRate: testResult.total > 0
+              ? Math.round((testResult.passed_count / testResult.total) * 100)
+              : 0,
+            totalTests: testResult.total,
+          },
+        });
+      } catch (_techDebtError) {
+        // 技術的負債記録失敗は非ブロッキング
+      }
+
       // 品質ゲート失敗: developmentフェーズに戻す
       await this.transitionToPhase(
         workflowId,
@@ -1391,6 +1683,11 @@ export class WorkflowEngine implements IWorkflowEngine {
     if (!state) {
       throw new WorkflowEngineError(`ワークフローが見つかりません: ${workflowId}`);
     }
+
+    // 社員ステータス: COO/PMが納品作業中
+    await this.employeeStatusTracker?.updateStatus(
+      DEFAULT_FACILITATOR_ID, 'working', { id: workflowId, title: '納品準備: ' + state.instruction }
+    );
 
     // Proposal の taskBreakdown から変更一覧を生成
     const changes: ChangeEntry[] = state.proposal
@@ -1450,6 +1747,29 @@ export class WorkflowEngine implements IWorkflowEngine {
       artifacts,
       createdAt: new Date().toISOString(),
     };
+
+    // 仕様適合チェック（SpecComplianceChecker）
+    try {
+      if (this.specComplianceChecker && state.proposal) {
+        const proposalInfo = {
+          tasks: state.proposal.taskBreakdown.map((t) => t.title),
+          expectedFiles: artifacts,
+          requirements: state.proposal.taskBreakdown.map((t) => t.description ?? t.title),
+        };
+        const complianceReport = await this.specComplianceChecker.check(
+          workflowId,
+          proposalInfo,
+          artifacts
+        );
+        // 適合率80%未満の場合はサマリーに警告を追加
+        if (this.specComplianceChecker.needsCeoReview(complianceReport)) {
+          deliverable.summaryReport += `\n\n⚠️ 仕様適合率: ${complianceReport.compliancePercentage}%（CEOレビュー推奨）`;
+        }
+      }
+    } catch (_complianceError) {
+      // 仕様適合チェック失敗は非ブロッキング
+    }
+
     state.deliverable = deliverable;
     state.updatedAt = new Date().toISOString();
 
@@ -1474,8 +1794,26 @@ export class WorkflowEngine implements IWorkflowEngine {
         state.updatedAt = new Date().toISOString();
         await this.persistWorkflowState(state);
 
+        // 社員ステータス: 全員アイドルに戻す
+        await this.employeeStatusTracker?.updateStatus(DEFAULT_FACILITATOR_ID, 'idle');
+
         // パフォーマンス記録（成功）
         await this.recordWorkflowPerformance(state, true);
+
+        // レトロスペクティブを自動実施
+        try {
+          const participants = state.proposal
+            ? [...new Set(state.proposal.taskBreakdown.map((t) => t.workerType ?? 'worker'))]
+            : ['worker'];
+          participants.push(DEFAULT_FACILITATOR_ID, 'reviewer');
+          await this.retrospectiveEngine?.conductRetrospective(workflowId, {
+            instruction: state.instruction,
+            participants,
+            outcome: 'success',
+          });
+        } catch (_retroError) {
+          // レトロスペクティブ失敗は非ブロッキング
+        }
         break;
 
       case 'request_revision':
@@ -1703,36 +2041,54 @@ export class WorkflowEngine implements IWorkflowEngine {
    * @see Requirement 1.3: THE Workflow_Engine SHALL persist the current phase and transition history
    * @see Requirement 13.1: THE Workflow_Engine SHALL persist the complete workflow state
    */
-  private async persistWorkflowState(state: WorkflowState): Promise<void> {
-    try {
-      const dirPath = path.join(this.basePath, state.workflowId);
-      await fs.mkdir(dirPath, { recursive: true });
+  /**
+     * ワークフロー状態を永続化する
+     *
+     * proposal, deliverable, progress, qualityResults, escalation を含む
+     * 完全なワークフロー状態をファイルに保存する。
+     *
+     * @param state - ワークフロー状態
+     * @throws {WorkflowEngineError} 永続化に失敗した場合
+     * @see Requirement 1.3: THE Workflow_Engine SHALL persist the current phase and transition history
+     * @see Requirement 13.1: THE Workflow_Engine SHALL persist the complete workflow state
+     */
+    private async persistWorkflowState(state: WorkflowState): Promise<void> {
+      try {
+        const dirPath = path.join(this.basePath, state.workflowId);
+        await fs.mkdir(dirPath, { recursive: true });
 
-      const filePath = path.join(dirPath, WORKFLOW_STATE_FILE);
-      const data: WorkflowPersistenceData = {
-        workflowId: state.workflowId,
-        runId: state.runId,
-        projectId: state.projectId,
-        instruction: state.instruction,
-        currentPhase: state.currentPhase,
-        status: state.status,
-        phaseHistory: state.phaseHistory,
-        approvalDecisions: state.approvalDecisions,
-        workerAssignments: state.workerAssignments,
-        errorLog: state.errorLog,
-        meetingMinutesIds: state.meetingMinutesIds,
-        createdAt: state.createdAt,
-        updatedAt: state.updatedAt,
-      };
+        const filePath = path.join(dirPath, WORKFLOW_STATE_FILE);
+        const data: WorkflowPersistenceData = {
+          workflowId: state.workflowId,
+          runId: state.runId,
+          projectId: state.projectId,
+          instruction: state.instruction,
+          currentPhase: state.currentPhase,
+          status: state.status,
+          phaseHistory: state.phaseHistory,
+          approvalDecisions: state.approvalDecisions,
+          workerAssignments: state.workerAssignments,
+          errorLog: state.errorLog,
+          meetingMinutesIds: state.meetingMinutesIds,
+          // サーバー再起動後も復元可能にするため、全オプショナルフィールドを永続化
+          proposal: state.proposal,
+          deliverable: state.deliverable,
+          progress: state.progress,
+          qualityResults: state.qualityResults,
+          escalation: state.escalation,
+          createdAt: state.createdAt,
+          updatedAt: state.updatedAt,
+        };
 
-      const json = JSON.stringify(data, null, 2);
-      await fs.writeFile(filePath, json, 'utf-8');
-    } catch (error) {
-      throw new WorkflowEngineError(
-        `ワークフロー状態の永続化に失敗しました: ${error instanceof Error ? error.message : String(error)}`
-      );
+        const json = JSON.stringify(data, null, 2);
+        await fs.writeFile(filePath, json, 'utf-8');
+      } catch (error) {
+        throw new WorkflowEngineError(
+          `ワークフロー状態の永続化に失敗しました: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
-  }
+
 
   /**
    * 提案書を永続化する
@@ -1836,15 +2192,39 @@ export class WorkflowEngine implements IWorkflowEngine {
       }
     }
 
-    // 復元されたワークフローのうち、running状態のものを再開
+    // 復元されたワークフローのうち、状態に応じた復元処理を実行
     for (const [workflowId, state] of this.workflows) {
+      // 全ワークフロー共通: 会議録をインメモリに復元
+      if (state.meetingMinutesIds.length > 0) {
+        await this.meetingCoordinator.restoreMeetingsForWorkflow(
+          workflowId,
+          state.meetingMinutesIds
+        );
+      }
+
       if (state.status === 'running') {
         // 現在のフェーズを再実行
         this.executePhase(workflowId).catch((error: unknown) => {
           this.handlePhaseError(workflowId, state.currentPhase, error);
         });
       }
-      // waiting_approval: そのまま待機状態を維持（何もしない）
+
+      if (state.status === 'waiting_approval') {
+        // 承認履歴をファイルから復元
+        await this.approvalGate.loadApprovals(workflowId);
+
+        // pendingApprovals をインメモリに復元（GUIのgetPendingApprovalsが正しく動作するため）
+        // resolverは復元しない（submitApprovalDirectlyで代替）
+        const isDeliveryPhase = state.currentPhase === 'delivery';
+        const content = isDeliveryPhase ? state.deliverable : state.proposal;
+        if (content) {
+          this.approvalGate.restorePendingApproval(
+            workflowId,
+            state.currentPhase,
+            content
+          );
+        }
+      }
       // completed / terminated: 何もしない
     }
 
@@ -2005,12 +2385,30 @@ export interface WorkflowEngineOptions {
   codingAgentRegistry?: CodingAgentRegistry;
   /** ワークスペースマネージャー（git操作用） */
   workspaceManager?: WorkspaceManager;
-  /** 優先コーディングエージェント名 */
+  /** 優先コーディングエージェント名（グローバルデフォルト） */
   preferredCodingAgent?: string;
+  /** フェーズ別AIサービス設定（フェーズごとに異なるエージェントを使用可能） */
+  phaseServices?: PhaseServiceConfig;
+  /** エージェント（社員）別AIサービスオーバーライド */
+  agentOverrides?: AgentServiceOverride[];
   /** パフォーマンストラッカー（エージェント実績記録用） */
   performanceTracker?: AgentPerformanceTracker;
   /** エスカレーション分析器（エスカレーション履歴記録用） */
   escalationAnalyzer?: EscalationAnalyzer;
+  /** 社員ステータストラッカー（リアルタイムステータス更新用） */
+  employeeStatusTracker?: EmployeeStatusTracker;
+  /** レトロスペクティブエンジン（振り返り自動実施用） */
+  retrospectiveEngine?: RetrospectiveEngine;
+  /** ナレッジベースマネージャー（過去の知見参照用） */
+  knowledgeBaseManager?: KnowledgeBaseManager;
+  /** 仕様適合チェッカー（成果物の仕様適合確認用） */
+  specComplianceChecker?: SpecComplianceChecker;
+  /** 技術的負債トラッカー（QAメトリクス記録用） */
+  techDebtTracker?: TechDebtTracker;
+  /** ムードトラッカー（エージェントモチベーション追跡用） */
+  moodTracker?: MoodTracker;
+  /** 関係性トラッカー（社員間インタラクション記録用） */
+  relationshipTracker?: RelationshipTracker;
 }
 
 /**

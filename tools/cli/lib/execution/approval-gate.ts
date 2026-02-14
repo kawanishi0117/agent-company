@@ -82,14 +82,17 @@ export interface IApprovalGate {
    *
    * 対応するrequestApprovalのPromiseをresolveし、
    * 決定を永続化する。
+   * サーバー再起動後はresolverが失われるため、
+   * 戻り値でresolverの有無を通知する。
    *
    * @param workflowId - ワークフローID
    * @param decision - CEO承認決定
-   * @throws {ApprovalGateError} 承認待ちでない場合
+   * @returns resolverが存在したかどうか（false = フォールバック処理が必要）
+   * @throws {ApprovalGateError} 永続化に失敗した場合
    * @see Requirement 3.2: Support three CEO actions: approve, request_revision, reject
    * @see Requirement 3.6: Persist CEO decision and feedback to approvals.json
    */
-  submitDecision(workflowId: string, decision: ApprovalDecision): Promise<void>;
+  submitDecision(workflowId: string, decision: ApprovalDecision): Promise<boolean>;
 
   /**
    * 承認待ちアイテム一覧を取得する
@@ -110,6 +113,19 @@ export interface IApprovalGate {
    * @returns 承認待ちの場合true
    */
   isWaitingApproval(workflowId: string): boolean;
+
+  /**
+   * サーバー再起動後に承認待ちアイテムをインメモリに復元する
+   * @param workflowId - ワークフローID
+   * @param phase - 承認待ちフェーズ
+   * @param content - 承認対象コンテンツ（提案書または納品物）
+   * @see Requirement 13.2
+   */
+  restorePendingApproval(
+    workflowId: string,
+    phase: WorkflowPhase,
+    content: Proposal | Deliverable
+  ): void;
 }
 
 // =============================================================================
@@ -218,24 +234,21 @@ export class ApprovalGate implements IApprovalGate {
    * 対応するrequestApprovalのPromiseをresolveし、
    * 決定を承認履歴に追加して永続化する。
    *
+   * サーバー再起動後など、pendingResolversが失われている場合でも
+   * ファイルベースで承認履歴を永続化する（フォールバック）。
+   *
    * @param workflowId - ワークフローID
    * @param decision - CEO承認決定
-   * @throws {ApprovalGateError} 承認待ちでない場合、または永続化に失敗した場合
+   * @returns resolverが存在したかどうか（false = フォールバック処理が必要）
+   * @throws {ApprovalGateError} 永続化に失敗した場合
    * @see Requirement 3.2: approve, request_revision, reject
    * @see Requirement 3.6: persist CEO decision and feedback
    */
   async submitDecision(
     workflowId: string,
     decision: ApprovalDecision
-  ): Promise<void> {
-    const resolver = this.pendingResolvers.get(workflowId);
-    if (!resolver) {
-      throw new ApprovalGateError(
-        `ワークフロー ${workflowId} は承認待ちではありません`
-      );
-    }
-
-    // 承認履歴に追加
+  ): Promise<boolean> {
+    // 承認履歴に追加（resolver有無に関わらず）
     const history = this.approvalHistory.get(workflowId) ?? [];
     history.push(decision);
     this.approvalHistory.set(workflowId, history);
@@ -243,12 +256,19 @@ export class ApprovalGate implements IApprovalGate {
     // 承認データを永続化
     await this.persistApprovals(workflowId, history);
 
-    // 承認待ち状態をクリア
-    this.pendingResolvers.delete(workflowId);
-    this.pendingApprovals.delete(workflowId);
+    // インメモリのresolverが存在する場合はresolve
+    const resolver = this.pendingResolvers.get(workflowId);
+    if (resolver) {
+      this.pendingResolvers.delete(workflowId);
+      this.pendingApprovals.delete(workflowId);
+      resolver.resolve(decision);
+      return true;
+    }
 
-    // requestApprovalのPromiseをresolve
-    resolver.resolve(decision);
+    // resolverがない場合（サーバー再起動後など）
+    // 承認待ち状態をクリアし、呼び出し元にフォールバック処理を委譲
+    this.pendingApprovals.delete(workflowId);
+    return false;
   }
 
   /**
@@ -317,6 +337,37 @@ export class ApprovalGate implements IApprovalGate {
         `承認履歴の読み込みに失敗しました: ${error instanceof Error ? error.message : String(error)}`
       );
     }
+  }
+
+  /**
+   * サーバー再起動後に承認待ちアイテムをインメモリに復元する
+   *
+   * pendingResolvers は復元しない（submitApprovalDirectly で代替）。
+   * pendingApprovals のみ復元し、GUIの getPendingApprovals() が
+   * 正しい結果を返せるようにする。
+   *
+   * @param workflowId - ワークフローID
+   * @param phase - 承認待ちフェーズ
+   * @param content - 承認対象コンテンツ（提案書または納品物）
+   * @see Requirement 13.2: THE Workflow_Engine SHALL restore workflow state on system restart
+   */
+  restorePendingApproval(
+    workflowId: string,
+    phase: WorkflowPhase,
+    content: Proposal | Deliverable
+  ): void {
+    // 既に登録済みの場合はスキップ
+    if (this.pendingApprovals.has(workflowId)) {
+      return;
+    }
+
+    const pendingApproval: PendingApproval = {
+      workflowId,
+      phase,
+      content,
+      createdAt: new Date().toISOString(),
+    };
+    this.pendingApprovals.set(workflowId, pendingApproval);
   }
 
   // ===========================================================================

@@ -24,6 +24,7 @@ import type {
   RunId,
 } from './types.js';
 import { AgentBus } from './agent-bus.js';
+import type { RelationshipTracker } from './relationship-tracker.js';
 
 // =============================================================================
 // 定数定義
@@ -124,6 +125,18 @@ export interface IMeetingCoordinator {
    * @see Requirement 2.7
    */
   saveMeetingMinutes(minutes: MeetingMinutes): Promise<void>;
+
+  /**
+   * ワークフローの会議録をファイルからインメモリに復元する
+   * @param workflowId - ワークフローID
+   * @param meetingMinutesIds - 復元対象の会議録ID一覧
+   * @returns 復元された会議録の数
+   * @see Requirement 13.2
+   */
+  restoreMeetingsForWorkflow(
+    workflowId: string,
+    meetingMinutesIds: string[]
+  ): Promise<number>;
 }
 
 // =============================================================================
@@ -159,14 +172,23 @@ export class MeetingCoordinator implements IMeetingCoordinator {
   /** 会議録保存ベースパス（テスト時にオーバーライド可能） */
   private readonly basePath: string;
 
+  /** 関係性トラッカー（オプション） */
+  private readonly relationshipTracker?: RelationshipTracker;
+
   /**
    * コンストラクタ
    * @param agentBus - エージェント間通信バス
    * @param basePath - 会議録保存ベースパス（デフォルト: 'runtime/state/runs'）
+   * @param relationshipTracker - 関係性トラッカー（オプション）
    */
-  constructor(agentBus: AgentBus, basePath: string = RUNTIME_RUNS_DIR) {
+  constructor(
+    agentBus: AgentBus,
+    basePath: string = RUNTIME_RUNS_DIR,
+    relationshipTracker?: RelationshipTracker
+  ) {
     this.agentBus = agentBus;
     this.basePath = basePath;
+    this.relationshipTracker = relationshipTracker;
   }
 
   /**
@@ -672,6 +694,26 @@ export class MeetingCoordinator implements IMeetingCoordinator {
       // 7. ファイルに永続化
       await this.saveMeetingMinutes(minutes);
 
+      // 8. 参加者間のインタラクションを記録（RelationshipTracker）
+      try {
+        if (this.relationshipTracker && minutes.participants.length > 1) {
+          const participantIds = minutes.participants.map((p) => p.agentId);
+          for (let i = 0; i < participantIds.length; i++) {
+            for (let j = i + 1; j < participantIds.length; j++) {
+              await this.relationshipTracker.recordInteraction({
+                agentA: participantIds[i],
+                agentB: participantIds[j],
+                type: 'meeting',
+                timestamp: new Date().toISOString(),
+                workflowId,
+              });
+            }
+          }
+        }
+      } catch (_relationshipError) {
+        // 関係性記録失敗は非ブロッキング
+      }
+
       return minutes;
     } catch (error) {
       if (error instanceof MeetingCoordinatorError) {
@@ -821,6 +863,48 @@ export class MeetingCoordinator implements IMeetingCoordinator {
    */
   private getMeetingMinutesDir(workflowId: string): string {
     return path.join(this.basePath, workflowId, MEETING_MINUTES_DIR);
+  }
+
+  /**
+   * ワークフローの会議録をファイルからインメモリに復元する
+   *
+   * サーバー再起動後に、永続化された会議録ファイルを読み込み、
+   * meetingStore と workflowMeetings のインメモリマップを再構築する。
+   *
+   * @param workflowId - ワークフローID
+   * @param meetingMinutesIds - 復元対象の会議録ID一覧
+   * @returns 復元された会議録の数
+   * @see Requirement 13.2: THE Workflow_Engine SHALL restore workflow state on system restart
+   */
+  async restoreMeetingsForWorkflow(
+    workflowId: string,
+    meetingMinutesIds: string[]
+  ): Promise<number> {
+    let restoredCount = 0;
+
+    for (const meetingId of meetingMinutesIds) {
+      // 既にインメモリにある場合はスキップ
+      if (this.meetingStore.has(meetingId)) {
+        restoredCount++;
+        continue;
+      }
+
+      const minutes = await this.loadMeetingMinutes(workflowId, meetingId);
+      if (minutes) {
+        // インメモリストアに復元
+        this.meetingStore.set(meetingId, minutes);
+        restoredCount++;
+      }
+    }
+
+    // workflowMeetings マップも復元
+    if (meetingMinutesIds.length > 0) {
+      const existing = this.workflowMeetings.get(workflowId) ?? [];
+      const merged = [...new Set([...existing, ...meetingMinutesIds])];
+      this.workflowMeetings.set(workflowId, merged);
+    }
+
+    return restoredCount;
   }
 
   /**

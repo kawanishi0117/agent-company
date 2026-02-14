@@ -74,6 +74,39 @@ interface CodingAgentSettings {
   agentSettings: Record<string, AgentSetting>;
   /** 新規プロジェクト時にGitHubリポジトリを自動作成するか */
   autoCreateGithubRepo: boolean;
+  /** フェーズ別AIサービス設定 */
+  phaseServices?: PhaseServiceConfig;
+  /** エージェント（社員）別AIサービスオーバーライド */
+  agentOverrides?: AgentServiceOverride[];
+}
+
+/**
+ * フェーズ別AIサービス設定
+ */
+interface PhaseServiceConfig {
+  proposal?: string;
+  development?: string;
+  quality_assurance?: string;
+}
+
+/**
+ * エージェント（社員）別AIサービスオーバーライド
+ */
+interface AgentServiceOverride {
+  agentId: string;
+  service: string;
+  model?: string;
+}
+
+/**
+ * サービス検出結果
+ */
+interface ServiceDetectionResult {
+  name: string;
+  displayName: string;
+  available: boolean;
+  version: string | null;
+  checkedAt: string;
 }
 
 /**
@@ -84,7 +117,6 @@ interface AgentInfo {
   displayName: string;
   command: string;
   description: string;
-}
 }
 
 // =============================================================================
@@ -121,6 +153,15 @@ const MEMORY_OPTIONS = ['1g', '2g', '4g', '8g', '16g'];
  */
 const CPU_OPTIONS = ['1', '2', '4', '8'];
 
+/**
+ * ワークフローフェーズ定義（表示用）
+ */
+const WORKFLOW_PHASES = [
+  { key: 'proposal' as const, label: '提案フェーズ', description: '会議・提案書生成' },
+  { key: 'development' as const, label: '開発フェーズ', description: 'コーディング・実装' },
+  { key: 'quality_assurance' as const, label: 'QAフェーズ', description: 'lint/test・品質確認' },
+];
+
 // =============================================================================
 // コンポーネント
 // =============================================================================
@@ -145,6 +186,10 @@ export default function SettingsPage(): JSX.Element {
   const [codingAgentLoading, setCodingAgentLoading] = useState(true);
   const [codingAgentSaving, setCodingAgentSaving] = useState(false);
   const [connectionTestResults, setConnectionTestResults] = useState<Record<string, 'testing' | 'available' | 'unavailable'>>({});
+
+  // サービス検出結果の状態
+  const [detectedServices, setDetectedServices] = useState<ServiceDetectionResult[]>([]);
+  const [serviceDetecting, setServiceDetecting] = useState(false);
 
   // 設定を読み込む
   const loadSettings = useCallback(async () => {
@@ -187,11 +232,31 @@ export default function SettingsPage(): JSX.Element {
     }
   }, []);
 
+  /**
+   * 環境で利用可能なAIサービスを検出する
+   */
+  const detectServices = useCallback(async () => {
+    try {
+      setServiceDetecting(true);
+      const response = await fetch('/api/settings/service-detection');
+      const result = await response.json();
+
+      if (result.data?.services) {
+        setDetectedServices(result.data.services);
+      }
+    } catch {
+      // 検出失敗は無視
+    } finally {
+      setServiceDetecting(false);
+    }
+  }, []);
+
   // 初回読み込み
   useEffect(() => {
     loadSettings();
     loadCodingAgentSettings();
-  }, [loadSettings, loadCodingAgentSettings]);
+    detectServices();
+  }, [loadSettings, loadCodingAgentSettings, detectServices]);
 
   // 設定を保存する
   const saveSettings = async () => {
@@ -557,6 +622,168 @@ export default function SettingsPage(): JSX.Element {
               </p>
             </div>
 
+            {/* サービス検出結果 */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-medium text-text-secondary">
+                  環境のサービス検出
+                </label>
+                <button
+                  onClick={detectServices}
+                  disabled={serviceDetecting}
+                  className="px-3 py-1 text-xs rounded-md border border-bg-tertiary text-text-secondary hover:border-accent-primary hover:text-accent-primary transition-colors disabled:opacity-50"
+                >
+                  {serviceDetecting ? '検出中...' : '再検出'}
+                </button>
+              </div>
+              {detectedServices.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {detectedServices.map((svc) => (
+                    <div
+                      key={svc.name}
+                      className={`p-3 rounded-lg border ${
+                        svc.available
+                          ? 'border-status-pass/40 bg-status-pass/5'
+                          : 'border-bg-tertiary bg-bg-primary/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`w-2 h-2 rounded-full ${svc.available ? 'bg-status-pass' : 'bg-text-muted'}`} />
+                        <span className="text-sm font-medium text-text-primary">{svc.displayName}</span>
+                      </div>
+                      <p className="text-xs text-text-muted">
+                        {svc.available
+                          ? `v${svc.version ?? '不明'}`
+                          : '未インストール'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-text-muted">サービス検出結果がありません。「再検出」を押してください。</p>
+              )}
+            </div>
+
+            {/* フェーズ別AIサービス設定 */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                フェーズ別AIサービス設定
+              </label>
+              <p className="text-xs text-text-muted mb-3">
+                各ワークフローフェーズで使用するAIサービスを個別に指定できます。未指定の場合は上記の優先エージェントが使用されます。
+              </p>
+              <div className="space-y-2">
+                {WORKFLOW_PHASES.map((phase) => {
+                  const currentValue = codingAgentSettings.phaseServices?.[phase.key] ?? '';
+                  return (
+                    <div key={phase.key} className="flex items-center gap-3 p-3 rounded-lg border border-bg-tertiary">
+                      <div className="min-w-[140px]">
+                        <div className="text-sm font-medium text-text-primary">{phase.label}</div>
+                        <div className="text-xs text-text-muted">{phase.description}</div>
+                      </div>
+                      <select
+                        value={currentValue}
+                        onChange={(e) => {
+                          const val = e.target.value || undefined;
+                          setCodingAgentSettings({
+                            ...codingAgentSettings,
+                            phaseServices: {
+                              ...codingAgentSettings.phaseServices,
+                              [phase.key]: val,
+                            },
+                          });
+                        }}
+                        className="flex-1 px-2 py-1.5 text-sm bg-bg-primary border border-bg-tertiary rounded-md text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                      >
+                        <option value="">デフォルト（優先エージェント）</option>
+                        {agentInfoList.map((agent) => {
+                          const detected = detectedServices.find((s) => s.name === agent.name);
+                          const available = detected?.available ?? false;
+                          return (
+                            <option key={agent.name} value={agent.name}>
+                              {agent.displayName}{available ? '' : ' (未検出)'}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* エージェント（社員）別オーバーライド */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-text-secondary">
+                  社員別AIサービスオーバーライド
+                </label>
+                <button
+                  onClick={() => {
+                    const overrides = codingAgentSettings.agentOverrides ?? [];
+                    setCodingAgentSettings({
+                      ...codingAgentSettings,
+                      agentOverrides: [...overrides, { agentId: '', service: agentInfoList[0]?.name ?? 'opencode' }],
+                    });
+                  }}
+                  className="px-3 py-1 text-xs rounded-md border border-bg-tertiary text-text-secondary hover:border-accent-primary hover:text-accent-primary transition-colors"
+                >
+                  + 追加
+                </button>
+              </div>
+              <p className="text-xs text-text-muted mb-3">
+                特定のエージェント（社員）に対して、使用するAIサービスを個別に指定できます。フェーズ設定より優先されます。
+              </p>
+              {(codingAgentSettings.agentOverrides ?? []).length > 0 ? (
+                <div className="space-y-2">
+                  {(codingAgentSettings.agentOverrides ?? []).map((override, idx) => (
+                    <div key={idx} className="flex items-center gap-2 p-3 rounded-lg border border-bg-tertiary">
+                      <input
+                        type="text"
+                        value={override.agentId}
+                        onChange={(e) => {
+                          const overrides = [...(codingAgentSettings.agentOverrides ?? [])];
+                          overrides[idx] = { ...overrides[idx], agentId: e.target.value };
+                          setCodingAgentSettings({ ...codingAgentSettings, agentOverrides: overrides });
+                        }}
+                        placeholder="エージェントID（例: coo_pm）"
+                        className="flex-1 px-2 py-1.5 text-sm bg-bg-primary border border-bg-tertiary rounded-md text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                      />
+                      <select
+                        value={override.service}
+                        onChange={(e) => {
+                          const overrides = [...(codingAgentSettings.agentOverrides ?? [])];
+                          overrides[idx] = { ...overrides[idx], service: e.target.value };
+                          setCodingAgentSettings({ ...codingAgentSettings, agentOverrides: overrides });
+                        }}
+                        className="w-40 px-2 py-1.5 text-sm bg-bg-primary border border-bg-tertiary rounded-md text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                      >
+                        {agentInfoList.map((agent) => (
+                          <option key={agent.name} value={agent.name}>{agent.displayName}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => {
+                          const overrides = (codingAgentSettings.agentOverrides ?? []).filter((_, i) => i !== idx);
+                          setCodingAgentSettings({ ...codingAgentSettings, agentOverrides: overrides });
+                        }}
+                        className="p-1.5 text-text-muted hover:text-status-fail transition-colors"
+                        aria-label="削除"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-text-muted py-2 px-3 border border-dashed border-bg-tertiary rounded-lg text-center">
+                  オーバーライドなし。「+ 追加」で社員別の設定を追加できます。
+                </p>
+              )}
+            </div>
+
             {/* エージェント一覧 */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-3">
@@ -837,12 +1064,26 @@ export default function SettingsPage(): JSX.Element {
             <div className="text-text-primary font-medium">{config.containerRuntime.toUpperCase()}</div>
           </div>
           {codingAgentSettings && (
-            <div>
-              <div className="text-text-muted">コーディングエージェント</div>
-              <div className="text-text-primary font-medium">
-                {agentInfoList.find((a) => a.name === codingAgentSettings.preferredAgent)?.displayName ?? codingAgentSettings.preferredAgent}
+            <>
+              <div>
+                <div className="text-text-muted">コーディングエージェント</div>
+                <div className="text-text-primary font-medium">
+                  {agentInfoList.find((a) => a.name === codingAgentSettings.preferredAgent)?.displayName ?? codingAgentSettings.preferredAgent}
+                </div>
               </div>
-            </div>
+              {codingAgentSettings.phaseServices && Object.values(codingAgentSettings.phaseServices).some(Boolean) && (
+                <div>
+                  <div className="text-text-muted">フェーズ別設定</div>
+                  <div className="text-text-primary font-medium">有効</div>
+                </div>
+              )}
+              {(codingAgentSettings.agentOverrides ?? []).length > 0 && (
+                <div>
+                  <div className="text-text-muted">社員別オーバーライド</div>
+                  <div className="text-text-primary font-medium">{codingAgentSettings.agentOverrides!.length}件</div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </Card>

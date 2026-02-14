@@ -72,13 +72,13 @@ export function ProposalTab({ proposal }: ProposalTabProps): JSX.Element {
       {/* タスク分解テーブル */}
       <section>
         <h3 className="text-sm font-medium text-text-muted mb-2">
-          タスク分解 ({proposal.taskBreakdown.length}件)
+          タスク分解 ({(proposal.taskBreakdown ?? []).length}件)
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-bg-tertiary text-text-muted text-left">
-                <th className="py-2 px-3">#</th>
+                <th className="py-2 px-3">ID</th>
                 <th className="py-2 px-3">タイトル</th>
                 <th className="py-2 px-3">担当</th>
                 <th className="py-2 px-3">工数</th>
@@ -86,16 +86,16 @@ export function ProposalTab({ proposal }: ProposalTabProps): JSX.Element {
               </tr>
             </thead>
             <tbody>
-              {proposal.taskBreakdown.map((task) => (
-                <tr key={task.taskNumber} className="border-b border-bg-tertiary/50 hover:bg-bg-tertiary/30">
-                  <td className="py-2 px-3 text-text-muted">{task.taskNumber}</td>
+              {(proposal.taskBreakdown ?? []).map((task) => (
+                <tr key={task.id} className="border-b border-bg-tertiary/50 hover:bg-bg-tertiary/30">
+                  <td className="py-2 px-3 text-text-muted font-mono text-xs">{task.id}</td>
                   <td className="py-2 px-3 text-text-primary">{task.title}</td>
                   <td className="py-2 px-3">
                     <Badge variant="running" size="sm">{task.workerType}</Badge>
                   </td>
                   <td className="py-2 px-3 text-text-secondary">{task.estimatedEffort}</td>
                   <td className="py-2 px-3 text-text-muted text-xs">
-                    {task.dependencies.length > 0 ? task.dependencies.join(', ') : '—'}
+                    {(task.dependencies ?? []).length > 0 ? task.dependencies.join(', ') : '—'}
                   </td>
                 </tr>
               ))}
@@ -105,19 +105,22 @@ export function ProposalTab({ proposal }: ProposalTabProps): JSX.Element {
       </section>
 
       {/* ワーカー割り当て */}
-      {proposal.workerAssignments.length > 0 && (
+      {(proposal.workerAssignments ?? []).length > 0 && (
         <section>
           <h3 className="text-sm font-medium text-text-muted mb-2">ワーカー割り当て</h3>
           <div className="flex flex-wrap gap-3">
             {proposal.workerAssignments.map((assignment) => (
               <div
-                key={assignment.workerType}
+                key={`${assignment.workerType}-${assignment.taskId}`}
                 className="p-3 bg-bg-secondary rounded-md border border-bg-tertiary"
               >
                 <div className="text-sm font-medium text-text-primary">{assignment.workerType}</div>
                 <div className="text-xs text-text-muted mt-1">
-                  タスク: {assignment.taskNumbers.join(', ')}
+                  タスク: {assignment.taskId}
                 </div>
+                {assignment.rationale && (
+                  <div className="text-xs text-text-secondary mt-1">{assignment.rationale}</div>
+                )}
               </div>
             ))}
           </div>
@@ -125,13 +128,13 @@ export function ProposalTab({ proposal }: ProposalTabProps): JSX.Element {
       )}
 
       {/* リスク評価 */}
-      {proposal.risks.length > 0 && (
+      {(proposal.riskAssessment ?? []).length > 0 && (
         <section>
           <h3 className="text-sm font-medium text-text-muted mb-2">
-            リスク評価 ({proposal.risks.length}件)
+            リスク評価 ({proposal.riskAssessment.length}件)
           </h3>
           <div className="space-y-2">
-            {proposal.risks.map((risk, idx) => (
+            {proposal.riskAssessment.map((risk, idx) => (
               <div
                 key={idx}
                 className="p-3 bg-bg-secondary rounded-md border border-bg-tertiary flex items-start gap-3"
@@ -150,9 +153,9 @@ export function ProposalTab({ proposal }: ProposalTabProps): JSX.Element {
       )}
 
       {/* 会議録リンク */}
-      {proposal.meetingId && (
+      {(proposal.meetingMinutesIds ?? []).length > 0 && (
         <div className="text-xs text-text-muted">
-          参照会議: <span className="font-mono">{proposal.meetingId}</span>
+          参照会議: <span className="font-mono">{proposal.meetingMinutesIds!.join(', ')}</span>
           {proposal.version && <span className="ml-2">（バージョン {proposal.version}）</span>}
         </div>
       )}

@@ -17,6 +17,7 @@ import type {
   GrandchildTicket,
   TicketStatus,
 } from './types.js';
+import type { RelationshipTracker } from './relationship-tracker.js';
 
 // =============================================================================
 // 型定義
@@ -160,6 +161,9 @@ export class ReviewWorkflow {
   /** マージコールバック */
   private onMerge?: MergeCallback;
 
+  /** 関係性トラッカー（オプション） */
+  private relationshipTracker?: RelationshipTracker;
+
   /**
    * コンストラクタ
    *
@@ -167,6 +171,15 @@ export class ReviewWorkflow {
    */
   constructor(runtimeDir: string = 'runtime') {
     this.runtimeDir = runtimeDir;
+  }
+
+  /**
+   * 関係性トラッカーを設定
+   *
+   * @param tracker - RelationshipTracker インスタンス
+   */
+  setRelationshipTracker(tracker: RelationshipTracker): void {
+    this.relationshipTracker = tracker;
   }
 
   /**
@@ -297,6 +310,20 @@ export class ReviewWorkflow {
       feedback: decision.feedback,
       checklist: decision.checklist,
     });
+
+    // レビュアーとワーカー間のインタラクションを記録
+    try {
+      if (this.relationshipTracker && request.workerId) {
+        await this.relationshipTracker.recordInteraction({
+          agentA: reviewerId,
+          agentB: request.workerId,
+          type: 'review',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (_relationshipError) {
+      // 関係性記録失敗は非ブロッキング
+    }
 
     // 承認時の処理
     if (decision.approved) {

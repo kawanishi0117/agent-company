@@ -425,3 +425,68 @@ Pull Request作成を担当するコンポーネント。
 - [AI実行統合仕様](../specs/ai-execution-integration.md)
 - [Company Workflow Engine仕様](../specs/company-workflow-engine.md)
 - [CLI README](../../tools/cli/README.md)
+
+## サーバー再起動耐性
+
+### 概要
+
+OrchestratorServer再起動後も、ワークフローの状態が完全に復元され、GUIからの操作（承認・会議録閲覧等）が正常に動作する。
+
+### 永続化対象
+
+| データ | 保存先 | 復元タイミング |
+|--------|--------|---------------|
+| ワークフロー状態（全フィールド） | `runtime/state/runs/<wf-id>/workflow.json` | `restoreWorkflows()` |
+| 提案書（Proposal） | `workflow.json` 内 + `proposal.json` | `loadWorkflowState()` |
+| 納品物（Deliverable） | `workflow.json` 内 | `loadWorkflowState()` |
+| 開発進捗（Progress） | `workflow.json` 内 | `loadWorkflowState()` |
+| 品質結果（QualityResults） | `workflow.json` 内 | `loadWorkflowState()` |
+| エスカレーション | `workflow.json` 内 | `loadWorkflowState()` |
+| 承認履歴 | `runtime/state/runs/<wf-id>/approvals.json` | `ApprovalGate.loadApprovals()` |
+| 会議録 | `runtime/state/runs/<wf-id>/meeting-minutes/<id>.json` | `MeetingCoordinator.restoreMeetingsForWorkflow()` |
+| Agent Busメッセージ | `runtime/state/bus/` | `AgentBus.ensureInitialized()` |
+
+### 復元フロー
+
+```
+OrchestratorServer起動
+    ↓
+WorkflowEngine.restoreWorkflows()
+    ↓
+┌─ 各ワークフローに対して:
+│   ├─ loadWorkflowState(): workflow.json → WorkflowState（全フィールド復元）
+│   ├─ MeetingCoordinator.restoreMeetingsForWorkflow(): 会議録をインメモリに復元
+│   │
+│   ├─ status === 'running':
+│   │   └─ executePhase(): 現在のフェーズを再実行
+│   │
+│   ├─ status === 'waiting_approval':
+│   │   ├─ ApprovalGate.loadApprovals(): 承認履歴復元
+│   │   └─ ApprovalGate.restorePendingApproval(): pendingApprovals復元（GUI表示用）
+│   │       ※ pendingResolversは復元しない（submitApprovalDirectlyで代替）
+│   │
+│   └─ status === 'completed' / 'terminated':
+│       └─ 何もしない
+└─
+```
+
+### 承認フォールバック機構
+
+サーバー再起動後、`ApprovalGate.pendingResolvers`（インメモリPromise）は失われる。
+GUIからの承認リクエストは以下のフォールバックで処理される:
+
+1. `OrchestratorServer.handleWorkflowApprove()` が `ApprovalGate.submitDecision()` を呼ぶ
+2. `submitDecision()` は resolver がない場合 `false` を返す（エラーにしない）
+3. `false` の場合、`WorkflowEngine.submitApprovalDirectly()` を呼び出し
+4. `submitApprovalDirectly()` がワークフロー状態を直接更新し、フェーズ遷移を実行
+
+### コンポーネント別の再起動耐性
+
+| コンポーネント | 方式 | 備考 |
+|---------------|------|------|
+| WorkflowEngine | ファイル永続化 + restoreWorkflows() | 全フィールド永続化 |
+| ApprovalGate | ファイル永続化 + restorePendingApproval() | resolverはフォールバックで代替 |
+| MeetingCoordinator | ファイル永続化 + restoreMeetingsForWorkflow() | インメモリマップを復元 |
+| StateManager | 完全ファイルベース | 再起動の影響なし |
+| AgentBus | FileMessageQueue | ensureInitialized()で再初期化 |
+| WorkerPool | インメモリのみ | ワーカーは再作成が必要（想定動作） |

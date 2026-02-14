@@ -26,6 +26,24 @@ interface AgentSetting {
 }
 
 /**
+ * フェーズ別AIサービス設定
+ */
+interface PhaseServiceConfig {
+  proposal?: string;
+  development?: string;
+  quality_assurance?: string;
+}
+
+/**
+ * エージェント（社員）別AIサービスオーバーライド
+ */
+interface AgentServiceOverride {
+  agentId: string;
+  service: string;
+  model?: string;
+}
+
+/**
  * コーディングエージェント設定
  */
 interface CodingAgentSettings {
@@ -35,6 +53,10 @@ interface CodingAgentSettings {
   agentSettings: Record<string, AgentSetting>;
   /** 新規プロジェクト時にGitHubリポジトリを自動作成するか */
   autoCreateGithubRepo: boolean;
+  /** フェーズ別AIサービス設定 */
+  phaseServices?: PhaseServiceConfig;
+  /** エージェント（社員）別AIサービスオーバーライド */
+  agentOverrides?: AgentServiceOverride[];
 }
 
 /**
@@ -108,6 +130,8 @@ const DEFAULT_CODING_AGENT_SETTINGS: CodingAgentSettings = {
     'kiro-cli': { timeout: DEFAULT_TIMEOUT },
   },
   autoCreateGithubRepo: false,
+  phaseServices: {},
+  agentOverrides: [],
 };
 
 // =============================================================================
@@ -229,6 +253,44 @@ function validateSettings(settings: unknown): string[] {
   if (s.autoCreateGithubRepo !== undefined) {
     if (typeof s.autoCreateGithubRepo !== 'boolean') {
       errors.push('autoCreateGithubRepo は真偽値である必要があります');
+    }
+  }
+
+  // phaseServices のバリデーション
+  if (s.phaseServices !== undefined) {
+    if (typeof s.phaseServices !== 'object' || s.phaseServices === null) {
+      errors.push('phaseServices はオブジェクトである必要があります');
+    } else {
+      const ps = s.phaseServices as Record<string, unknown>;
+      const validPhases = ['proposal', 'development', 'quality_assurance'];
+      for (const [phase, service] of Object.entries(ps)) {
+        if (!validPhases.includes(phase)) {
+          errors.push(`不明なフェーズ名: ${phase}`);
+        }
+        if (service !== undefined && service !== null && typeof service === 'string') {
+          if (!VALID_AGENT_NAMES.includes(service)) {
+            errors.push(`フェーズ '${phase}' のサービス '${service}' は無効です`);
+          }
+        }
+      }
+    }
+  }
+
+  // agentOverrides のバリデーション
+  if (s.agentOverrides !== undefined) {
+    if (!Array.isArray(s.agentOverrides)) {
+      errors.push('agentOverrides は配列である必要があります');
+    } else {
+      for (const override of s.agentOverrides as Record<string, unknown>[]) {
+        if (!override.agentId || typeof override.agentId !== 'string') {
+          errors.push('agentOverrides の各要素には agentId（文字列）が必要です');
+        }
+        if (!override.service || typeof override.service !== 'string') {
+          errors.push('agentOverrides の各要素には service（文字列）が必要です');
+        } else if (!VALID_AGENT_NAMES.includes(override.service as string)) {
+          errors.push(`agentOverrides のサービス '${override.service}' は無効です`);
+        }
+      }
     }
   }
 
